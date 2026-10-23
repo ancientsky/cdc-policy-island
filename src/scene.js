@@ -10,6 +10,10 @@ import { t } from "./i18n.js";
 
 const _tangent = new THREE.Vector3();
 const _threatDir = new THREE.Vector3();
+const _lunge = new THREE.Vector3();
+const _crewDir = new THREE.Vector3();
+const _crewFace = new THREE.Vector3();
+const _crewAt = new THREE.Vector3();
 const mixA = new THREE.Color();
 const mixB = new THREE.Color();
 const lookTop = new THREE.Color();
@@ -262,7 +266,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   topGeo.rotateY(Math.PI / 6);
   const shadeGeo = new THREE.CircleGeometry(MESH_R * 1.22, 6);
   shadeGeo.rotateX(-Math.PI / 2);
-  shadeGeo.rotateY(Math.PI / 6);
   const shadeMat = new THREE.MeshBasicMaterial({ color: "#041014", transparent: true, opacity: 0.14, depthWrite: false });
   const box = new THREE.BoxGeometry(1, 1, 1);
   const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
@@ -276,7 +279,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const trunkMat = new THREE.MeshStandardMaterial({ color: "#6b4a32", roughness: 0.9 });
   const glowGeo = new THREE.CircleGeometry(MESH_R * 1.05, 6);
   glowGeo.rotateX(-Math.PI / 2);
-  glowGeo.rotateY(Math.PI / 6);
+  // Outer rim stays short of the next island's coast. Centers are √3 * HEX_SIZE apart.
+  const ringGeo = new THREE.RingGeometry(MESH_R * 0.985, MESH_R * 1.058, 6);
 
   const raw = data.islands.map((island) => ({ island, ...offsetToWorld(island.col, island.row) }));
   const mainland = raw.filter((p) => p.island.id !== "amr");
@@ -465,12 +469,17 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     group.add(glow);
 
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(MESH_R * 1.04, MESH_R * 1.12, 6),
-      new THREE.MeshBasicMaterial({ color: island.accent, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }),
+      ringGeo,
+      new THREE.MeshBasicMaterial({
+        color: island.accent,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.96,
+        depthWrite: false,
+      }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.rotation.z = Math.PI / 6;
-    ring.position.y = 0.58;
+    ring.position.y = 0.5;
     ring.visible = false;
     group.add(ring);
 
@@ -516,6 +525,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       landMat,
       skirtMat,
       glow,
+      shade,
       ring,
       pinEl,
       buildings,
@@ -581,6 +591,18 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const packMat = new THREE.MeshStandardMaterial({ color: "#f3efe4", roughness: 0.8 });
   const crateMat = new THREE.MeshStandardMaterial({ color: "#e39a3a", roughness: 0.7 });
   const skinMats = ["#f0c7a4", "#d9a57a", "#c48a6a", "#8d5a3c"].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.68 }));
+  const vaxMat = new THREE.MeshStandardMaterial({ color: "#ef8a3a", roughness: 0.42, emissive: "#c45518", emissiveIntensity: 0.45 });
+  const drugMat = new THREE.MeshStandardMaterial({ color: "#f4f7fb", roughness: 0.32, emissive: "#d7dde8", emissiveIntensity: 0.2 });
+  const pillMat = new THREE.MeshStandardMaterial({ color: "#f7f1e4", roughness: 0.4, emissive: "#e7d2b0", emissiveIntensity: 0.15 });
+  const pillBand = new THREE.MeshStandardMaterial({ color: "#d4544a", roughness: 0.45, emissive: "#a02018", emissiveIntensity: 0.3 });
+  const supplyMat = new THREE.MeshStandardMaterial({ color: "#14a39a", roughness: 0.4, emissive: "#0c6e68", emissiveIntensity: 0.35 });
+  const policyMat = new THREE.MeshStandardMaterial({ color: "#e2b43a", roughness: 0.32, metalness: 0.28, emissive: "#a07818", emissiveIntensity: 0.45 });
+  const steelMat = new THREE.MeshStandardMaterial({ color: "#e7eef2", roughness: 0.22, metalness: 0.65, emissive: "#b7c4cc", emissiveIntensity: 0.15 });
+  const pillGeo = new THREE.CapsuleGeometry(0.03, 0.07, 2, 8);
+  const shieldGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.028, 6);
+  const burstGeo = new THREE.SphereGeometry(0.32, 12, 10);
+  const TOOL_KEY = { vax: "toolVax", drug: "toolDrug", supply: "toolSupply", policy: "toolPolicy" };
+  const BURST = { vax: "#e07a2f", drug: "#f7f4ea", supply: "#3ecfc4", policy: "#e2b43a" };
 
   const walkers = flowViews.map((route, index) => {
     const mesh = new THREE.Group();
@@ -631,6 +653,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let elapsed = 0;
   const shoreLamps = [];
   const threats = [];
+  const crews = [];
+  const crewMarks = [];
   let shoreLabel = null;
   const allyMarks = [];
 
@@ -643,6 +667,279 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     threat.mesh.updateWorldMatrix(true, true);
   }
 
+  // Visual only. poseThreat stays a lerp, so the distance self-test still samples u.
+  function applyLunge(threat) {
+    threat.mesh.scale.setScalar(threat.scale0);
+    if (threat.dir <= 0 || threat.u <= 0.48) return;
+    _lunge.subVectors(threat.halt, threat.home);
+    _lunge.y = 0;
+    const span = _lunge.length();
+    if (span < 1e-4) return;
+    const view = views.get(threat.islandId);
+    const dist = Math.hypot(threat.mesh.position.x - view.base.x, threat.mesh.position.z - view.base.z);
+    const room = dist - 2.15;
+    if (room <= 0.02) return;
+    let along = Math.sin(((threat.u - 0.48) / 0.24) * Math.PI) * Math.min(0.7, span * 0.5);
+    if (along > room) along = room;
+    _lunge.multiplyScalar(along / span);
+    threat.mesh.position.add(_lunge);
+    threat.mesh.scale.setScalar(threat.scale0 * (1 + along * 0.15));
+  }
+
+  function makeProp(kind) {
+    const g = new THREE.Group();
+    if (kind === "vax") {
+      const barrel = new THREE.Mesh(unitCyl, vaxMat);
+      barrel.rotation.x = -Math.PI / 2;
+      barrel.scale.set(0.09, 0.26, 0.09);
+      barrel.position.z = -0.04;
+      const plunger = new THREE.Mesh(unitCyl, packMat);
+      plunger.rotation.x = -Math.PI / 2;
+      plunger.scale.set(0.045, 0.08, 0.045);
+      plunger.position.z = 0.12;
+      const needle = new THREE.Mesh(unitCyl, steelMat);
+      needle.rotation.x = -Math.PI / 2;
+      needle.scale.set(0.014, 0.1, 0.014);
+      needle.position.z = -0.2;
+      g.add(barrel, plunger, needle);
+    } else if (kind === "drug") {
+      const bottle = new THREE.Mesh(unitCyl, drugMat);
+      bottle.scale.set(0.11, 0.22, 0.11);
+      const cap = new THREE.Mesh(unitCyl, supplyMat);
+      cap.scale.set(0.07, 0.05, 0.07);
+      cap.position.y = 0.13;
+      const pill = new THREE.Mesh(pillGeo, pillMat);
+      pill.rotation.z = Math.PI / 2;
+      pill.position.set(0.12, 0.02, 0);
+      const band = new THREE.Mesh(unitCyl, pillBand);
+      band.rotation.z = Math.PI / 2;
+      band.scale.set(0.034, 0.028, 0.034);
+      band.position.copy(pill.position);
+      g.add(bottle, cap, pill, band);
+    } else if (kind === "supply") {
+      const can = new THREE.Mesh(unitCyl, supplyMat);
+      can.scale.set(0.11, 0.24, 0.11);
+      const nozzle = new THREE.Mesh(unitCone, packMat);
+      nozzle.rotation.x = -Math.PI / 2;
+      nozzle.scale.set(0.05, 0.1, 0.05);
+      nozzle.position.set(0, 0.06, -0.16);
+      g.add(can, nozzle);
+    } else {
+      const shield = new THREE.Mesh(shieldGeo, policyMat);
+      shield.rotation.x = -Math.PI / 2;
+      g.add(shield);
+    }
+    return g;
+  }
+
+  function poseCrew(crew, from, to, alpha) {
+    crew.mesh.position.lerpVectors(from, to, alpha);
+    crew.mesh.position.y = from.y + Math.abs(Math.sin(elapsed * 11 + crew.spread * 5)) * 0.035;
+    _crewDir.subVectors(to, from);
+    _crewDir.y = 0;
+    if (_crewDir.lengthSq() > 1e-8) crew.mesh.rotation.y = Math.atan2(-_crewDir.x, -_crewDir.z);
+    crew.mesh.updateWorldMatrix(true, true);
+  }
+
+  function faceThreat(crew) {
+    crew.mesh.getWorldPosition(_crewAt);
+    _crewFace.subVectors(crew.threat.mesh.position, _crewAt);
+    _crewFace.y = 0;
+    if (_crewFace.lengthSq() > 1e-8) crew.mesh.rotation.y = Math.atan2(-_crewFace.x, -_crewFace.z);
+    crew.mesh.updateWorldMatrix(true, true);
+  }
+
+  function repel(crew) {
+    const threat = crew.threat;
+    crew.burst.position.copy(threat.mesh.position);
+    threat.dir = -1;
+    threat.u = Math.max(threat.floor, threat.u - 0.16);
+    poseThreat(threat);
+    applyLunge(threat);
+    crew.shot.visible = false;
+    crew.held.visible = true;
+    crew.burst.visible = true;
+    crew.burst.scale.setScalar(0.45);
+    crew.burstMat.opacity = 0.82;
+    crew.burstT = 0;
+  }
+
+  function stepCrew(crew, step) {
+    const threat = crew.threat;
+    if (crew.burstT >= 0) {
+      crew.burstT += step;
+      const k = crew.burstT / 0.45;
+      if (k >= 1) {
+        crew.burst.visible = false;
+        crew.burstT = -1;
+      } else {
+        crew.burst.visible = true;
+        crew.burst.scale.setScalar(0.45 + k * 1.6);
+        crew.burstMat.opacity = (1 - k) * 0.82;
+      }
+    }
+    if (crew.phase === "wait") {
+      crew.mesh.visible = false;
+      crew.labelAnchor.visible = false;
+      if (elapsed > 0.7 && threat.dir > 0 && threat.u > 0.58) {
+        crew.phase = "run";
+        crew.t = 0;
+        crew.mesh.visible = true;
+        crew.labelAnchor.visible = true;
+        crew.held.visible = true;
+      }
+      return;
+    }
+    crew.mesh.visible = true;
+    crew.labelAnchor.visible = true;
+    crew.t += step;
+    if (crew.phase === "run") {
+      const alpha = Math.min(1, crew.t / 0.62);
+      poseCrew(crew, crew.home, crew.post, alpha);
+      if (crew.t >= 0.62) {
+        crew.phase = "aim";
+        crew.t = 0;
+      }
+      return;
+    }
+    if (crew.phase === "aim") {
+      crew.mesh.position.copy(crew.post);
+      faceThreat(crew);
+      if (crew.t >= 0.16) {
+        crew.phase = "throw";
+        crew.t = 0;
+        crew.hand.getWorldPosition(crew.shotFrom);
+        _crewFace.subVectors(threat.mesh.position, crew.shotFrom);
+        _crewFace.y = 0;
+        if (_crewFace.lengthSq() > 1e-8) crew.shot.rotation.y = Math.atan2(-_crewFace.x, -_crewFace.z);
+        crew.held.visible = false;
+        crew.shot.position.copy(crew.shotFrom);
+        crew.shot.visible = true;
+      }
+      return;
+    }
+    if (crew.phase === "throw") {
+      faceThreat(crew);
+      const alpha = Math.min(1, crew.t / 0.4);
+      crew.shot.position.lerpVectors(crew.shotFrom, threat.mesh.position, alpha);
+      crew.shot.position.y += Math.sin(alpha * Math.PI) * 0.9;
+      if (crew.t >= 0.4) {
+        crew.phase = "back";
+        crew.t = 0;
+        repel(crew);
+      }
+      return;
+    }
+    if (crew.phase === "back") {
+      const alpha = Math.min(1, crew.t / 0.7);
+      poseCrew(crew, crew.post, crew.home, alpha);
+      if (crew.t >= 0.7) {
+        crew.phase = "wait";
+        crew.t = 0;
+        crew.mesh.visible = false;
+        crew.labelAnchor.visible = false;
+        crew.mesh.position.copy(crew.home);
+        crew.shot.visible = false;
+      }
+    }
+  }
+
+  function makeCrew(threat, view, spread) {
+    _crewDir.subVectors(threat.halt, view.base);
+    _crewDir.y = 0;
+    _crewDir.normalize();
+    const sideX = -_crewDir.z;
+    const sideZ = _crewDir.x;
+    const home = new THREE.Vector3(
+      _crewDir.x * 0.42 + sideX * spread * 0.45,
+      0.62,
+      _crewDir.z * 0.42 + sideZ * spread * 0.45,
+    );
+    const post = new THREE.Vector3(
+      _crewDir.x * 1.28 + sideX * spread,
+      0.62,
+      _crewDir.z * 1.28 + sideZ * spread,
+    );
+    const mesh = new THREE.Group();
+    mesh.scale.setScalar(2);
+    mesh.visible = false;
+    mesh.userData = { kind: "crew" };
+    const skin = skinMats[crews.length % skinMats.length];
+    const body = new THREE.Mesh(meepleGeo.body, vestMat);
+    body.position.y = 0.2;
+    body.castShadow = true;
+    const head = new THREE.Mesh(meepleGeo.head, skin);
+    head.position.y = 0.44;
+    head.name = "head";
+    const nose = new THREE.Mesh(meepleGeo.nose, skin);
+    nose.position.set(0, 0.43, -0.085);
+    nose.name = "nose";
+    const hand = new THREE.Object3D();
+    hand.position.set(0.1, 0.34, -0.04);
+    const held = makeProp(threat.tool);
+    hand.add(held);
+    const labelEl = document.createElement("div");
+    labelEl.className = "crew-label";
+    labelEl.textContent = t(TOOL_KEY[threat.tool]);
+    const label = new CSS2DObject(labelEl);
+    const labelAnchor = new THREE.Object3D();
+    labelAnchor.position.set(_crewDir.x * 1.9 + sideX * spread, 1.15, _crewDir.z * 1.9 + sideZ * spread);
+    labelAnchor.add(label);
+    labelAnchor.visible = false;
+    mesh.add(body, head, nose, hand);
+    mesh.position.copy(home);
+    view.group.add(mesh, labelAnchor);
+    const shot = makeProp(threat.tool);
+    shot.scale.setScalar(2);
+    shot.visible = false;
+    scene.add(shot);
+    const burstMat = new THREE.MeshBasicMaterial({
+      color: BURST[threat.tool],
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const burst = new THREE.Mesh(burstGeo, burstMat);
+    burst.visible = false;
+    scene.add(burst);
+    crewMarks.push({ el: labelEl, key: TOOL_KEY[threat.tool] });
+    return {
+      mesh,
+      nose,
+      head,
+      hand,
+      held,
+      labelAnchor,
+      home,
+      post,
+      spread,
+      threat,
+      phase: "wait",
+      t: 0,
+      shot,
+      shotFrom: new THREE.Vector3(),
+      burst,
+      burstMat,
+      burstT: -1,
+    };
+  }
+
+  function placeCrews() {
+    const groups = new Map();
+    for (const threat of threats) {
+      const list = groups.get(threat.islandId) ?? [];
+      list.push(threat);
+      groups.set(threat.islandId, list);
+    }
+    for (const [islandId, list] of groups) {
+      const view = views.get(islandId);
+      list.forEach((threat, index) => {
+        const spread = (index - (list.length - 1) / 2) * 0.42;
+        crews.push(makeCrew(threat, view, spread));
+      });
+    }
+  }
+
   function markFront(group, mat) {
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), mat);
     head.name = "head";
@@ -653,7 +950,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     return { head, nose };
   }
 
-  function addThreat(mesh, head, nose, home, halt, rate, scale = 2.3) {
+  function addThreat(mesh, head, nose, home, halt, rate, scale, tool, islandId) {
     mesh.userData = { kind: "threat" };
     mesh.scale.setScalar(scale);
     scene.add(mesh);
@@ -663,13 +960,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       nose,
       home,
       halt,
-      u: 0.4 + (threats.length % 5) * 0.04,
+      u: 0.46 + (threats.length % 5) * 0.03,
       floor: 0.28,
       limit: 0.7,
       dir: 1,
       rate,
       phase: threats.length * 0.9,
       hover: 0.78,
+      scale0: scale,
+      tool,
+      islandId,
     };
     threats.push(threat);
     poseThreat(threat);
@@ -846,23 +1146,23 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     };
     const virusA = makeVirus("#c43858");
     const raidA = park(amr, -3.04, 7.4, 3.1);
-    addThreat(virusA.group, virusA.head, virusA.nose, raidA.home, raidA.halt, 0.04, 2.15);
+    addThreat(virusA.group, virusA.head, virusA.nose, raidA.home, raidA.halt, 0.04, 2.15, "vax", "amr");
     const virusB = makeVirus("#9a3478");
     const raidB = park(border, 3.93, -1.56, 3.0);
-    addThreat(virusB.group, virusB.head, virusB.nose, raidB.home, raidB.halt, 0.038, 2);
+    addThreat(virusB.group, virusB.head, virusB.nose, raidB.home, raidB.halt, 0.038, 2, "vax", "border");
     const mosquitoA = makeMosquito();
     const raidM = park(dengue, -2.77, 1.91, 2.95);
-    addThreat(mosquitoA.group, mosquitoA.head, mosquitoA.nose, raidM.home, raidM.halt, 0.046, 2.2);
+    addThreat(mosquitoA.group, mosquitoA.head, mosquitoA.nose, raidM.home, raidM.halt, 0.046, 2.2, "supply", "dengue");
     const mosquitoB = makeMosquito();
     const raidN = park(hepa, 1.2, -2.8, 2.75);
-    addThreat(mosquitoB.group, mosquitoB.head, mosquitoB.nose, raidN.home, raidN.halt, 0.04, 2);
+    addThreat(mosquitoB.group, mosquitoB.head, mosquitoB.nose, raidN.home, raidN.halt, 0.04, 2, "supply", "hepa");
     const rod = makeRod();
     const raidR = park(globalI, 2.2, -2.79, 3.0);
-    addThreat(rod.group, rod.head, rod.nose, raidR.home, raidR.halt, 0.034, 2);
+    addThreat(rod.group, rod.head, rod.nose, raidR.home, raidR.halt, 0.034, 2, "drug", "global");
     for (const [hx, hz] of [[-3.84, 7.7], [-2.94, 7.5], [-2.09, 7.9]]) {
       const wedge = makeWedge();
       const raid = park(amr, hx, hz, 3.15);
-      addThreat(wedge.group, wedge.head, wedge.nose, raid.home, raid.halt, 0.05, 1.55);
+      addThreat(wedge.group, wedge.head, wedge.nose, raid.home, raid.halt, 0.05, 1.55, "policy", "amr");
     }
 
     const vax = views.get("vax").base;
@@ -948,6 +1248,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       sun.position.set(0.05, 0.78, -0.05);
       g.add(hut, roofP, trunk, frond, sun);
     });
+    placeCrews();
   }
 
   let pickCb = () => {};
@@ -1160,7 +1461,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           threat.dir = 1;
         }
         poseThreat(threat);
+        applyLunge(threat);
       }
+      for (const crew of crews) stepCrew(crew, step);
     }
     const phiGoal = bird ? 0.58 : userPhi;
     const k = 1 - Math.exp(-step * (reduced ? 28 : 3.4));
@@ -1308,6 +1611,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
       if (shoreLabel) shoreLabel.textContent = t("shore");
       for (const mark of allyMarks) mark.el.textContent = t(mark.key);
+      for (const mark of crewMarks) mark.el.textContent = t(mark.key);
       refresh();
     },
     setPhase(value) { phase = value; refresh(); },
@@ -1402,6 +1706,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (!threat) errors.push("no threat to face");
       else {
         const savedU = threat.u;
+        const savedDir = threat.dir;
         threat.u = 0.2;
         poseThreat(threat);
         const from = threat.mesh.position.clone();
@@ -1424,7 +1729,104 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         for (const view of views.values()) nearest = Math.min(nearest, threat.mesh.position.distanceTo(view.base));
         if (nearest < 1.9) errors.push(`threat landed on an island (${nearest.toFixed(2)})`);
         threat.u = savedU;
+        threat.dir = savedDir;
         poseThreat(threat);
+        threat.mesh.scale.setScalar(threat.scale0);
+      }
+
+      const crew = crews[0];
+      if (!crew) errors.push("no crew to face");
+      else {
+        const savedCrew = {
+          phase: crew.phase,
+          t: crew.t,
+          visible: crew.mesh.visible,
+          held: crew.held.visible,
+          shot: crew.shot.visible,
+          pos: crew.mesh.position.clone(),
+          rot: crew.mesh.rotation.y,
+        };
+        poseCrew(crew, crew.home, crew.post, 0.12);
+        const w0 = new THREE.Vector3();
+        crew.mesh.getWorldPosition(w0);
+        poseCrew(crew, crew.home, crew.post, 0.7);
+        const w1 = new THREE.Vector3();
+        crew.mesh.getWorldPosition(w1);
+        const move = w1.sub(w0);
+        move.y = 0;
+        if (move.length() < 0.02) errors.push("crew did not run toward the threat");
+        else {
+          const nose = new THREE.Vector3();
+          const head = new THREE.Vector3();
+          crew.nose.getWorldPosition(nose);
+          crew.head.getWorldPosition(head);
+          const front = nose.sub(head);
+          front.y = 0;
+          const cos = front.normalize().dot(move.normalize());
+          if (cos < 0.9) errors.push(`crew faces away from travel (cos ${cos.toFixed(2)})`);
+        }
+        crew.phase = savedCrew.phase;
+        crew.t = savedCrew.t;
+        crew.mesh.visible = savedCrew.visible;
+        crew.held.visible = savedCrew.held;
+        crew.shot.visible = savedCrew.shot;
+        crew.mesh.position.copy(savedCrew.pos);
+        crew.mesh.rotation.y = savedCrew.rot;
+      }
+
+      for (const member of crews) {
+        const parent = member.mesh.parent;
+        const px = parent.position.x + member.post.x;
+        const pz = parent.position.z + member.post.z;
+        const ownD = Math.hypot(member.post.x, member.post.z);
+        if (ownD < 0.9 || ownD > MESH_R * 0.98) errors.push(`crew post left its beach (${ownD.toFixed(2)})`);
+        for (const view of views.values()) {
+          if (view.group === parent) continue;
+          const d = Math.hypot(px - view.base.x, pz - view.base.z);
+          if (d < MESH_R * 1.05) errors.push(`crew stands on ${view.island.id}`);
+        }
+      }
+
+      function rimAngles(mesh, minR) {
+        mesh.updateWorldMatrix(true, false);
+        const origin = new THREE.Vector3();
+        mesh.getWorldPosition(origin);
+        const attr = mesh.geometry.attributes.position;
+        const v = new THREE.Vector3();
+        const angles = [];
+        for (let i = 0; i < attr.count; i += 1) {
+          v.fromBufferAttribute(attr, i).applyMatrix4(mesh.matrixWorld);
+          const dx = v.x - origin.x;
+          const dz = v.z - origin.z;
+          if (Math.hypot(dx, dz) < minR) continue;
+          const a = Math.atan2(dz, dx);
+          if (!angles.some((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 0.02)) angles.push(a);
+        }
+        angles.sort((p, q) => p - q);
+        return angles;
+      }
+      const sample = views.get("amr");
+      const coastA = rimAngles(sample.coast, MESH_R * 0.97);
+      const ringA = rimAngles(sample.ring, MESH_R * 1.02);
+      const shadeA = rimAngles(sample.shade, MESH_R * 1.05);
+      if (coastA.length !== 6 || ringA.length !== 6) errors.push(`hex rim count coast ${coastA.length} ring ${ringA.length}`);
+      else {
+        for (const a of coastA) {
+          let best = Infinity;
+          for (const b of ringA) {
+            const d = Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+            if (d < best) best = d;
+          }
+          if (best > 0.05) errors.push(`selection hex is rotated ${(best * 180 / Math.PI).toFixed(1)}° off the island`);
+        }
+        for (const a of coastA) {
+          let best = Infinity;
+          for (const b of shadeA) {
+            const d = Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+            if (d < best) best = d;
+          }
+          if (best > 0.05) errors.push(`shade hex is rotated ${(best * 180 / Math.PI).toFixed(1)}° off the island`);
+        }
       }
       return errors;
     },

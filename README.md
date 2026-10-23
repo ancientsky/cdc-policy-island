@@ -4,7 +4,7 @@
 
 線上版：<https://ancientsky.github.io/cdc-policy-island/>
 
-本島依疾病管制署公開計畫與常設業務整理，用來看出政策之間怎麼相連。這不是疾病管制署官方網站。衛生福利部施政計畫和年度計畫評核是管考，沒有另做成一座島。海面上的病原和對岸的陰影是這張圖自己的警示，不是署的說法。旁邊的美國、日本、歐洲、菲律賓小島是友誼記號，不是邦交名單。
+本島依疾病管制署公開計畫與常設業務整理，用來看出政策之間怎麼相連。這不是疾病管制署官方網站。衛生福利部施政計畫和年度計畫評核是管考，沒有另做成一座島。海面上的病原和對岸的陰影是這張圖自己的警示，不是署的說法。旁邊的美國、日本、歐洲、菲律賓小島是友誼記號，不是邦交名單。防疫人員用疫苗、藥品、物資和政策把病原擋在海上，是這張圖的比喻。
 
 內容以疾管署 [重大政策](https://www.cdc.gov.tw/Category/MPage/kVzFWokFW3l9_YeB8idzuw) 為準，中文是原文。英文和日文是對照說明，不是官方譯名。
 
@@ -15,6 +15,7 @@
 - 下方的一天表示這個鐘點誰在值班。晨、午、晚、夜跟時鐘走，不是另一套皮膚。
 - 語言是「中 / EN / 日」。階段可以只看本期、近期、中程或長期。主軸可複選：監測預警、邊境阻絕、免疫防護、防治網絡、整備韌性。
 - 拖曳旋轉，滾輪拉近。手機上同一套操作。
+- 海面上的病原會靠近。島上的人拿疫苗、藥品、物資或政策把他們擋回去。這是比喻，不是署的作業流程。
 
 ## 十四座島
 
@@ -61,4 +62,4 @@ npm run preview
 
 An interactive map of public Taiwan CDC programs, arranged as fourteen hexes in the outline of Taiwan. Buildings are pieces of work. Arcs are handoffs. This is not an official Taiwan CDC website. Chinese text is the source. English and Japanese are descriptive translations, not official titles.
 
-The pathogens offshore and the far shore are this picture’s own warning. They are not a statement by Taiwan CDC. The nearby islets for the United States, Japan, Europe, and the Philippines are marks of friendship, not a diplomatic list.
+The pathogens offshore and the far shore are this picture’s own warning. They are not a statement by Taiwan CDC. The nearby islets for the United States, Japan, Europe, and the Philippines are marks of friendship, not a diplomatic list. Staff holding pathogens off with vaccines, medicines, supplies, and policy is this picture’s metaphor.
