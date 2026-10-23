@@ -526,6 +526,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
 }
 .pin.named em { display: block; }
 .pin.dim { opacity: 0.38; }
+.pin.occluded { opacity: 0.25; }
 .pin.crowded { opacity: 0; }
 .pin.hot b { background: var(--c, var(--teal)); color: #fff; }
 .handoff-pop {

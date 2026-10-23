@@ -11,7 +11,6 @@ document.head.appendChild(preloadFont);
 import { flows, islands, validate } from "./data.js";
 import { assertHexFrame } from "./hex.js";
 import { applyLocale, savedLang, t } from "./i18n.js";
-import { createScene } from "./scene.js";
 import { mount } from "./ui.js";
 
 assertHexFrame();
@@ -50,39 +49,117 @@ function fallbackScene() {
   };
 }
 
-let scene;
-try {
-  scene = createScene(canvas, { islands, flows }, { reduced });
-} catch (error) {
-  console.error(error);
-  document.body.classList.add("no-webgl");
-  scene = fallbackScene();
-  veil.remove();
-  const note = document.querySelector("#hero-lead");
-  if (note) note.textContent = t("fallback");
-}
+// The list mounts before the 3D chunk arrives. Setters queue until createScene
+// resolves; tick and readouts stay live on the fallback so the clock still moves.
+let impl = fallbackScene();
+let ready = false;
+const queued = [];
+let pick = () => {};
+let arrive = () => {};
+const passthrough = new Set(["tick", "resize", "isBird", "getTheta", "selfTest", "debugState"]);
+const scene = new Proxy({}, {
+  get(_target, key) {
+    if (key === "onPick") {
+      return (fn) => {
+        pick = fn;
+        impl.onPick(fn);
+      };
+    }
+    if (key === "onArrive") {
+      return (fn) => {
+        arrive = fn;
+        impl.onArrive(fn);
+      };
+    }
+    return (...args) => {
+      if (!ready && !passthrough.has(key)) {
+        const index = queued.findIndex((item) => item[0] === key);
+        if (index >= 0) queued.splice(index, 1);
+        queued.push([key, args]);
+        return undefined;
+      }
+      const fn = impl[key];
+      return typeof fn === "function" ? fn.apply(impl, args) : fn;
+    };
+  },
+});
 
 const ui = mount({ scene, islands, flows });
 window.addEventListener("resize", () => scene.resize());
 
 let last = performance.now();
+let onScreen = true;
+let looping = false;
+
 function loop(now) {
+  if (!onScreen) {
+    looping = false;
+    return;
+  }
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   ui.tick(dt);
   scene.tick(dt);
+  if (!onScreen) {
+    looping = false;
+    return;
+  }
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
-if (!document.body.classList.contains("no-webgl")) {
-  setTimeout(() => veil?.remove(), reduced ? 0 : 900);
+function startLoop() {
+  if (looping || !onScreen) return;
+  looping = true;
+  last = performance.now();
+  requestAnimationFrame(loop);
 }
-requestAnimationFrame(() => scene.resize());
-setTimeout(() => {
+
+const screenWatch = new IntersectionObserver((entries) => {
+  onScreen = entries.some((entry) => entry.isIntersecting);
+  if (onScreen) startLoop();
+});
+screenWatch.observe(canvas);
+startLoop();
+
+function writeDiag() {
   const errors = scene.selfTest();
   const info = scene.debugState();
   const diag = document.querySelector("#diag");
-  diag.textContent = `${errors.length ? errors.join("\n") : "PASS"}\nflows=${info.flows} lit=${info.lit.join(",")}`;
+  if (!diag) return;
+  diag.textContent = `${errors.length ? errors.join("\n") : "PASS"}\nflows=${info.flows} lit=${(info.lit ?? []).join(",")}`;
   if (errors.length) diag.hidden = false;
-}, 1800);
+}
+
+function failWebgl(error) {
+  console.error(error);
+  document.body.classList.add("no-webgl");
+  impl = fallbackScene();
+  impl.onPick(pick);
+  impl.onArrive(arrive);
+  ready = true;
+  for (const [name, args] of queued.splice(0)) {
+    const fn = impl[name];
+    if (typeof fn === "function") fn.apply(impl, args);
+  }
+  veil?.remove();
+  const note = document.querySelector("#hero-lead");
+  if (note) note.textContent = t("fallback");
+  writeDiag();
+}
+
+async function bootScene() {
+  try {
+    const { createScene } = await import("./scene.js");
+    impl = createScene(canvas, { islands, flows }, { reduced });
+    impl.onPick(pick);
+    impl.onArrive(arrive);
+    for (const [name, args] of queued.splice(0)) impl[name](...args);
+    ready = true;
+    impl.resize();
+    setTimeout(() => veil?.remove(), reduced ? 0 : 900);
+    setTimeout(writeDiag, 1800);
+  } catch (error) {
+    failWebgl(error);
+  }
+}
+bootScene();

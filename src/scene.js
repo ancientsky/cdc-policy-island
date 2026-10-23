@@ -4,6 +4,7 @@ import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer
 import { MESH_R, offsetToWorld } from "./hex.js";
 import { hourCovers } from "./data.js";
 import { t } from "./i18n.js";
+import { createKit } from "./kit.js";
 
 // Meeple front is local -z: the nose sits at z < 0, the pack sits at z > 0.
 // rotation.y = atan2(-dir.x, -dir.z) turns that -z axis onto dir.
@@ -14,6 +15,10 @@ const _threatDir = new THREE.Vector3();
 const _crewDir = new THREE.Vector3();
 const _crewFace = new THREE.Vector3();
 const _crewAt = new THREE.Vector3();
+const _pinWorld = new THREE.Vector3();
+const _pinDir = new THREE.Vector3();
+const _blobAt = new THREE.Vector3();
+const _proj = new THREE.Vector3();
 const mixA = new THREE.Color();
 const mixB = new THREE.Color();
 const lookTop = new THREE.Color();
@@ -84,12 +89,16 @@ function lookAtHour(hour) {
 
 export function createScene(canvas, data, { reduced = false } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const narrowScreen = () => (canvas.clientWidth || window.innerWidth || 1200) < 980;
+  let pixelCap = Math.min(window.devicePixelRatio || 1, narrowScreen() ? 1.5 : 2);
+  renderer.setPixelRatio(pixelCap);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#f7e6cf");
@@ -152,7 +161,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const sun = new THREE.DirectionalLight(0xfff3df, 1.35);
   sun.position.set(16, 22, 10);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(narrowScreen() ? 1024 : 2048, narrowScreen() ? 1024 : 2048);
   sun.shadow.camera.near = 2;
   sun.shadow.camera.far = 70;
   sun.shadow.camera.left = -20;
@@ -235,13 +244,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   scene.add(water);
 
   const sandMat = new THREE.MeshBasicMaterial({ color: "#e9d6a8", transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
+  const sandGeo = new THREE.CircleGeometry(0.6, 6);
+  sandGeo.rotateX(-Math.PI / 2);
+  const sand = new THREE.InstancedMesh(sandGeo, sandMat, 3);
+  sand.castShadow = false;
+  sand.receiveShadow = false;
+  const sandDummy = new THREE.Object3D();
   for (let i = 0; i < 3; i += 1) {
     const ang = (i / 3) * Math.PI * 2 + 0.5;
-    const sand = new THREE.Mesh(new THREE.CircleGeometry(0.6, 6), sandMat);
-    sand.rotation.x = -Math.PI / 2;
-    sand.position.set(Math.cos(ang) * 16.5, 0.015, Math.sin(ang) * 16.5);
-    scene.add(sand);
+    sandDummy.position.set(Math.cos(ang) * 16.5, 0.015, Math.sin(ang) * 16.5);
+    sandDummy.updateMatrix();
+    sand.setMatrixAt(i, sandDummy.matrix);
   }
+  sand.instanceMatrix.needsUpdate = true;
+  scene.add(sand);
 
   const starPositions = [];
   for (let i = 0; i < 90; i += 1) {
@@ -273,7 +289,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   roofGeo.rotateY(Math.PI / 4);
   const trunkGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.16, 5);
   const crownGeo = new THREE.ConeGeometry(0.16, 0.34, 6);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: "#6b4a32", roughness: 0.9 });
   const glowGeo = new THREE.CircleGeometry(MESH_R * 1.05, 6);
   glowGeo.rotateX(-Math.PI / 2);
   // Outer rim stays short of the next island's coast. Centers are √3 * HEX_SIZE apart.
@@ -287,6 +302,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const pickables = [];
   const views = new Map();
   const lamps = [];
+  const kit = createKit();
+  kit.geo("box", box);
+  kit.geo("cyl", unitCyl);
+  kit.geo("cone", unitCone);
+  kit.geo("roof", roofGeo);
+  kit.geo("sphere", unitSphere);
+  kit.geo("torus", unitTorus);
+  kit.geo("trunk", trunkGeo);
+  kit.geo("crown", crownGeo);
+  kit.geo("crown2", crownGeo);
+  const hitGeo = new THREE.CylinderGeometry(MESH_R, MESH_R, 1.2, 6);
+  hitGeo.rotateY(Math.PI / 6);
+  const hitMat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+  const hitboxes = [];
 
   function tag(mesh, islandId, cast = true) {
     mesh.userData = { kind: "island", islandId };
@@ -297,136 +326,128 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function tree(parent, x, z, leaf) {
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.set(x, 0.62, z);
-    const leafMat = new THREE.MeshStandardMaterial({ color: leaf, roughness: 0.82 });
-    const crown = new THREE.Mesh(crownGeo, leafMat);
-    crown.position.set(x, 0.86, z);
-    const crown2 = new THREE.Mesh(crownGeo, leafMat);
-    crown2.position.set(x + 0.05, 0.98, z - 0.04);
-    crown2.scale.setScalar(0.72);
-    parent.add(trunk, crown, crown2);
-    tag(trunk, parent.userData.islandId, false);
-    tag(crown, parent.userData.islandId);
-    tag(crown2, parent.userData.islandId);
+    const alive = () => parent.userData.lit !== false;
+    kit.part({ kind: "trunk", parent, x, y: 0.62, z, color: "#6b4a32", alive, glow: false });
+    kit.part({ kind: "crown", parent, x, y: 0.86, z, color: leaf, alive });
+    kit.part({ kind: "crown2", parent, x: x + 0.05, y: 0.98, z: z - 0.04, sx: 0.72, sy: 0.72, sz: 0.72, color: leaf, alive });
   }
 
   function house(parent, item, x, z, index, island) {
     const group = new THREE.Group();
     group.position.set(x, 0.55, z);
-    const ud = { kind: "item", islandId: island.id, itemId: item.id };
-    const winMat = new THREE.MeshStandardMaterial({
-      color: "#fff6d8",
-      emissive: "#ffb15a",
-      emissiveIntensity: 0.2,
-      roughness: 0.28,
-    });
-    const wall = new THREE.MeshStandardMaterial({ color: "#f7f1e4", roughness: 0.82 });
-    const roof = new THREE.MeshStandardMaterial({ color: island.accent, roughness: 0.48 });
-    const wood = new THREE.MeshStandardMaterial({ color: "#8d5a3c", roughness: 0.86 });
-    const stone = new THREE.MeshStandardMaterial({ color: "#d9d0c2", roughness: 0.9 });
-    const add = (geo, mat, px, py, pz, sx = 1, sy = 1, sz = 1) => {
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(px, py, pz);
-      mesh.scale.set(sx, sy, sz);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.userData = ud;
-      group.add(mesh);
-      pickables.push(mesh);
-      return mesh;
+    const windows = [];
+    const wall = "#f7f1e4";
+    const roof = island.accent;
+    const wood = "#8d5a3c";
+    const stone = "#d9d0c2";
+    const alive = () => group.visible;
+    const add = (kind, color, px, py, pz, sx = 1, sy = 1, sz = 1, rot = null, glow = false) => {
+      const rec = kit.part({
+        kind,
+        parent: group,
+        x: px,
+        y: py,
+        z: pz,
+        sx,
+        sy,
+        sz,
+        rx: rot?.x || 0,
+        ry: rot?.y || 0,
+        rz: rot?.z || 0,
+        color,
+        glow,
+        alive,
+      });
+      if (glow) windows.push(rec);
+      return rec;
     };
     const v = index % 4;
-    const kit = island.kit;
-    if (kit === "tower") {
+    const shape = island.kit;
+    const win = true;
+    if (shape === "tower") {
       const h = 0.48 + v * 0.14;
-      add(box, wall, 0, h / 2, 0, 0.18, h, 0.18);
-      add(box, roof, 0, h + 0.03, 0, 0.26, 0.05, 0.26);
-      add(unitCyl, winMat, 0, h * 0.62, 0.1, 0.08, 0.08, 0.03);
-      const dish = add(unitTorus, roof, 0, h + 0.16, 0, 0.16, 0.16, 0.16);
-      dish.rotation.x = 1.05;
-    } else if (kit === "port") {
+      add("box", wall, 0, h / 2, 0, 0.18, h, 0.18);
+      add("box", roof, 0, h + 0.03, 0, 0.26, 0.05, 0.26);
+      add("cyl", "#fff6d8", 0, h * 0.62, 0.1, 0.08, 0.08, 0.03, null, win);
+      add("torus", roof, 0, h + 0.16, 0, 0.16, 0.16, 0.16, { x: 1.05 });
+    } else if (shape === "port") {
       if (v === 0) {
-        add(unitCyl, wall, 0, 0.28, 0, 0.16, 0.5, 0.16);
-        add(unitCyl, roof, 0, 0.58, 0, 0.22, 0.08, 0.22);
-        add(unitSphere, winMat, 0, 0.7, 0, 0.12, 0.12, 0.12);
+        add("cyl", wall, 0, 0.28, 0, 0.16, 0.5, 0.16);
+        add("cyl", roof, 0, 0.58, 0, 0.22, 0.08, 0.22);
+        add("sphere", "#fff6d8", 0, 0.7, 0, 0.12, 0.12, 0.12, null, win);
       } else {
-        add(box, wall, 0, 0.16, 0, 0.42, 0.22, 0.28);
-        add(roofGeo, roof, 0, 0.38, 0, 0.7, 0.55, 0.7);
-        add(box, winMat, 0, 0.18, 0.15, 0.1, 0.08, 0.02);
-        add(unitCyl, wood, 0.22, 0.1, 0.16, 0.05, 0.16, 0.05);
+        add("box", wall, 0, 0.16, 0, 0.42, 0.22, 0.28);
+        add("roof", roof, 0, 0.38, 0, 0.7, 0.55, 0.7);
+        add("box", "#fff6d8", 0, 0.18, 0.15, 0.1, 0.08, 0.02, null, win);
+        add("cyl", wood, 0.22, 0.1, 0.16, 0.05, 0.16, 0.05);
       }
-    } else if (kit === "lab") {
-      add(box, wall, 0, 0.2, 0, 0.4, 0.32, 0.28);
-      add(box, roof, 0, 0.38, 0, 0.44, 0.04, 0.32);
-      add(box, winMat, 0, 0.22, 0.15, 0.22, 0.1, 0.02);
-      add(unitCyl, stone, v === 1 ? 0.16 : -0.16, 0.48, 0, 0.05, 0.22, 0.05);
-      add(unitSphere, winMat, v === 1 ? 0.16 : -0.16, 0.62, 0, 0.08, 0.08, 0.08);
-    } else if (kit === "clinic") {
-      add(box, wall, 0, 0.16, 0, 0.36, 0.26, 0.28);
-      add(roofGeo, roof, 0, 0.4, 0, 0.62, 0.5, 0.62);
-      add(box, new THREE.MeshStandardMaterial({ color: "#d4544a" }), 0, 0.22, 0.15, 0.05, 0.14, 0.02);
-      add(box, new THREE.MeshStandardMaterial({ color: "#d4544a" }), 0, 0.22, 0.15, 0.14, 0.05, 0.02);
-      if (v % 2 === 0) add(box, winMat, 0.16, 0.12, 0, 0.1, 0.14, 0.1);
-    } else if (kit === "houses") {
-      add(box, wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
-      add(roofGeo, roof, 0, 0.36, 0, 0.58, 0.48, 0.58);
-      add(box, winMat, 0, 0.14, 0.14, 0.08, 0.08, 0.02);
-      add(unitCyl, wood, 0.1, 0.4, -0.04, 0.04, 0.14, 0.04);
-    } else if (kit === "school") {
-      add(box, wall, 0, 0.16, 0, 0.46, 0.26, 0.3);
-      add(roofGeo, roof, 0, 0.42, 0, 0.78, 0.46, 0.7);
-      add(box, winMat, -0.1, 0.16, 0.16, 0.08, 0.08, 0.02);
-      add(box, winMat, 0.1, 0.16, 0.16, 0.08, 0.08, 0.02);
-      add(unitSphere, roof, 0, 0.58, 0, 0.08, 0.08, 0.08);
-    } else if (kit === "yard") {
-      add(box, wall, 0, 0.22, 0, 0.28, 0.2, 0.24);
-      add(box, wood, -0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
-      add(box, wood, 0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
-      add(roofGeo, roof, 0, 0.4, 0, 0.5, 0.36, 0.5);
-      add(unitCyl, new THREE.MeshStandardMaterial({ color: "#c47a4a", roughness: 0.7 }), 0.16, 0.08, -0.08, 0.1, 0.1, 0.1);
-      add(box, winMat, 0, 0.24, 0.13, 0.1, 0.06, 0.02);
-    } else if (kit === "dots") {
-      add(box, wall, 0, 0.12, 0, 0.5, 0.16, 0.24);
-      add(box, roof, 0, 0.22, 0, 0.54, 0.04, 0.28);
-      add(box, winMat, 0, 0.12, 0.13, 0.12, 0.06, 0.02);
-      for (let i = 0; i < 3; i += 1) add(unitSphere, stone, -0.12 + i * 0.12, 0.28, 0, 0.05, 0.05, 0.05);
-    } else if (kit === "ribbon") {
-      add(box, wall, 0, 0.14, 0, 0.28, 0.22, 0.22);
-      add(box, winMat, 0, 0.16, 0.12, 0.08, 0.1, 0.02);
-      const arch = add(unitTorus, new THREE.MeshStandardMaterial({ color: "#c4546a", roughness: 0.45 }), 0, 0.34, 0, 0.28, 0.28, 0.28);
-      arch.rotation.x = Math.PI / 2;
-    } else if (kit === "tent") {
-      const tent = add(unitCone, wall, 0, 0.22, 0, 0.36, 0.4, 0.36);
-      tent.rotation.y = Math.PI / 4;
-      add(box, roof, 0, 0.08, 0.12, 0.1, 0.12, 0.02);
-      add(unitSphere, winMat, 0, 0.16, 0.14, 0.06, 0.06, 0.04);
-    } else if (kit === "hospital") {
+    } else if (shape === "lab") {
+      add("box", wall, 0, 0.2, 0, 0.4, 0.32, 0.28);
+      add("box", roof, 0, 0.38, 0, 0.44, 0.04, 0.32);
+      add("box", "#fff6d8", 0, 0.22, 0.15, 0.22, 0.1, 0.02, null, win);
+      add("cyl", stone, v === 1 ? 0.16 : -0.16, 0.48, 0, 0.05, 0.22, 0.05);
+      add("sphere", "#fff6d8", v === 1 ? 0.16 : -0.16, 0.62, 0, 0.08, 0.08, 0.08, null, win);
+    } else if (shape === "clinic") {
+      add("box", wall, 0, 0.16, 0, 0.36, 0.26, 0.28);
+      add("roof", roof, 0, 0.4, 0, 0.62, 0.5, 0.62);
+      add("box", "#d4544a", 0, 0.22, 0.15, 0.05, 0.14, 0.02);
+      add("box", "#d4544a", 0, 0.22, 0.15, 0.14, 0.05, 0.02);
+      if (v % 2 === 0) add("box", "#fff6d8", 0.16, 0.12, 0, 0.1, 0.14, 0.1, null, win);
+    } else if (shape === "houses") {
+      add("box", wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
+      add("roof", roof, 0, 0.36, 0, 0.58, 0.48, 0.58);
+      add("box", "#fff6d8", 0, 0.14, 0.14, 0.08, 0.08, 0.02, null, win);
+      add("cyl", wood, 0.1, 0.4, -0.04, 0.04, 0.14, 0.04);
+    } else if (shape === "school") {
+      add("box", wall, 0, 0.16, 0, 0.46, 0.26, 0.3);
+      add("roof", roof, 0, 0.42, 0, 0.78, 0.46, 0.7);
+      add("box", "#fff6d8", -0.1, 0.16, 0.16, 0.08, 0.08, 0.02, null, win);
+      add("box", "#fff6d8", 0.1, 0.16, 0.16, 0.08, 0.08, 0.02, null, win);
+      add("sphere", roof, 0, 0.58, 0, 0.08, 0.08, 0.08);
+    } else if (shape === "yard") {
+      add("box", wall, 0, 0.22, 0, 0.28, 0.2, 0.24);
+      add("box", wood, -0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
+      add("box", wood, 0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
+      add("roof", roof, 0, 0.4, 0, 0.5, 0.36, 0.5);
+      add("cyl", "#c47a4a", 0.16, 0.08, -0.08, 0.1, 0.1, 0.1);
+      add("box", "#fff6d8", 0, 0.24, 0.13, 0.1, 0.06, 0.02, null, win);
+    } else if (shape === "dots") {
+      add("box", wall, 0, 0.12, 0, 0.5, 0.16, 0.24);
+      add("box", roof, 0, 0.22, 0, 0.54, 0.04, 0.28);
+      add("box", "#fff6d8", 0, 0.12, 0.13, 0.12, 0.06, 0.02, null, win);
+      for (let i = 0; i < 3; i += 1) add("sphere", stone, -0.12 + i * 0.12, 0.28, 0, 0.05, 0.05, 0.05);
+    } else if (shape === "ribbon") {
+      add("box", wall, 0, 0.14, 0, 0.28, 0.22, 0.22);
+      add("box", "#fff6d8", 0, 0.16, 0.12, 0.08, 0.1, 0.02, null, win);
+      add("torus", "#c4546a", 0, 0.34, 0, 0.28, 0.28, 0.28, { x: Math.PI / 2 });
+    } else if (shape === "tent") {
+      add("cone", wall, 0, 0.22, 0, 0.36, 0.4, 0.36, { y: Math.PI / 4 });
+      add("box", roof, 0, 0.08, 0.12, 0.1, 0.12, 0.02);
+      add("sphere", "#fff6d8", 0, 0.16, 0.14, 0.06, 0.06, 0.04, null, win);
+    } else if (shape === "hospital") {
       const h = 0.34 + (v % 2) * 0.16;
-      add(box, wall, 0, h / 2, 0, 0.32, h, 0.26);
-      add(box, roof, 0, h + 0.03, 0, 0.36, 0.04, 0.3);
-      add(box, new THREE.MeshStandardMaterial({ color: "#e15a4a" }), 0, h * 0.72, 0.14, 0.05, 0.16, 0.02);
-      add(box, new THREE.MeshStandardMaterial({ color: "#e15a4a" }), 0, h * 0.72, 0.14, 0.16, 0.05, 0.02);
-      add(box, winMat, 0, h * 0.4, 0.14, 0.1, 0.06, 0.02);
-    } else if (kit === "rings") {
-      add(unitCyl, wall, 0, 0.14, 0, 0.28, 0.24, 0.28);
-      const ring = add(unitTorus, roof, 0, 0.3, 0, 0.34, 0.34, 0.34);
-      ring.rotation.x = Math.PI / 2;
-      add(box, winMat, 0, 0.16, 0.15, 0.08, 0.08, 0.02);
-    } else if (kit === "warehouse") {
-      add(box, new THREE.MeshStandardMaterial({ color: "#e4d3a8", roughness: 0.88 }), 0, 0.16, 0, 0.46, 0.26, 0.32);
-      add(roofGeo, roof, 0, 0.38, 0, 0.72, 0.4, 0.62);
-      add(box, wood, 0.2, 0.1, 0.18, 0.12, 0.1, 0.12);
-      add(box, winMat, -0.08, 0.16, 0.17, 0.08, 0.08, 0.02);
+      add("box", wall, 0, h / 2, 0, 0.32, h, 0.26);
+      add("box", roof, 0, h + 0.03, 0, 0.36, 0.04, 0.3);
+      add("box", "#e15a4a", 0, h * 0.72, 0.14, 0.05, 0.16, 0.02);
+      add("box", "#e15a4a", 0, h * 0.72, 0.14, 0.16, 0.05, 0.02);
+      add("box", "#fff6d8", 0, h * 0.4, 0.14, 0.1, 0.06, 0.02, null, win);
+    } else if (shape === "rings") {
+      add("cyl", wall, 0, 0.14, 0, 0.28, 0.24, 0.28);
+      add("torus", roof, 0, 0.3, 0, 0.34, 0.34, 0.34, { x: Math.PI / 2 });
+      add("box", "#fff6d8", 0, 0.16, 0.15, 0.08, 0.08, 0.02, null, win);
+    } else if (shape === "warehouse") {
+      add("box", "#e4d3a8", 0, 0.16, 0, 0.46, 0.26, 0.32);
+      add("roof", roof, 0, 0.38, 0, 0.72, 0.4, 0.62);
+      add("box", wood, 0.2, 0.1, 0.18, 0.12, 0.1, 0.12);
+      add("box", "#fff6d8", -0.08, 0.16, 0.17, 0.08, 0.08, 0.02, null, win);
     } else {
-      add(box, wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
-      add(unitCyl, stone, 0, 0.42, 0, 0.03, 0.36, 0.03);
-      add(unitSphere, winMat, 0, 0.64, 0, 0.08, 0.08, 0.08);
-      const ring = add(unitTorus, roof, 0, 0.5, 0, 0.16, 0.16, 0.16);
-      ring.rotation.x = Math.PI / 2;
+      add("box", wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
+      add("cyl", stone, 0, 0.42, 0, 0.03, 0.36, 0.03);
+      add("sphere", "#fff6d8", 0, 0.64, 0, 0.08, 0.08, 0.08, null, win);
+      add("torus", roof, 0, 0.5, 0, 0.16, 0.16, 0.16, { x: Math.PI / 2 });
     }
     parent.add(group);
-    return { group, item, winMat };
+    return { group, item, windows };
   }
 
   for (const point of raw) {
@@ -451,9 +472,15 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     shade.position.y = 0.012;
     shade.userData = { kind: "island", islandId: island.id };
     group.add(shade, skirt, coast, top);
-    tag(skirt, island.id);
-    tag(coast, island.id);
-    tag(top, island.id);
+    tag(skirt, island.id, false);
+    tag(coast, island.id, false);
+    tag(top, island.id, false);
+    const hit = new THREE.Mesh(hitGeo, hitMat);
+    hit.visible = false;
+    hit.position.y = 0.55;
+    hit.userData = { kind: "hitbox", islandId: island.id };
+    group.add(hit);
+    hitboxes.push(hit);
 
     const glowMat = new THREE.MeshBasicMaterial({
       color: island.accent,
@@ -503,7 +530,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
     tree(group, 0.92, -0.15, island.id === "dengue" ? "#c4a24a" : "#3e6a3c");
     tree(group, -0.96, 0.05, "#4e7a48");
-    addKit(group, island, lamps, box);
+    addKit(group, island, lamps, kit);
     group.traverse((child) => {
       if (!child.isMesh) return;
       if (!child.userData.kind) child.userData = { kind: "island", islandId: island.id };
@@ -578,44 +605,46 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     return { flow, curve, tube, len };
   });
 
-  const meepleGeo = {
-    body: new THREE.ConeGeometry(0.15, 0.38, 8),
-    head: new THREE.SphereGeometry(0.1, 14, 12),
-    nose: new THREE.SphereGeometry(0.028, 8, 8),
-    pack: new THREE.BoxGeometry(0.1, 0.09, 0.045),
-    crate: new THREE.BoxGeometry(0.11, 0.09, 0.09),
-  };
-  const vestMat = new THREE.MeshStandardMaterial({ color: "#14756f", roughness: 0.72 });
-  const packMat = new THREE.MeshStandardMaterial({ color: "#f3efe4", roughness: 0.8 });
-  const crateMat = new THREE.MeshStandardMaterial({ color: "#e39a3a", roughness: 0.7 });
-  const skinMats = ["#f0c7a4", "#d9a57a", "#c48a6a", "#8d5a3c"].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.68 }));
+  const skinHex = ["#f0c7a4", "#d9a57a", "#c48a6a", "#8d5a3c"];
+  let cargoOn = true;
   const TOOL_KEY = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
+
+  function anchorFront(mesh, yHead, nosePos) {
+    const head = new THREE.Object3D();
+    head.position.y = yHead;
+    const nose = new THREE.Object3D();
+    nose.position.copy(nosePos);
+    mesh.add(head, nose);
+    return { head, nose };
+  }
 
   const walkers = flowViews.map((route, index) => {
     const mesh = new THREE.Group();
-    const skin = skinMats[index % skinMats.length];
-    const body = new THREE.Mesh(meepleGeo.body, vestMat);
-    body.position.y = 0.2;
-    body.castShadow = true;
-    const head = new THREE.Mesh(meepleGeo.head, skin);
-    head.position.y = 0.44;
-    head.name = "head";
-    const nose = new THREE.Mesh(meepleGeo.nose, skin);
-    nose.position.set(0, 0.43, -0.085);
-    nose.name = "nose";
-    const pack = new THREE.Mesh(meepleGeo.pack, packMat);
-    pack.position.set(0, 0.28, 0.09);
-    const crate = new THREE.Mesh(meepleGeo.crate, crateMat);
-    crate.position.set(0.11, 0.32, -0.02);
-    crate.name = "crate";
-    mesh.add(body, head, nose, pack, crate);
+    const skin = skinHex[index % skinHex.length];
+    const alive = () => mesh.visible;
+    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: "#14756f", alive });
+    kit.part({ kind: "sphere", parent: mesh, y: 0.44, sx: 0.2, sy: 0.2, sz: 0.2, color: skin, alive });
+    kit.part({ kind: "sphere", parent: mesh, y: 0.43, z: -0.085, sx: 0.056, sy: 0.056, sz: 0.056, color: skin, alive });
+    kit.part({ kind: "box", parent: mesh, y: 0.28, z: 0.09, sx: 0.1, sy: 0.09, sz: 0.045, color: "#f3efe4", alive });
+    kit.part({
+      kind: "box",
+      parent: mesh,
+      x: 0.11,
+      y: 0.32,
+      z: -0.02,
+      sx: 0.11,
+      sy: 0.09,
+      sz: 0.09,
+      color: "#e39a3a",
+      alive: () => mesh.visible && cargoOn,
+    });
+    const { head, nose } = anchorFront(mesh, 0.44, new THREE.Vector3(0, 0.43, -0.085));
     mesh.visible = false;
     scene.add(mesh);
     return {
       mesh,
       nose,
       head,
-      crate,
       route,
       flow: route.flow,
       t: (index * 0.37) % 1,
@@ -631,7 +660,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let query = "";
   let showAllFlows = false;
   let namesOn = false;
-  let cargoOn = true;
   let frozen = false;
   let bird = false;
   let hoverId = null;
@@ -838,16 +866,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     mesh.scale.setScalar(1.4);
     mesh.visible = false;
     mesh.userData = { kind: "crew" };
-    const skin = skinMats[crews.length % skinMats.length];
-    const body = new THREE.Mesh(meepleGeo.body, vestMat);
-    body.position.y = 0.2;
-    body.castShadow = true;
-    const head = new THREE.Mesh(meepleGeo.head, skin);
-    head.position.y = 0.44;
-    head.name = "head";
-    const nose = new THREE.Mesh(meepleGeo.nose, skin);
-    nose.position.set(0, 0.43, -0.085);
-    nose.name = "nose";
+    const skin = skinHex[crews.length % skinHex.length];
+    const alive = () => mesh.visible;
+    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: "#14756f", alive });
+    kit.part({ kind: "sphere", parent: mesh, y: 0.44, sx: 0.2, sy: 0.2, sz: 0.2, color: skin, alive });
+    kit.part({ kind: "sphere", parent: mesh, y: 0.43, z: -0.085, sx: 0.056, sy: 0.056, sz: 0.056, color: skin, alive });
+    const { head, nose } = anchorFront(mesh, 0.44, new THREE.Vector3(0, 0.43, -0.085));
     const fx = new THREE.Group();
     fx.visible = false;
     if (threat.tool === "shield") {
@@ -889,7 +913,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     labelAnchor.position.set(_crewDir.x * 1.9 + sideX * spread, 1.15, _crewDir.z * 1.9 + sideZ * spread);
     labelAnchor.add(label);
     labelAnchor.visible = false;
-    mesh.add(body, head, nose);
     mesh.position.copy(home);
     fx.position.copy(post);
     view.group.add(mesh, labelAnchor, fx);
@@ -940,10 +963,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
   }
 
-  function markFront(group, mat) {
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), mat);
+  function markFront(group) {
+    const head = new THREE.Object3D();
     head.name = "head";
-    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), mat);
+    const nose = new THREE.Object3D();
     nose.name = "nose";
     nose.position.set(0, 0, -0.36);
     group.add(head, nose);
@@ -953,6 +976,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   function addThreat(mesh, head, nose, home, halt, rate, scale, tool, islandId) {
     mesh.userData = { kind: "threat" };
     mesh.scale.setScalar(scale);
+    mesh.traverse((child) => {
+      if (!child.isMesh) return;
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
     scene.add(mesh);
     const threat = {
       mesh,
@@ -1024,7 +1052,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     spikes.instanceMatrix.needsUpdate = true;
     group.add(spikes);
-    return { group, ...markFront(group, bodyMat) };
+    return { group, ...markFront(group) };
   }
 
   function makeRod() {
@@ -1041,7 +1069,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       tail.rotation.z = (i - 1.5) * 0.35;
       group.add(tail);
     }
-    return { group, ...markFront(group, mat) };
+    return { group, ...markFront(group) };
   }
 
   function makeMosquito() {
@@ -1088,7 +1116,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
     }
     group.add(thorax, head, beak, wingL, wingR);
-    const marks = markFront(group, dark);
+    const marks = markFront(group);
     marks.nose.position.set(0, -0.01, -0.4);
     return { group, ...marks };
   }
@@ -1125,6 +1153,33 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       addThreat(built.group, built.head, built.nose, raid.home, raid.halt, spec.rate, 1.2, spec.tool, spec.id);
     });
     placeCrews();
+  }
+
+  const blobGeo = new THREE.CircleGeometry(0.28, 10);
+  blobGeo.rotateX(-Math.PI / 2);
+  const blobs = new THREE.InstancedMesh(
+    blobGeo,
+    new THREE.MeshBasicMaterial({ color: "#041014", transparent: true, opacity: 0.25, depthWrite: false }),
+    threats.length + crews.length,
+  );
+  blobs.frustumCulled = false;
+  blobs.castShadow = false;
+  blobs.receiveShadow = false;
+  scene.add(blobs);
+  const blobDummy = new THREE.Object3D();
+  function poseBlobs() {
+    let index = 0;
+    const put = (object, show, scale) => {
+      object.getWorldPosition(_blobAt);
+      blobDummy.position.set(_blobAt.x, 0.03, _blobAt.z);
+      blobDummy.scale.setScalar(show ? scale : 0);
+      blobDummy.updateMatrix();
+      blobs.setMatrixAt(index, blobDummy.matrix);
+      index += 1;
+    };
+    for (const threat of threats) put(threat.mesh, threat.mesh.visible && !threat.gone, 1.15);
+    for (const crew of crews) put(crew.mesh, crew.mesh.visible, 0.55);
+    blobs.instanceMatrix.needsUpdate = true;
   }
 
   let pickCb = () => {};
@@ -1278,6 +1333,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const kind = queryKind(view);
       const on = Boolean(kind) && pillarOk(view.island) && (phase === "all" || view.island.items.some((item) => phaseOk(item.phase)));
       view.lit = on;
+      view.group.userData.lit = on;
       for (const mat of [view.coastMat, view.landMat, view.skirtMat]) {
         mat.opacity = on ? 1 : 0.14;
         mat.transparent = !on;
@@ -1297,6 +1353,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       view.pinEl.classList.toggle("hot", hoverId === view.island.id || selected.has(view.island.id));
       view.pinEl.classList.toggle("named", namesOn || hoverId === view.island.id || selected.has(view.island.id));
     }
+    paintGlow();
+    kit.sync();
     for (const route of flowViews) {
       const forced = Boolean(query) && norm(route.flow._hay).includes(query);
       const touched = [...selected].some((id) => id === route.flow.a || id === route.flow.b);
@@ -1315,7 +1373,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function applyClock() {
     const hour = minutes / 60;
-    const night = nightAmount(hour);
     const look = lookAtHour(hour);
     skyMat.uniforms.top.value.copy(look.top);
     skyMat.uniforms.horizon.value.copy(look.hor);
@@ -1358,13 +1415,22 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     sun.intensity = 0.05 + dayLit * (0.45 + Math.max(elev, 0) * 1.15);
     sun.color.copy(look.sun);
     stars.material.opacity = look.stars * 0.9;
-    for (const lamp of lamps) lamp.emissiveIntensity = 0.08 + night * 1.7;
+    paintGlow();
+    renderer.shadowMap.needsUpdate = true;
+  }
+
+  function paintGlow() {
+    const hour = minutes / 60;
+    const night = nightAmount(hour);
+    kit.glowMat.emissiveIntensity = 0.04 + night * 1.7;
+    for (const lamp of lamps) lamp.glowAmount = 0.35 + night * 0.85;
     for (const view of views.values()) {
       const active = view.buildings.some((building) => building.group.visible && hourCovers(building.item.hours, hour));
       view.glow.material.opacity = active ? 0.28 + (1 - night) * 0.12 : 0;
+      view.glow.visible = view.glow.material.opacity > 0.02;
       for (const building of view.buildings) {
-        const awake = hourCovers(building.item.hours, hour);
-        building.winMat.emissiveIntensity = awake ? 0.04 + night * 1.7 : night * 0.12;
+        const amount = building.group.visible && hourCovers(building.item.hours, hour) ? 1 : 0.18;
+        for (const win of building.windows) win.glowAmount = amount;
       }
     }
   }
@@ -1372,6 +1438,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   function resize() {
     const { W, H } = viewSize();
     if (W < 2 || H < 2) return;
+    const cap = Math.min(window.devicePixelRatio || 1, W < 980 ? 1.5 : 2);
+    if (cap < pixelCap) pixelCap = cap;
+    renderer.setPixelRatio(pixelCap);
+    const shadow = W < 980 ? 1024 : 2048;
+    if (sun.shadow.mapSize.x !== shadow) {
+      sun.shadow.mapSize.set(shadow, shadow);
+      renderer.shadowMap.needsUpdate = true;
+    }
     renderer.setSize(W, H, false);
     labels.setSize(W, H);
     applyFit();
@@ -1455,7 +1529,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     for (const walker of walkers) {
       const show = Boolean(routesOn && walker.route.tube.visible === true);
       walker.mesh.visible = show;
-      walker.crate.visible = Boolean(cargoOn);
       if (!show || frozen || reduced) continue;
       walker.t += (step / walker.duration) * walker.sign;
       if (walker.t >= 1) {
@@ -1473,10 +1546,102 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       walker.mesh.position.y += Math.sin(elapsed * 7 + walker.phase) * 0.02;
     }
     stepHandoffs(frozen ? 0 : step);
-    applyClock();
+    hoverTick = (hoverTick + 1) % 2;
+    if (hoverSample && hoverTick === 0 && pointers.size === 0) {
+      const hit = hitAt(hoverSample);
+      const id = hit?.islandId ?? null;
+      if (id !== hoverId) {
+        hoverId = id;
+        refresh();
+        holdRender = 0.3;
+      }
+      canvas.style.cursor = id ? "pointer" : "grab";
+    }
+    const moving = Math.abs(wrapAngle(goal.theta - cam.theta)) > 0.002
+      || Math.abs((bird ? 0.58 : userPhi) - cam.phi) > 0.002
+      || Math.abs(goal.radius - cam.radius) > 0.03
+      || cam.target.distanceTo(goalTarget) > 0.03
+      || safeT < 1;
+    if (moving) holdRender = 0.3;
+    if (minutes !== paintedMinutes) {
+      applyClock();
+      paintedMinutes = minutes;
+      holdRender = 0.3;
+    }
+    if (shadowWarm) {
+      renderer.shadowMap.needsUpdate = true;
+      if (reduced || elapsed > 1.3) shadowWarm = false;
+    }
+    frameMs.push(step * 1000);
+    if (frameMs.length >= 60) {
+      const avg = frameMs.reduce((sum, ms) => sum + ms, 0) / frameMs.length;
+      frameMs.length = 0;
+      if (avg > 22 && pixelCap > 1 && elapsed > 2) {
+        pixelCap = Math.max(1, pixelCap - 0.25);
+        renderer.setPixelRatio(pixelCap);
+      }
+    }
+    const draw = (!reduced && !frozen) || moving || holdRender > 0;
+    holdRender = Math.max(0, holdRender - step);
+    if (!draw) return;
+    poseBlobs();
+    kit.sync();
     renderer.render(scene, camera);
     labels.render(scene, camera);
+    shadePins();
     markCrowding();
+  }
+
+  let hoverSample = null;
+  let hoverTick = 0;
+  let paintedMinutes = null;
+  let holdRender = 0.4;
+  let shadowWarm = true;
+  const frameMs = [];
+  let occTick = 0;
+
+  function shadePins() {
+    occTick = (occTick + 1) % 6;
+    if (occTick === 0) {
+      const { W, H } = viewSize();
+      const columns = [];
+      for (const view of views.values()) {
+        view.group.updateWorldMatrix(true, false);
+        _pinWorld.set(0, 0.55, 0).applyMatrix4(view.group.matrixWorld);
+        _pinDir.copy(_pinWorld);
+        _pinDir.x += MESH_R;
+        _proj.copy(_pinWorld).project(camera);
+        const cx = (_proj.x * 0.5 + 0.5) * W;
+        const cy = (-_proj.y * 0.5 + 0.5) * H;
+        _proj.copy(_pinDir).project(camera);
+        const radius = Math.hypot((_proj.x * 0.5 + 0.5) * W - cx, (-_proj.y * 0.5 + 0.5) * H - cy);
+        _pinWorld.set(0, 1.25, 0).applyMatrix4(view.group.matrixWorld);
+        const dist = _pinWorld.distanceTo(camera.position);
+        _proj.copy(_pinWorld).project(camera);
+        columns.push({
+          view,
+          dist,
+          cx,
+          cy,
+          radius,
+          px: (_proj.x * 0.5 + 0.5) * W,
+          py: (-_proj.y * 0.5 + 0.5) * H,
+        });
+        view.pinScale = THREE.MathUtils.clamp(14 / Math.max(dist, 0.1), 0.75, 1.1);
+      }
+      for (const pin of columns) {
+        // The click cylinders are shorter than the camera-to-pin ray, so a
+        // nearer island covers a pin when its projected hex contains that badge.
+        const blocked = columns.some((other) => other !== pin
+          && other.dist + 0.4 < pin.dist
+          && Math.hypot(pin.px - other.cx, pin.py - other.cy) < other.radius * 0.92);
+        pin.view.pinEl.classList.toggle("occluded", blocked);
+      }
+    }
+    for (const view of views.values()) {
+      if (!view.pinScale) continue;
+      view.pinEl.style.transform += ` scale(${view.pinScale})`;
+    }
   }
 
   function markCrowding() {
@@ -1581,9 +1746,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function hitAt(event) {
     const point = ndc(event);
+    raycaster.far = Infinity;
     raycaster.setFromCamera(point, camera);
-    const hits = raycaster.intersectObjects(pickables, false);
-    return hits[0]?.object.userData ?? null;
+    const hit = raycaster.intersectObjects(hitboxes, false)[0];
+    const islandId = hit?.object.userData.islandId;
+    return islandId ? { kind: "island", islandId } : null;
   }
 
   canvas.addEventListener("pointerdown", (event) => {
@@ -1595,13 +1762,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   canvas.addEventListener("pointermove", (event) => {
     const prev = pointers.get(event.pointerId);
     if (!prev) {
-      const hit = hitAt(event);
-      const id = hit?.islandId ?? null;
-      if (id !== hoverId) {
-        hoverId = id;
-        refresh();
-      }
-      canvas.style.cursor = id ? "pointer" : "grab";
+      hoverSample = { clientX: event.clientX, clientY: event.clientY };
       return;
     }
     const dx = event.clientX - prev.x;
@@ -1682,10 +1843,21 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     applyFit();
   }
 
+  kit.build(scene);
   refresh();
   applyClock();
+  paintedMinutes = minutes;
   resize();
   placeCamera();
+  if (import.meta.env.DEV) {
+    window.__island = Object.assign(window.__island ?? {}, {
+      stats: () => ({
+        draws: renderer.info.render.calls,
+        instances: kit.instanceCount(),
+        meshes: kit.meshCount(),
+      }),
+    });
+  }
 
   return {
     tick,
@@ -1725,10 +1897,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     },
     isBird() { return bird; },
     setNames(value) { namesOn = value; refresh(); },
-    setCargo(value) {
-      cargoOn = Boolean(value);
-      for (const walker of walkers) walker.crate.visible = cargoOn;
-    },
+    setCargo(value) { cargoOn = Boolean(value); },
     setHotItem(id) { hotItem = id; },
     onPick(fn) { pickCb = fn; },
     onArrive(fn) { arriveCb = fn; },
@@ -1737,6 +1906,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       return {
         flows: flowViews.filter((route) => route.tube.visible === true).length,
         lit: [...views.values()].filter((view) => view.lit).map((view) => view.island.id),
+        draws: renderer.info.render.calls,
+        instances: kit.instanceCount(),
       };
     },
     selfTest() {
@@ -1949,135 +2120,75 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   };
 }
 
-function addKit(group, island, lamps, box) {
-  const id = group.userData.islandId;
-  const white = new THREE.MeshStandardMaterial({ color: "#f7f4ee", roughness: 0.8 });
-  const wood = new THREE.MeshStandardMaterial({ color: "#8d6244", roughness: 0.86 });
-  const put = (mesh, x, y, z, sx, sy, sz) => {
-    mesh.position.set(x, y, z);
-    mesh.scale.set(sx, sy, sz);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.userData = { kind: "island", islandId: id };
-    group.add(mesh);
-    return mesh;
+function addKit(group, island, lamps, kit) {
+  const alive = () => group.userData.lit !== false;
+  const put = (kind, color, x, y, z, sx, sy, sz, rot = null, glow = false) => {
+    const rec = kit.part({
+      kind,
+      parent: group,
+      x,
+      y,
+      z,
+      sx,
+      sy,
+      sz,
+      rx: rot?.x || 0,
+      ry: rot?.y || 0,
+      rz: rot?.z || 0,
+      color,
+      glow,
+      alive,
+    });
+    if (glow) lamps.push(rec);
+    return rec;
   };
   if (island.kit === "port") {
-    put(new THREE.Mesh(box, wood), 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
-    const towerMat = white;
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 0.72, 8), towerMat);
-    tower.position.set(0.02, 0.7, -MESH_R - 0.15);
-    const lampMat = new THREE.MeshStandardMaterial({ color: "#ffe1a8", emissive: "#ffb347", emissiveIntensity: 0.5 });
-    lamps.push(lampMat);
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), lampMat);
-    lamp.position.set(0.02, 1.12, -MESH_R - 0.15);
-    group.add(tower, lamp);
-    tower.castShadow = lamp.castShadow = true;
-    tower.userData = lamp.userData = { kind: "island", islandId: id };
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#c4473a" })), 0.42, 0.66, -0.2, 0.28, 0.22, 0.22);
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#2f6f9e" })), -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
+    put("box", "#8d6244", 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
+    put("cyl", "#f7f4ee", 0.02, 0.7, -MESH_R - 0.15, 0.22, 0.72, 0.22);
+    put("sphere", "#ffe1a8", 0.02, 1.12, -MESH_R - 0.15, 0.15, 0.15, 0.15, null, true);
+    put("box", "#c4473a", 0.42, 0.66, -0.2, 0.28, 0.22, 0.22);
+    put("box", "#2f6f9e", -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
   } else if (island.kit === "tower") {
-    put(new THREE.Mesh(box, white), 0, 0.95, -0.2, 0.26, 0.9, 0.26);
-    const dish = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.03, 8, 14), new THREE.MeshStandardMaterial({ color: "#d9e2e4" }));
-    dish.position.set(0, 1.5, -0.2);
-    dish.rotation.x = Math.PI / 2.4;
-    dish.userData = { kind: "island", islandId: id };
-    group.add(dish);
+    put("box", "#f7f4ee", 0, 0.95, -0.2, 0.26, 0.9, 0.26);
+    put("torus", "#d9e2e4", 0, 1.5, -0.2, 0.32, 0.32, 0.32, { x: Math.PI / 2.4 });
   } else if (island.kit === "lab") {
-    put(new THREE.Mesh(box, white), 0, 0.78, -0.25, 0.72, 0.5, 0.42);
-    const glassMat = new THREE.MeshStandardMaterial({ color: "#b7e0e4", emissive: "#7ec8d0", emissiveIntensity: 0.25, roughness: 0.2 });
-    lamps.push(glassMat);
-    put(new THREE.Mesh(box, glassMat), 0, 0.86, -0.02, 0.5, 0.22, 0.04);
+    put("box", "#f7f4ee", 0, 0.78, -0.25, 0.72, 0.5, 0.42);
+    put("box", "#b7e0e4", 0, 0.86, -0.02, 0.5, 0.22, 0.04, null, true);
   } else if (island.kit === "clinic" || island.kit === "hospital") {
     const tall = island.kit === "hospital" ? 0.72 : 0.48;
-    put(new THREE.Mesh(box, white), 0, 0.52 + tall / 2, -0.28, 0.55, tall, 0.4);
-    const cross = new THREE.MeshStandardMaterial({ color: "#d4544a" });
-    put(new THREE.Mesh(box, cross), 0, 0.52 + tall * 0.72, -0.06, 0.06, 0.22, 0.04);
-    put(new THREE.Mesh(box, cross), 0, 0.52 + tall * 0.72, -0.06, 0.2, 0.06, 0.04);
+    put("box", "#f7f4ee", 0, 0.52 + tall / 2, -0.28, 0.55, tall, 0.4);
+    put("box", "#d4544a", 0, 0.52 + tall * 0.72, -0.06, 0.06, 0.22, 0.04);
+    put("box", "#d4544a", 0, 0.52 + tall * 0.72, -0.06, 0.2, 0.06, 0.04);
   } else if (island.kit === "warehouse") {
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#d7c7a2", roughness: 0.9 })), 0, 0.74, -0.2, 0.9, 0.4, 0.46);
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#b98348" })), 0.55, 0.64, 0.15, 0.2, 0.16, 0.2);
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#8d6244" })), 0.32, 0.66, 0.18, 0.18, 0.2, 0.18);
+    put("box", "#d7c7a2", 0, 0.74, -0.2, 0.9, 0.4, 0.46);
+    put("box", "#b98348", 0.55, 0.64, 0.15, 0.2, 0.16, 0.2);
+    put("box", "#8d6244", 0.32, 0.66, 0.18, 0.18, 0.2, 0.18);
   } else if (island.kit === "school") {
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#f3efe2" })), 0, 0.7, -0.3, 0.8, 0.36, 0.4);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.55, 6), new THREE.MeshStandardMaterial({ color: "#5c6670" }));
-    pole.position.set(0.55, 0.8, 0.15);
-    const flag = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#d4544a" }));
-    flag.position.set(0.66, 0.98, 0.15);
-    flag.scale.set(0.18, 0.1, 0.02);
-    pole.userData = flag.userData = { kind: "island", islandId: id };
-    group.add(pole, flag);
+    put("box", "#f3efe2", 0, 0.7, -0.3, 0.8, 0.36, 0.4);
+    put("cyl", "#5c6670", 0.55, 0.8, 0.15, 0.04, 0.55, 0.04);
+    put("box", "#d4544a", 0.66, 0.98, 0.15, 0.18, 0.1, 0.02);
   } else if (island.kit === "rings") {
-    const colors = ["#2a9a90", "#e0a04a", "#6a8f4e"];
-    colors.forEach((color, index) => {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(0.16 + index * 0.05, 0.028, 8, 18),
-        new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.15 }),
-      );
-      ring.position.set(0, 0.85 + index * 0.08, -0.15);
-      ring.rotation.x = Math.PI / 2.2;
-      ring.rotation.y = index * 0.6;
-      ring.userData = { kind: "island", islandId: id };
-      ring.castShadow = true;
-      group.add(ring);
+    ["#2a9a90", "#e0a04a", "#6a8f4e"].forEach((color, index) => {
+      const scale = (0.16 + index * 0.05) / 0.5;
+      put("torus", color, 0, 0.85 + index * 0.08, -0.15, scale, scale, scale, { x: Math.PI / 2.2, y: index * 0.6 });
     });
   } else if (island.kit === "dots") {
-    const stone = new THREE.MeshStandardMaterial({ color: "#f4efe4" });
-    for (let i = 0; i < 5; i += 1) {
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), stone);
-      dot.position.set(-0.28 + i * 0.14, 0.58, -0.35);
-      dot.userData = { kind: "island", islandId: id };
-      group.add(dot);
-    }
+    for (let i = 0; i < 5; i += 1) put("sphere", "#f4efe4", -0.28 + i * 0.14, 0.58, -0.35, 0.1, 0.1, 0.1);
   } else if (island.kit === "ribbon") {
-    const ribbon = new THREE.Mesh(
-      new THREE.TorusGeometry(0.18, 0.045, 8, 18),
-      new THREE.MeshStandardMaterial({ color: "#c4546a", roughness: 0.5 }),
-    );
-    ribbon.position.set(0, 0.9, -0.2);
-    ribbon.rotation.x = Math.PI / 2.5;
-    ribbon.userData = { kind: "island", islandId: id };
-    ribbon.castShadow = true;
-    group.add(ribbon);
+    put("torus", "#c4546a", 0, 0.9, -0.2, 0.36, 0.36, 0.36, { x: Math.PI / 2.5 });
   } else if (island.kit === "tent") {
-    const cloth = new THREE.MeshStandardMaterial({ color: "#f7f4ee", roughness: 0.85 });
-    for (const x of [-0.22, 0.22]) {
-      const tent = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.38, 4), cloth);
-      tent.position.set(x, 0.72, -0.25);
-      tent.userData = { kind: "island", islandId: id };
-      tent.castShadow = true;
-      group.add(tent);
-    }
+    for (const x of [-0.22, 0.22]) put("cone", "#f7f4ee", x, 0.72, -0.25, 0.44, 0.38, 0.44);
   } else if (island.kit === "yard") {
-    const clay = new THREE.MeshStandardMaterial({ color: "#c47a4a", roughness: 0.75 });
-    const lid = new THREE.MeshStandardMaterial({ color: "#6e8f62" });
     for (let i = 0; i < 4; i += 1) {
-      const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.14, 8), clay);
-      jar.position.set(-0.24 + (i % 2) * 0.28, 0.6, -0.4 + Math.floor(i / 2) * 0.24);
-      jar.userData = { kind: "island", islandId: id };
-      group.add(jar);
-      if (i !== 1) {
-        const cap = new THREE.Mesh(box, lid);
-        cap.scale.set(0.12, 0.03, 0.12);
-        cap.position.copy(jar.position);
-        cap.position.y += 0.09;
-        cap.userData = jar.userData;
-        group.add(cap);
-      }
+      const x = -0.24 + (i % 2) * 0.28;
+      const z = -0.4 + Math.floor(i / 2) * 0.24;
+      put("cyl", "#c47a4a", x, 0.6, z, 0.16, 0.14, 0.16);
+      if (i !== 1) put("box", "#6e8f62", x, 0.69, z, 0.12, 0.03, 0.12);
     }
   } else if (island.kit === "antenna") {
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.9, 6), new THREE.MeshStandardMaterial({ color: "#d5dbde" }));
-    mast.position.set(0, 1.0, -0.2);
-    const lampMat = new THREE.MeshStandardMaterial({ color: "#fff", emissive: "#f2f6ff", emissiveIntensity: 0.4 });
-    lamps.push(lampMat);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), lampMat);
-    bulb.position.set(0, 1.5, -0.2);
-    mast.userData = bulb.userData = { kind: "island", islandId: id };
-    group.add(mast, bulb);
+    put("cyl", "#d5dbde", 0, 1.0, -0.2, 0.065, 0.9, 0.065);
+    put("sphere", "#f2f6ff", 0, 1.5, -0.2, 0.12, 0.12, 0.12, null, true);
   } else if (island.kit === "houses") {
-    put(new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#efe6d4" })), 0, 0.66, -0.32, 0.7, 0.28, 0.34);
-  }
-  for (const child of group.children) {
-    if (child.isMesh && !child.userData.kind) child.userData = { kind: "island", islandId: id };
+    put("box", "#efe6d4", 0, 0.66, -0.32, 0.7, 0.28, 0.34);
   }
 }
