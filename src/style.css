@@ -348,6 +348,17 @@ body.detail .sheet { bottom: 16px; }
   border-radius: 999px;
   padding: 3px 9px;
 }
+.ally-label {
+  font-family: var(--serif);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: var(--paper-solid);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  box-shadow: 0 4px 12px rgba(16, 36, 40, 0.12);
+}
 .pin.dim { opacity: 0.38; }
 .pin.hot b { background: var(--c, var(--teal)); color: white; }
 #diag:not([hidden]) {

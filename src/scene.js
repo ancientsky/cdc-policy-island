@@ -265,6 +265,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   shadeGeo.rotateY(Math.PI / 6);
   const shadeMat = new THREE.MeshBasicMaterial({ color: "#041014", transparent: true, opacity: 0.14, depthWrite: false });
   const box = new THREE.BoxGeometry(1, 1, 1);
+  const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+  const unitCone = new THREE.ConeGeometry(0.5, 1, 6);
+  const unitSphere = new THREE.SphereGeometry(0.5, 12, 10);
+  const unitTorus = new THREE.TorusGeometry(0.5, 0.1, 6, 16);
   const roofGeo = new THREE.ConeGeometry(0.24, 0.3, 4);
   roofGeo.rotateY(Math.PI / 4);
   const trunkGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.16, 5);
@@ -306,47 +310,121 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     tag(crown2, parent.userData.islandId);
   }
 
-  function house(parent, item, x, z, index, accent) {
+  function house(parent, item, x, z, index, island) {
     const group = new THREE.Group();
     group.position.set(x, 0.55, z);
-    const h = 0.34 + (index % 3) * 0.12;
-    const w = 0.32 + (index % 2) * 0.1;
-    const depth = w * 0.84;
-    const wallMat = new THREE.MeshStandardMaterial({ color: "#f4efe4", roughness: 0.88 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.62 });
+    const ud = { kind: "item", islandId: island.id, itemId: item.id };
     const winMat = new THREE.MeshStandardMaterial({
-      color: "#fff1cf",
+      color: "#fff6d8",
       emissive: "#ffb15a",
-      emissiveIntensity: 0.15,
-      roughness: 0.35,
+      emissiveIntensity: 0.2,
+      roughness: 0.28,
     });
-    const body = new THREE.Mesh(box, wallMat);
-    body.scale.set(w, h, depth);
-    body.position.y = h / 2 + 0.04;
-    body.userData = { kind: "item", islandId: parent.userData.islandId, itemId: item.id };
-    const plinth = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#cbbfa6", roughness: 0.92 }));
-    plinth.scale.set(w * 1.12, 0.06, depth * 1.12);
-    plinth.position.y = 0.03;
-    plinth.userData = body.userData;
-    const eave = new THREE.Mesh(box, roofMat);
-    eave.scale.set(w * 1.28, 0.045, depth * 1.28);
-    eave.position.y = h + 0.05;
-    eave.userData = body.userData;
-    const roof = new THREE.Mesh(roofGeo, roofMat);
-    roof.scale.set(w * 1.15, 0.72, w * 1.15);
-    roof.position.y = h + 0.16;
-    roof.userData = body.userData;
-    const win = new THREE.Mesh(box, winMat);
-    win.scale.set(w * 0.28, Math.min(0.12, h * 0.26), 0.02);
-    win.position.set(0, h * 0.55 + 0.04, depth / 2 + 0.012);
-    win.userData = body.userData;
-    group.add(plinth, body, eave, roof, win);
-    parent.add(group);
-    for (const mesh of [plinth, body, eave, roof, win]) {
+    const wall = new THREE.MeshStandardMaterial({ color: "#f7f1e4", roughness: 0.82 });
+    const roof = new THREE.MeshStandardMaterial({ color: island.accent, roughness: 0.48 });
+    const wood = new THREE.MeshStandardMaterial({ color: "#8d5a3c", roughness: 0.86 });
+    const stone = new THREE.MeshStandardMaterial({ color: "#d9d0c2", roughness: 0.9 });
+    const add = (geo, mat, px, py, pz, sx = 1, sy = 1, sz = 1) => {
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(px, py, pz);
+      mesh.scale.set(sx, sy, sz);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.userData = ud;
+      group.add(mesh);
       pickables.push(mesh);
+      return mesh;
+    };
+    const v = index % 4;
+    const kit = island.kit;
+    if (kit === "tower") {
+      const h = 0.48 + v * 0.14;
+      add(box, wall, 0, h / 2, 0, 0.18, h, 0.18);
+      add(box, roof, 0, h + 0.03, 0, 0.26, 0.05, 0.26);
+      add(unitCyl, winMat, 0, h * 0.62, 0.1, 0.08, 0.08, 0.03);
+      const dish = add(unitTorus, roof, 0, h + 0.16, 0, 0.16, 0.16, 0.16);
+      dish.rotation.x = 1.05;
+    } else if (kit === "port") {
+      if (v === 0) {
+        add(unitCyl, wall, 0, 0.28, 0, 0.16, 0.5, 0.16);
+        add(unitCyl, roof, 0, 0.58, 0, 0.22, 0.08, 0.22);
+        add(unitSphere, winMat, 0, 0.7, 0, 0.12, 0.12, 0.12);
+      } else {
+        add(box, wall, 0, 0.16, 0, 0.42, 0.22, 0.28);
+        add(roofGeo, roof, 0, 0.38, 0, 0.7, 0.55, 0.7);
+        add(box, winMat, 0, 0.18, 0.15, 0.1, 0.08, 0.02);
+        add(unitCyl, wood, 0.22, 0.1, 0.16, 0.05, 0.16, 0.05);
+      }
+    } else if (kit === "lab") {
+      add(box, wall, 0, 0.2, 0, 0.4, 0.32, 0.28);
+      add(box, roof, 0, 0.38, 0, 0.44, 0.04, 0.32);
+      add(box, winMat, 0, 0.22, 0.15, 0.22, 0.1, 0.02);
+      add(unitCyl, stone, v === 1 ? 0.16 : -0.16, 0.48, 0, 0.05, 0.22, 0.05);
+      add(unitSphere, winMat, v === 1 ? 0.16 : -0.16, 0.62, 0, 0.08, 0.08, 0.08);
+    } else if (kit === "clinic") {
+      add(box, wall, 0, 0.16, 0, 0.36, 0.26, 0.28);
+      add(roofGeo, roof, 0, 0.4, 0, 0.62, 0.5, 0.62);
+      add(box, new THREE.MeshStandardMaterial({ color: "#d4544a" }), 0, 0.22, 0.15, 0.05, 0.14, 0.02);
+      add(box, new THREE.MeshStandardMaterial({ color: "#d4544a" }), 0, 0.22, 0.15, 0.14, 0.05, 0.02);
+      if (v % 2 === 0) add(box, winMat, 0.16, 0.12, 0, 0.1, 0.14, 0.1);
+    } else if (kit === "houses") {
+      add(box, wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
+      add(roofGeo, roof, 0, 0.36, 0, 0.58, 0.48, 0.58);
+      add(box, winMat, 0, 0.14, 0.14, 0.08, 0.08, 0.02);
+      add(unitCyl, wood, 0.1, 0.4, -0.04, 0.04, 0.14, 0.04);
+    } else if (kit === "school") {
+      add(box, wall, 0, 0.16, 0, 0.46, 0.26, 0.3);
+      add(roofGeo, roof, 0, 0.42, 0, 0.78, 0.46, 0.7);
+      add(box, winMat, -0.1, 0.16, 0.16, 0.08, 0.08, 0.02);
+      add(box, winMat, 0.1, 0.16, 0.16, 0.08, 0.08, 0.02);
+      add(unitSphere, roof, 0, 0.58, 0, 0.08, 0.08, 0.08);
+    } else if (kit === "yard") {
+      add(box, wall, 0, 0.22, 0, 0.28, 0.2, 0.24);
+      add(box, wood, -0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
+      add(box, wood, 0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
+      add(roofGeo, roof, 0, 0.4, 0, 0.5, 0.36, 0.5);
+      add(unitCyl, new THREE.MeshStandardMaterial({ color: "#c47a4a", roughness: 0.7 }), 0.16, 0.08, -0.08, 0.1, 0.1, 0.1);
+      add(box, winMat, 0, 0.24, 0.13, 0.1, 0.06, 0.02);
+    } else if (kit === "dots") {
+      add(box, wall, 0, 0.12, 0, 0.5, 0.16, 0.24);
+      add(box, roof, 0, 0.22, 0, 0.54, 0.04, 0.28);
+      add(box, winMat, 0, 0.12, 0.13, 0.12, 0.06, 0.02);
+      for (let i = 0; i < 3; i += 1) add(unitSphere, stone, -0.12 + i * 0.12, 0.28, 0, 0.05, 0.05, 0.05);
+    } else if (kit === "ribbon") {
+      add(box, wall, 0, 0.14, 0, 0.28, 0.22, 0.22);
+      add(box, winMat, 0, 0.16, 0.12, 0.08, 0.1, 0.02);
+      const arch = add(unitTorus, new THREE.MeshStandardMaterial({ color: "#c4546a", roughness: 0.45 }), 0, 0.34, 0, 0.28, 0.28, 0.28);
+      arch.rotation.x = Math.PI / 2;
+    } else if (kit === "tent") {
+      const tent = add(unitCone, wall, 0, 0.22, 0, 0.36, 0.4, 0.36);
+      tent.rotation.y = Math.PI / 4;
+      add(box, roof, 0, 0.08, 0.12, 0.1, 0.12, 0.02);
+      add(unitSphere, winMat, 0, 0.16, 0.14, 0.06, 0.06, 0.04);
+    } else if (kit === "hospital") {
+      const h = 0.34 + (v % 2) * 0.16;
+      add(box, wall, 0, h / 2, 0, 0.32, h, 0.26);
+      add(box, roof, 0, h + 0.03, 0, 0.36, 0.04, 0.3);
+      add(box, new THREE.MeshStandardMaterial({ color: "#e15a4a" }), 0, h * 0.72, 0.14, 0.05, 0.16, 0.02);
+      add(box, new THREE.MeshStandardMaterial({ color: "#e15a4a" }), 0, h * 0.72, 0.14, 0.16, 0.05, 0.02);
+      add(box, winMat, 0, h * 0.4, 0.14, 0.1, 0.06, 0.02);
+    } else if (kit === "rings") {
+      add(unitCyl, wall, 0, 0.14, 0, 0.28, 0.24, 0.28);
+      const ring = add(unitTorus, roof, 0, 0.3, 0, 0.34, 0.34, 0.34);
+      ring.rotation.x = Math.PI / 2;
+      add(box, winMat, 0, 0.16, 0.15, 0.08, 0.08, 0.02);
+    } else if (kit === "warehouse") {
+      add(box, new THREE.MeshStandardMaterial({ color: "#e4d3a8", roughness: 0.88 }), 0, 0.16, 0, 0.46, 0.26, 0.32);
+      add(roofGeo, roof, 0, 0.38, 0, 0.72, 0.4, 0.62);
+      add(box, wood, 0.2, 0.1, 0.18, 0.12, 0.1, 0.12);
+      add(box, winMat, -0.08, 0.16, 0.17, 0.08, 0.08, 0.02);
+    } else {
+      add(box, wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
+      add(unitCyl, stone, 0, 0.42, 0, 0.03, 0.36, 0.03);
+      add(unitSphere, winMat, 0, 0.64, 0, 0.08, 0.08, 0.08);
+      const ring = add(unitTorus, roof, 0, 0.5, 0, 0.16, 0.16, 0.16);
+      ring.rotation.x = Math.PI / 2;
     }
+    parent.add(group);
     return { group, item, winMat };
   }
 
@@ -414,7 +492,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         [0.02, -0.35],
       ];
       const [sx, sz] = spots[index] ?? spots[index % spots.length];
-      return house(group, item, sx, sz, index, island.accent);
+      return house(group, item, sx, sz, index, island);
     });
 
     tree(group, 0.92, -0.15, island.id === "dengue" ? "#c4a24a" : "#3e6a3c");
@@ -460,12 +538,32 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     start.addScaledVector(dir, 1.05);
     end.addScaledVector(dir, -1.05);
     const mid = start.clone().lerp(end, 0.5);
-    mid.y += 0.65 + len * 0.16;
+    const bend = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar((data.flows.indexOf(flow) % 2 === 0 ? 1 : -1) * Math.min(0.7, len * 0.12));
+    mid.add(bend);
+    mid.y += 1.05 + len * 0.2;
     const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-    const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 28, 0.028, 5, false),
-      new THREE.MeshStandardMaterial({ color: "#f4e4bc", emissive: "#f4e4bc", emissiveIntensity: 0.35, roughness: 0.45 }),
+    const accent = new THREE.Color(views.get(flow.a).island.accent);
+    const ribbonMat = new THREE.MeshStandardMaterial({
+      color: accent,
+      emissive: accent,
+      emissiveIntensity: 0.55,
+      roughness: 0.32,
+    });
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.055, 8, false), ribbonMat);
+    const halo = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 36, 0.12, 8, false),
+      new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.34, depthWrite: false }),
     );
+    const arrow = new THREE.Group();
+    const endTangent = new THREE.Vector3();
+    curve.getTangent(1, endTangent);
+    endTangent.y = 0;
+    arrow.position.copy(end);
+    if (endTangent.lengthSq() > 1e-8) arrow.rotation.y = Math.atan2(-endTangent.x, -endTangent.z);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 6), ribbonMat);
+    tip.rotation.x = -Math.PI / 2;
+    arrow.add(tip);
+    tube.add(halo, arrow);
     tube.visible = false;
     scene.add(tube);
     flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
@@ -534,6 +632,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const shoreLamps = [];
   const threats = [];
   let shoreLabel = null;
+  const allyMarks = [];
 
   function poseThreat(threat) {
     threat.mesh.position.lerpVectors(threat.home, threat.halt, threat.u);
@@ -578,54 +677,95 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function makeVirus(color) {
     const group = new THREE.Group();
-    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, emissive: color, emissiveIntensity: 0.55 });
-    group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), bodyMat));
-    const spikeMat = new THREE.MeshStandardMaterial({ color: "#ffd0c8", roughness: 0.45, emissive: "#c04038", emissiveIntensity: 0.4 });
-    const spike = new THREE.ConeGeometry(0.03, 0.14, 5);
-    for (const [x, y, z] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [1, 1, 0], [0, 1, 1], [1, 0, 1]]) {
-      const s = new THREE.Mesh(spike, spikeMat);
-      const d = new THREE.Vector3(x, y, z).normalize();
-      s.position.copy(d).multiplyScalar(0.22);
-      s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
-      group.add(s);
+    const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.32, emissive: color, emissiveIntensity: 0.4 });
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 20, 16), bodyMat));
+    const stalkMat = new THREE.MeshStandardMaterial({ color: "#f6ddd6", roughness: 0.4 });
+    const knobMat = new THREE.MeshStandardMaterial({ color: "#ffd7b0", roughness: 0.3, emissive: "#d15a3a", emissiveIntensity: 0.35 });
+    const stalkGeo = new THREE.CylinderGeometry(0.01, 0.014, 0.11, 5);
+    const knobGeo = new THREE.SphereGeometry(0.026, 7, 6);
+    for (let i = 0; i < 16; i += 1) {
+      const y = 1 - (i / 15) * 2;
+      const ring = Math.sqrt(Math.max(0, 1 - y * y));
+      const ang = i * 2.399;
+      const d = new THREE.Vector3(Math.cos(ang) * ring, y, Math.sin(ang) * ring).normalize();
+      const stalk = new THREE.Mesh(stalkGeo, stalkMat);
+      stalk.position.copy(d).multiplyScalar(0.21);
+      stalk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+      const knob = new THREE.Mesh(knobGeo, knobMat);
+      knob.position.copy(d).multiplyScalar(0.29);
+      group.add(stalk, knob);
     }
-    return { group, ...markFront(group, spikeMat) };
+    return { group, ...markFront(group, knobMat) };
   }
 
   function makeRod() {
     const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: "#9ecf62", roughness: 0.45, emissive: "#4a7828", emissiveIntensity: 0.55 });
-    const rod = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.36, 3, 8), mat);
-    rod.rotation.x = Math.PI / 2;
-    group.add(rod);
+    const mat = new THREE.MeshStandardMaterial({ color: "#8ed15a", roughness: 0.38, emissive: "#3f6e24", emissiveIntensity: 0.4 });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.32, 4, 12), mat);
+    body.rotation.x = Math.PI / 2;
+    group.add(body);
+    const tailMat = new THREE.MeshStandardMaterial({ color: "#e7f0cf", roughness: 0.45 });
+    for (let i = 0; i < 4; i += 1) {
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.003, 0.26, 4), tailMat);
+      tail.rotation.x = Math.PI / 2;
+      tail.position.set((i - 1.5) * 0.028, -0.015, 0.3);
+      tail.rotation.z = (i - 1.5) * 0.35;
+      group.add(tail);
+    }
     return { group, ...markFront(group, mat) };
   }
 
   function makeMosquito() {
     const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: "#3a2a22", roughness: 0.55, emissive: "#6a3020", emissiveIntensity: 0.5 });
-    const abdomen = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.26, 3, 6), mat);
-    abdomen.rotation.x = -Math.PI / 2;
-    abdomen.position.z = 0.08;
-    const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), mat);
-    thorax.position.z = -0.08;
+    const dark = new THREE.MeshStandardMaterial({ color: "#2c241e", roughness: 0.5, emissive: "#5a3024", emissiveIntensity: 0.3 });
+    const pale = new THREE.MeshStandardMaterial({ color: "#d9d3c6", roughness: 0.55 });
+    for (let i = 0; i < 5; i += 1) {
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(0.05 - i * 0.005, 8, 6), i % 2 ? pale : dark);
+      seg.scale.set(1, 0.7, 1.2);
+      seg.position.z = 0.02 + i * 0.07;
+      group.add(seg);
+    }
+    const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), dark);
+    thorax.position.z = -0.07;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), dark);
+    head.position.z = -0.16;
+    const eyeMat = new THREE.MeshStandardMaterial({ color: "#6f9a48", roughness: 0.25, emissive: "#3e6428", emissiveIntensity: 0.35 });
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 6), eyeMat);
+    eyeL.position.set(-0.028, 0.02, -0.19);
+    const eyeR = eyeL.clone();
+    eyeR.position.x = 0.028;
+    const beak = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.003, 0.16, 5), dark);
+    beak.rotation.x = Math.PI / 2;
+    beak.position.set(0, -0.012, -0.28);
     const wingMat = new THREE.MeshStandardMaterial({
-      color: "#d5e4ea",
+      color: "#e8f1f4",
       transparent: true,
-      opacity: 0.42,
-      roughness: 0.2,
+      opacity: 0.5,
+      roughness: 0.12,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const wingL = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.12), wingMat);
-    wingL.position.set(-0.2, 0.06, -0.02);
-    wingL.rotation.z = 0.45;
-    const wingR = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.12), wingMat);
-    wingR.position.set(0.2, 0.06, -0.02);
-    wingR.rotation.z = -0.45;
-    group.add(abdomen, thorax, wingL, wingR);
-    const marks = markFront(group, mat);
-    marks.nose.scale.set(0.35, 0.35, 1.5);
+    const wingL = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.11), wingMat);
+    wingL.position.set(-0.16, 0.07, -0.02);
+    wingL.rotation.z = 0.4;
+    wingL.rotation.y = 0.25;
+    const wingR = wingL.clone();
+    wingR.position.x = 0.16;
+    wingR.rotation.z = -0.4;
+    wingR.rotation.y = -0.25;
+    const legGeo = new THREE.CylinderGeometry(0.005, 0.003, 0.22, 4);
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i += 1) {
+        const leg = new THREE.Mesh(legGeo, dark);
+        leg.position.set(side * 0.07, -0.05, -0.08 + i * 0.06);
+        leg.rotation.z = side * 1.05;
+        leg.rotation.x = -0.35 + i * 0.28;
+        group.add(leg);
+      }
+    }
+    group.add(thorax, head, eyeL, eyeR, beak, wingL, wingR);
+    const marks = markFront(group, dark);
+    marks.nose.position.set(0, -0.01, -0.4);
     return { group, ...marks };
   }
 
@@ -634,7 +774,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const mat = new THREE.MeshStandardMaterial({ color: "#161214", roughness: 0.38, metalness: 0.42, emissive: "#5a1814", emissiveIntensity: 0.4 });
     const hull = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.62, 4), mat);
     hull.rotation.x = -Math.PI / 2;
-    group.add(hull);
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 6, 6),
+      new THREE.MeshStandardMaterial({ color: "#ff3a2a", emissive: "#ff180e", emissiveIntensity: 1.1 }),
+    );
+    eye.position.set(0, 0.04, -0.22);
+    group.add(hull, eye);
     return { group, ...markFront(group, mat) };
   }
 
@@ -648,60 +793,161 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     let isleIndex = 0;
     for (const view of views.values()) isle[isleIndex++].set(view.base.x, view.base.z);
     const shore = new THREE.Group();
-    shore.position.set(amr.x - 4.15, 0, amr.z + 1.35);
-    const groundMat = new THREE.MeshStandardMaterial({ color: "#120c10", roughness: 0.9 });
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.42, 3.2), groundMat);
+    shore.position.set(amr.x - 3.55, 0, amr.z + 9.25);
+    const groundMat = new THREE.MeshStandardMaterial({ color: "#12080e", roughness: 0.94 });
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(2.65, 0.36, 2.05), groundMat);
     slab.position.y = 0.16;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(0.28, 1.15, 2.6), groundMat);
-    wall.position.set(1.85, 0.7, 0.1);
-    shore.add(slab, wall);
-    const peakMat = new THREE.MeshStandardMaterial({ color: "#1c1016", roughness: 0.84, emissive: "#3a1418", emissiveIntensity: 0.2 });
-    for (const [x, h, z, r] of [[-1.1, 1.5, -1.2, 0.62], [0.15, 2.15, 0.15, 0.48], [1.05, 1.25, 1.35, 0.55], [-0.2, 0.9, 1.7, 0.4]]) {
-      const peak = new THREE.Mesh(new THREE.ConeGeometry(r, h, 5), peakMat);
-      peak.position.set(x, 0.28 + h / 2, z);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 0.2), groundMat);
+    lip.position.set(0, 0.42, -0.92);
+    shore.add(slab, lip);
+    const mawMat = new THREE.MeshStandardMaterial({ color: "#3a080c", emissive: "#e01818", emissiveIntensity: 0.9, roughness: 0.35 });
+    shoreLamps.push(mawMat);
+    const maw = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.36, 0.16), mawMat);
+    maw.position.set(0.02, 0.42, -0.98);
+    shore.add(maw);
+    const peakMat = new THREE.MeshStandardMaterial({ color: "#1a0c12", roughness: 0.78, emissive: "#6a1420", emissiveIntensity: 0.4 });
+    for (const [x, h, z] of [[-0.8, 1.25, 0.2], [0.1, 1.55, -0.05], [0.78, 1.05, 0.28], [-0.15, 0.82, 0.5], [0.48, 1.15, -0.48]]) {
+      const peak = new THREE.Mesh(new THREE.ConeGeometry(0.22 + h * 0.06, h, 5), peakMat);
+      peak.position.set(x, 0.18 + h / 2, z);
       shore.add(peak);
     }
-    const towerMat = new THREE.MeshStandardMaterial({ color: "#2a161c", roughness: 0.66, metalness: 0.22 });
-    const winMat = new THREE.MeshStandardMaterial({ color: "#ff6844", emissive: "#ff2e22", emissiveIntensity: 0.9 });
+    const toothMat = new THREE.MeshStandardMaterial({ color: "#241014", roughness: 0.62, emissive: "#8a1c1c", emissiveIntensity: 0.55 });
+    for (let i = 0; i < 8; i += 1) {
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.32, 4), toothMat);
+      tooth.position.set(-1.15 + i * 0.33, 0.28, -0.98);
+      tooth.rotation.x = -1.05;
+      shore.add(tooth);
+    }
+    const towerMat = new THREE.MeshStandardMaterial({ color: "#1c1016", roughness: 0.6, metalness: 0.3 });
+    const winMat = new THREE.MeshStandardMaterial({ color: "#ff6844", emissive: "#ff2418", emissiveIntensity: 1.2 });
     shoreLamps.push(winMat);
-    for (const [x, h, z] of [[-0.85, 1.9, -0.35], [0.35, 2.55, 0.55], [1.15, 1.45, -0.95]]) {
-      const tower = new THREE.Mesh(new THREE.BoxGeometry(0.32, h, 0.32), towerMat);
-      tower.position.set(x, 0.3 + h / 2, z);
-      const win = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.03), winMat);
-      win.position.set(x + 0.16, 0.45 + h * 0.45, z);
-      shore.add(tower, win);
+    for (const [x, h, z] of [[-0.62, 1.35, -0.15], [0.28, 1.58, 0.02], [0.82, 1.02, -0.32]]) {
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, 0.2), towerMat);
+      tower.position.set(x, 0.18 + h / 2, z);
+      tower.rotation.z = (x > 0 ? -1 : 1) * 0.07;
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), winMat);
+      eye.position.set(x, 0.22 + h * 0.7, z - 0.1);
+      shore.add(tower, eye);
     }
     const labelEl = document.createElement("div");
     labelEl.className = "shore-label";
     labelEl.textContent = t("shore");
     shoreLabel = labelEl;
     const label = new CSS2DObject(labelEl);
-    label.position.set(1.45, 2.85, 0.15);
+    label.position.set(0.1, 2.05, 0);
     shore.add(label);
     scene.add(shore);
 
+    const park = (focus, hx, hz, gap) => {
+      const home = new THREE.Vector3(focus.x + hx, 0, focus.z + hz);
+      const len = Math.hypot(hx, hz) || 1;
+      const halt = new THREE.Vector3(focus.x + (hx / len) * gap, 0, focus.z + (hz / len) * gap);
+      return { home, halt };
+    };
     const virusA = makeVirus("#c43858");
-    addThreat(virusA.group, virusA.head, virusA.nose, new THREE.Vector3(amr.x - 7.2, 0, amr.z - 0.2), new THREE.Vector3(amr.x - 2.85, 0, amr.z - 0.05), 0.045, 2.4);
+    const raidA = park(amr, -3.04, 7.4, 3.1);
+    addThreat(virusA.group, virusA.head, virusA.nose, raidA.home, raidA.halt, 0.04, 2.15);
     const virusB = makeVirus("#9a3478");
-    addThreat(virusB.group, virusB.head, virusB.nose, new THREE.Vector3(border.x - 0.3, 0, border.z - 5.4), new THREE.Vector3(border.x + 0.15, 0, border.z - 2.7), 0.04, 2.2);
+    const raidB = park(border, 3.93, -1.56, 3.0);
+    addThreat(virusB.group, virusB.head, virusB.nose, raidB.home, raidB.halt, 0.038, 2);
     const mosquitoA = makeMosquito();
-    addThreat(mosquitoA.group, mosquitoA.head, mosquitoA.nose, new THREE.Vector3(dengue.x + 1.6, 0, dengue.z + 4.6), new THREE.Vector3(dengue.x + 0.7, 0, dengue.z + 2.55), 0.05, 2.5);
+    const raidM = park(dengue, -2.77, 1.91, 2.95);
+    addThreat(mosquitoA.group, mosquitoA.head, mosquitoA.nose, raidM.home, raidM.halt, 0.046, 2.2);
     const mosquitoB = makeMosquito();
-    addThreat(mosquitoB.group, mosquitoB.head, mosquitoB.nose, new THREE.Vector3(hepa.x + 4.4, 0, hepa.z + 1.1), new THREE.Vector3(hepa.x + 2.55, 0, hepa.z + 0.35), 0.042, 2.3);
+    const raidN = park(hepa, 1.2, -2.8, 2.75);
+    addThreat(mosquitoB.group, mosquitoB.head, mosquitoB.nose, raidN.home, raidN.halt, 0.04, 2);
     const rod = makeRod();
-    addThreat(rod.group, rod.head, rod.nose, new THREE.Vector3(globalI.x + 4.6, 0, globalI.z - 0.4), new THREE.Vector3(globalI.x + 2.65, 0, globalI.z + 0.15), 0.036, 2.2);
-    for (const zOff of [-1.15, 0.2, 1.45]) {
+    const raidR = park(globalI, 2.2, -2.79, 3.0);
+    addThreat(rod.group, rod.head, rod.nose, raidR.home, raidR.halt, 0.034, 2);
+    for (const [hx, hz] of [[-3.84, 7.7], [-2.94, 7.5], [-2.09, 7.9]]) {
       const wedge = makeWedge();
-      addThreat(
-        wedge.group,
-        wedge.head,
-        wedge.nose,
-        new THREE.Vector3(amr.x - 5.4, 0, amr.z + zOff * 0.7),
-        new THREE.Vector3(amr.x - 2.9, 0, amr.z + zOff * 0.25),
-        0.055,
-        1.7,
-      );
+      const raid = park(amr, hx, hz, 3.15);
+      addThreat(wedge.group, wedge.head, wedge.nose, raid.home, raid.halt, 0.05, 1.55);
     }
+
+    const vax = views.get("vax").base;
+    function allyIsle(key, x, z, tint, decorate) {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      const coast = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.7, 0.84, 0.16, 6),
+        new THREE.MeshStandardMaterial({ color: "#ecd7ae", roughness: 0.9 }),
+      );
+      coast.position.y = 0.12;
+      coast.rotation.y = Math.PI / 6;
+      const top = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.54, 0.62, 0.16, 6),
+        new THREE.MeshStandardMaterial({ color: tint, roughness: 0.78 }),
+      );
+      top.position.y = 0.26;
+      top.rotation.y = Math.PI / 6;
+      g.add(coast, top);
+      decorate(g);
+      const el = document.createElement("div");
+      el.className = "ally-label";
+      el.textContent = t(key);
+      const mark = new CSS2DObject(el);
+      mark.position.set(0, 1.15, 0);
+      g.add(mark);
+      allyMarks.push({ el, key });
+      g.userData = { kind: "ally" };
+      scene.add(g);
+    }
+    allyIsle("allyJP", border.x - 3.6, border.z - 3.61, "#7faf72", (g) => {
+      const hall = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#f7f4ee", roughness: 0.8 }));
+      hall.position.set(0, 0.48, 0);
+      hall.scale.set(0.28, 0.28, 0.24);
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.1, 16), new THREE.MeshStandardMaterial({ color: "#d23a3a" }));
+      disc.position.set(0, 0.5, 0.13);
+      const roofM = new THREE.Mesh(unitCone, new THREE.MeshStandardMaterial({ color: "#8c3030", roughness: 0.6 }));
+      roofM.position.set(0, 0.74, 0);
+      roofM.scale.set(0.34, 0.22, 0.34);
+      g.add(hall, disc, roofM);
+    });
+    allyIsle("allyUS", hepa.x + 3.85, hepa.z - 0.25, "#6e9a68", (g) => {
+      const hall = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#f4f7fb", roughness: 0.75 }));
+      hall.position.set(0, 0.48, 0);
+      hall.scale.set(0.36, 0.26, 0.26);
+      const blue = new THREE.MeshStandardMaterial({ color: "#2a4e8c", roughness: 0.55 });
+      const cap = new THREE.Mesh(box, blue);
+      cap.position.set(-0.08, 0.66, 0);
+      cap.scale.set(0.16, 0.1, 0.26);
+      const stripe = new THREE.MeshStandardMaterial({ color: "#c4473a", roughness: 0.6 });
+      const band = new THREE.Mesh(box, stripe);
+      band.position.set(0.08, 0.58, 0.14);
+      band.scale.set(0.2, 0.04, 0.02);
+      g.add(hall, cap, band);
+    });
+    allyIsle("allyEU", vax.x - 5.79, vax.z - 0.83, "#7ea3c4", (g) => {
+      const hall = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#f6f3ea", roughness: 0.8 }));
+      hall.position.set(0, 0.46, 0);
+      hall.scale.set(0.26, 0.24, 0.22);
+      const gold = new THREE.MeshStandardMaterial({ color: "#e2b43a", emissive: "#a07818", emissiveIntensity: 0.25, roughness: 0.4 });
+      for (let i = 0; i < 8; i += 1) {
+        const ang = (i / 8) * Math.PI * 2;
+        const star = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), gold);
+        star.position.set(Math.cos(ang) * 0.28, 0.72, Math.sin(ang) * 0.28);
+        g.add(star);
+      }
+      g.add(hall);
+    });
+    allyIsle("allyPH", dengue.x + 3.45, dengue.z + 1.05, "#d2b15a", (g) => {
+      const hut = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ color: "#f3e2c4", roughness: 0.82 }));
+      hut.position.set(-0.08, 0.44, 0);
+      hut.scale.set(0.24, 0.2, 0.2);
+      const roofP = new THREE.Mesh(unitCone, new THREE.MeshStandardMaterial({ color: "#c4553a", roughness: 0.6 }));
+      roofP.position.set(-0.08, 0.64, 0);
+      roofP.scale.set(0.28, 0.16, 0.28);
+      const trunk = new THREE.Mesh(unitCyl, new THREE.MeshStandardMaterial({ color: "#8d6244", roughness: 0.85 }));
+      trunk.position.set(0.22, 0.48, 0.05);
+      trunk.scale.set(0.05, 0.28, 0.05);
+      const frond = new THREE.Mesh(unitCone, new THREE.MeshStandardMaterial({ color: "#3e7a3a", roughness: 0.7 }));
+      frond.position.set(0.22, 0.68, 0.05);
+      frond.scale.set(0.16, 0.14, 0.16);
+      const sun = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: "#f0c14a", emissive: "#e09a20", emissiveIntensity: 0.35 }));
+      sun.position.set(0.05, 0.78, -0.05);
+      g.add(hut, roofP, trunk, frond, sun);
+    });
   }
 
   let pickCb = () => {};
@@ -1061,6 +1307,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
       }
       if (shoreLabel) shoreLabel.textContent = t("shore");
+      for (const mark of allyMarks) mark.el.textContent = t(mark.key);
       refresh();
     },
     setPhase(value) { phase = value; refresh(); },
