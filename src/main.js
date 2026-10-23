@@ -1,4 +1,13 @@
 import "./style.css";
+
+const serifFont = new URL("./fonts/NotoSerifTC-Bold.subset.woff2", import.meta.url);
+const preloadFont = document.createElement("link");
+preloadFont.rel = "preload";
+preloadFont.as = "font";
+preloadFont.type = "font/woff2";
+preloadFont.crossOrigin = "anonymous";
+preloadFont.href = serifFont.href;
+document.head.appendChild(preloadFont);
 import { flows, islands, validate } from "./data.js";
 import { assertHexFrame } from "./hex.js";
 import { applyLocale, savedLang, t } from "./i18n.js";
@@ -34,6 +43,7 @@ function fallbackScene() {
     onPick: noop,
     onArrive: noop,
     getTheta: () => 0,
+    setSafeRect: noop,
     relabel: noop,
     selfTest: () => [t("fallback")],
     debugState: () => ({ flows: 0, lit: [] }),
@@ -48,7 +58,7 @@ try {
   document.body.classList.add("no-webgl");
   scene = fallbackScene();
   veil.remove();
-  const note = document.querySelector(".hero p");
+  const note = document.querySelector("#hero-lead");
   if (note) note.textContent = t("fallback");
 }
 

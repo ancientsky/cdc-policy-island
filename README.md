@@ -1,21 +1,23 @@
-# 疾管署政策發展島
+# 防疫島大冒險
 
 十四座六邊形島排成臺灣輪廓。一座島是一項公開的防治工作，島上的房子是具體工作，島與島之間的弧是交接。
 
 線上版：<https://ancientsky.github.io/cdc-policy-island/>
 
-本島依疾病管制署公開計畫與常設業務整理，用來看出政策之間怎麼相連。這不是疾病管制署官方網站。衛生福利部施政計畫和年度計畫評核是管考，沒有另做成一座島。海面上的病原和對岸的陰影是這張圖自己的警示，不是署的說法。旁邊的美國、日本、歐洲、菲律賓小島是友誼記號，不是邦交名單。防疫人員用疫苗、藥品、物資和政策把病原擋在海上，是這張圖的比喻。
+本站依疾病管制署公開資料整理，非官方網站。資料截至 2026 年 10 月。
+
+資料年份常數是 `src/data.js` 的 `DATA_AS_OF`（目前 `2026-10`）。
 
 內容以疾管署 [重大政策](https://www.cdc.gov.tw/Category/MPage/kVzFWokFW3l9_YeB8idzuw) 為準，中文是原文。英文和日文是對照說明，不是官方譯名。
 
 ## 怎麼看
 
-- 點一座島，或從右側清單進去。房子是一項工作。
+- 點一座島，或從清單進去。房子是一項工作。
 - 弧線預設不畫。點到相關的島，或打開「協作線」，才看得到交接。
-- 下方的一天表示這個鐘點誰在值班。晨、午、晚、夜跟時鐘走，不是另一套皮膚。
-- 語言是「中 / EN / 日」。階段可以只看本期、近期、中程或長期。主軸可複選：監測預警、邊境阻絕、免疫防護、防治網絡、整備韌性。
+- 下方的一天表示這個鐘點誰在值班。清晨、正午、黃昏、夜裡跟著這條時間走。
+- 語言在左上角「中 ▾」。階段和主軸在「篩選」裡。主軸可複選：監測預警、邊境阻絕、免疫防護、防治網絡、整備韌性。
 - 拖曳旋轉，滾輪拉近。手機上同一套操作。
-- 海面上的病原會靠近。島上的人拿疫苗、藥品、物資或政策把他們擋回去。這是比喻，不是署的作業流程。
+- 海上有五隻病菌，各自朝自己的島靠近：登革熱島旁的蚊子對上清積水，口岸的蚊子對上入境檢疫，流感病毒對上接種，腸病毒對上洗手，結核桿菌對上把藥吃完。這是比喻，不是署的作業流程。
 
 ## 十四座島
 
@@ -58,8 +60,16 @@ npm run preview
 
 推上 `main` 之後，`.github/workflows/pages.yml` 會安裝依賴、建置，並部署到 GitHub Pages。
 
+## 開發規範
+
+不得複製第三方網站的程式碼、模型、文案或資產。
+
+- 只能學技巧後自己重寫。禁止複製或改寫任何 JS/CSS 片段、數值表、3D 模型的零件參數、SVG 圖示、文案句型、標題、按鈕名稱、教學步驟結構、logo 或截圖。
+- 不得在網站、README、commit 訊息或程式註解中提及參考網站的名稱或網址。
+- 新寫的每個 3D 模組檔頭加一行：`// Original implementation for this project. Not derived from third-party source code.`
+
 ## English
 
-An interactive map of public Taiwan CDC programs, arranged as fourteen hexes in the outline of Taiwan. Buildings are pieces of work. Arcs are handoffs. This is not an official Taiwan CDC website. Chinese text is the source. English and Japanese are descriptive translations, not official titles.
+An interactive map of public Taiwan CDC programs, arranged as fourteen hexes in the outline of Taiwan. Buildings are pieces of work. Arcs are handoffs. This site is arranged from public Taiwan CDC material. It is not an official site. Data as of October 2026. Chinese text is the source. English and Japanese are descriptive translations, not official titles.
 
-The pathogens offshore and the far shore are this picture’s own warning. They are not a statement by Taiwan CDC. The nearby islets for the United States, Japan, Europe, and the Philippines are marks of friendship, not a diplomatic list. Staff holding pathogens off with vaccines, medicines, supplies, and policy is this picture’s metaphor.
+Five germs offshore each move toward their own island: a mosquito by dengue meets emptied water, a mosquito by the port meets screening, an influenza virus meets vaccination, an enterovirus meets handwashing, and a tuberculosis bacillus meets finishing the medicine. That picture is a metaphor, not an operating procedure.

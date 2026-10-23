@@ -1,5 +1,5 @@
-import { dayNote, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
-import { applyLocale, getLang, introSteps, t, THEME_MINUTES, themeFromMinutes } from "./i18n.js";
+import { DATA_AS_OF, dayNote, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
+import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 
 const INTRO_KEY = "cdc-policy-island-intro-v1";
 
@@ -54,14 +54,53 @@ export function mount({ scene, islands, flows }) {
 
   const toggleKey = { names: "toggleNames", cargo: "toggleCargo", flows: "toggleFlows", freeze: "toggleFreeze", bird: "toggleBird" };
   let introIndex = 0;
+  let lastFocus = null;
 
   function buildFilters() {
-    $("phase-buttons").innerHTML = phases.map((phase) => (
-      `<button type="button" data-phase="${phase.id}" class="${phase.id === state.phase ? "on" : ""}">${esc(phase.label)}<small>${esc(phase.years)}</small></button>`
-    )).join("");
-    $("pillar-buttons").innerHTML = `<button type="button" data-pillar="all" class="${state.pillars.size === 0 ? "on" : ""}">${esc(t("allPillars"))}</button>` + pillars.map((pillar) => (
-      `<button type="button" data-pillar="${pillar.id}" class="${state.pillars.has(pillar.id) ? "on" : ""}" style="--c:${pillar.color}"><b>${esc(pillar.mark)}</b>${esc(pillar.name)}</button>`
-    )).join("");
+    $("phase-buttons").innerHTML = phases.map((phase) => {
+      const on = phase.id === state.phase;
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-phase="${phase.id}" aria-pressed="${on}">${esc(phase.label)}<span class="dim">・${esc(phase.years)}</span></button>`;
+    }).join("");
+    const allOn = state.pillars.size === 0;
+    $("pillar-buttons").innerHTML = `<button type="button" class="btn ${allOn ? "on" : ""}" data-pillar="all" aria-pressed="${allOn}">${esc(t("allPillars"))}</button>` + pillars.map((pillar) => {
+      const on = state.pillars.has(pillar.id);
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-pillar="${pillar.id}" aria-pressed="${on}" style="--c:${pillar.color}"><b>${esc(pillar.mark)}</b>${esc(pillar.name)}</button>`;
+    }).join("");
+  }
+
+  function langName(code) {
+    return t(code === "en" ? "langEn" : code === "ja" ? "langJa" : "langZh");
+  }
+
+  function paintLangButton() {
+    const pop = $("lang-pop");
+    const button = $("lang-btn");
+    button.textContent = `${langName(getLang())} ▾`;
+    button.setAttribute("aria-label", t("langLabel"));
+    button.setAttribute("aria-expanded", String(!pop.hidden));
+    pop.innerHTML = [["zh", "langZh"], ["en", "langEn"], ["ja", "langJa"]].map(([id, key]) => {
+      const on = id === getLang();
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-lang="${id}" aria-pressed="${on}">${esc(t(key))}</button>`;
+    }).join("");
+  }
+
+  function selectedIslandId() {
+    if (state.selected?.type === "item") return state.selected.islandId;
+    if (state.selected?.type === "island") return state.selected.id;
+    return null;
+  }
+
+  function paintRail() {
+    const picked = selectedIslandId();
+    $("rail").innerHTML = ordered.map((island) => {
+      const on = picked === island.id;
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-rail="${island.id}" data-name="${esc(island.name)}" style="--c:${island.accent}" aria-pressed="${on}" aria-label="${esc(island.name)}">${esc(island.no)}</button>`;
+    }).join("");
+  }
+
+  function syncDrawerButton() {
+    const open = ledger.classList.contains("open") || ledger.classList.contains("half");
+    $("list").setAttribute("aria-expanded", String(open));
   }
 
   function paintChrome() {
@@ -69,8 +108,15 @@ export function mount({ scene, islands, flows }) {
     document.title = t("title");
     const description = document.querySelector('meta[name="description"]');
     if (description) description.content = t("description");
-    $("brand-kicker").textContent = t("brandKicker");
     $("brand-title").textContent = t("brandTitle");
+    const badge = $("badge");
+    badge.textContent = t("badge");
+    badge.title = t("badgeLabel");
+    badge.setAttribute("aria-label", t("badgeLabel"));
+    $("disclaimer-short").textContent = t("disclaimerShort");
+    $("disclaimer-peek").textContent = t("disclaimerShort");
+    $("data-as-of").textContent = t("dataAsOf", { date: DATA_AS_OF });
+    $("about").textContent = t("aboutTitle");
     $("compass-rose").querySelector("b").textContent = t("compass");
     $("compass-rose").parentElement.title = t("compassTitle");
     $("home").textContent = t("home");
@@ -78,19 +124,15 @@ export function mount({ scene, islands, flows }) {
     $("help").setAttribute("aria-label", t("help"));
     $("hero-title").innerHTML = esc(t("heroTitle")).replaceAll("\n", "<br>");
     $("hero-lead").innerHTML = esc(t("heroLead")).replaceAll("\n", "<br>");
-    $("ledger-kicker").textContent = t("eyebrow");
-    $("ledger-title").textContent = t("ledgerTitle");
-    $("ledger-lead").textContent = t("ledgerLead");
     search.placeholder = t("search");
     search.setAttribute("aria-label", t("searchLabel"));
     $("tab-islands").textContent = t("tabIslands");
     $("tab-flows").textContent = t("tabFlows", { n: flows.length });
     $("tab-log").textContent = t("tabLog");
-    $("disclaimer").textContent = t("disclaimer");
+    $("tab-phase").textContent = t("tabPhase");
+    $("tab-pillar").textContent = t("tabPillar");
     $("source-link").textContent = t("sourceLink");
-    $("panel-tab-day").textContent = t("panelDay");
-    $("panel-tab-phase").textContent = t("panelPhase");
-    $("panel-tab-pillar").textContent = t("panelPillar");
+    $("filter").textContent = t("filter");
     day.setAttribute("aria-label", t("dayLabel"));
     $("pillar-note").textContent = t("pillarNote");
     document.querySelector(".toggles")?.setAttribute("aria-label", t("togglesLabel"));
@@ -98,19 +140,12 @@ export function mount({ scene, islands, flows }) {
     const veilText = $("veil-text");
     if (veilText) veilText.textContent = t("veil");
     $("c")?.setAttribute("aria-label", t("canvas"));
-    const langBox = $("lang-switch");
-    langBox.setAttribute("aria-label", t("langLabel"));
-    langBox.innerHTML = [["zh", "langZh"], ["en", "langEn"], ["ja", "langJa"]].map(([id, key]) => (
-      `<button type="button" data-lang="${id}" class="${id === getLang() ? "on" : ""}" aria-pressed="${id === getLang()}">${esc(t(key))}</button>`
-    )).join("");
-    const themeBox = $("theme-switch");
-    themeBox.setAttribute("aria-label", t("themeLabel"));
-    themeBox.innerHTML = ["morning", "noon", "evening", "night"].map((id) => (
-      `<button type="button" data-theme-pick="${id}">${esc(t(`theme${id[0].toUpperCase()}${id.slice(1)}`))}</button>`
-    )).join("");
+    paintLangButton();
     for (const button of document.querySelectorAll("[data-toggle]")) button.textContent = t(toggleKey[button.dataset.toggle]);
     buildFilters();
+    paintRail();
     stats.textContent = t("stats", { islands: islands.length, items: itemCount(), flows: flows.length });
+    syncDrawerButton();
   }
 
   function writeHash() {
@@ -131,7 +166,8 @@ export function mount({ scene, islands, flows }) {
     const hour = state.minutes / 60;
     const awake = islands.filter((island) => island.items.some((item) => hourCovers(item.hours, hour))).length;
     clock.textContent = fmt(state.minutes);
-    day.value = String(Math.floor(state.minutes));
+    const nextMinute = String(Math.floor(state.minutes));
+    if (day.value !== nextMinute) day.value = nextMinute;
     const join = getLang() === "en" ? ". " : "。";
     dayNoteEl.textContent = `${note.title}${join}${note.text}`;
     status.textContent = t("onDuty", { n: awake });
@@ -141,11 +177,7 @@ export function mount({ scene, islands, flows }) {
     const themeColor = { morning: "#f6e3c8", noon: "#d5eee8", evening: "#3a1844", night: "#070b12" };
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = themeColor[theme];
-    for (const button of document.querySelectorAll("[data-theme-pick]")) {
-      const on = button.dataset.themePick === theme;
-      button.classList.toggle("on", on);
-      button.setAttribute("aria-pressed", String(on));
-    }
+    pokeCaption();
   }
 
   function renderList() {
@@ -154,7 +186,7 @@ export function mount({ scene, islands, flows }) {
       const rows = flows.filter((flow) => !q || [flow.title, flow.text, flow.carried, flow._alias, byId.get(flow.a).name, byId.get(flow.b).name].join(" ").toLowerCase().replace(/\s+/g, "").includes(q));
       tree.innerHTML = rows.length ? rows.map((flow) => {
         const on = state.selected?.type === "flow" && state.selected.id === flow.id;
-        return `<button type="button" class="flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.title)}</b><span>${esc(byId.get(flow.a).name)} → ${esc(byId.get(flow.b).name)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
+        return `<button type="button" class="btn flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.title)}</b><span>${esc(byId.get(flow.a).name)} → ${esc(byId.get(flow.b).name)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
       }).join("") : `<p class="empty">${esc(t("emptyFlow"))}</p>`;
       return;
     }
@@ -173,9 +205,9 @@ export function mount({ scene, islands, flows }) {
       const open = state.selected && ((state.selected.type === "island" && state.selected.id === island.id) || (state.selected.type === "item" && state.selected.islandId === island.id) || (state.selected.type === "flow" && (state.selected.flow.a === island.id || state.selected.flow.b === island.id)));
       const items = island.items.map((item) => {
         const on = state.selected?.type === "item" && state.selected.itemId === item.id;
-        return `<button type="button" class="sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
+        return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
       }).join("");
-      return `<section class="island ${open ? "open" : ""}"><button type="button" class="head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.name)}</b><small>${esc(island.pin)}</small></span></button><div class="subs">${items}</div></section>`;
+      return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.name)}</b><small>${esc(island.pin)}</small></span></button><div class="subs">${items}</div></section>`;
     }).join("") : `<p class="empty">${esc(t("emptyIsland"))}</p>`;
   }
 
@@ -184,25 +216,27 @@ export function mount({ scene, islands, flows }) {
     if (!selected) {
       sheet.hidden = true;
       document.body.classList.remove("detail");
+      measureSafe();
       return;
     }
     document.body.classList.add("detail");
     sheet.hidden = false;
     if (selected.type === "flow") {
       const flow = selected.flow;
-      sheet.innerHTML = `<button type="button" class="x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.title)}</h2><p class="route">${esc(byId.get(flow.a).name)} → ${esc(byId.get(flow.b).name)}</p><p>${esc(flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p><p class="fine">${esc(t("flowFine"))}</p>`;
+      sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.title)}</h2><p class="route">${esc(byId.get(flow.a).name)} → ${esc(byId.get(flow.b).name)}</p><p>${esc(flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p>`;
       return;
     }
     const island = byId.get(selected.type === "item" ? selected.islandId : selected.id);
     const related = flows.filter((flow) => flow.a === island.id || flow.b === island.id);
     const items = island.items.map((item) => {
       const on = selected.type === "item" && selected.itemId === item.id;
-      return `<button type="button" class="detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.name)}</b><small>${esc(phaseLabel[item.phase])}</small></span><em>${esc(item.text)}</em></button>`;
+      return `<button type="button" class="btn detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.name)}</b><small>${esc(phaseLabel[item.phase])}</small></span><em>${esc(item.text)}</em></button>`;
     }).join("");
-    const links = related.map((flow) => `<button type="button" data-flow="${flow.id}">${esc(flow.title)}</button>`).join("");
-    sheet.innerHTML = `<button type="button" class="x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2><p>${esc(island.blurb)}</p><p class="source">${esc(island.source)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div>`;
+    const links = related.map((flow) => `<button type="button" class="btn" data-flow="${flow.id}">${esc(flow.title)}</button>`).join("");
+    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2><p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
     const current = sheet.querySelector(".detail-item.on");
     current?.scrollIntoView({ block: "nearest" });
+    measureSafe();
   }
 
   function selectIsland(id) {
@@ -213,6 +247,7 @@ export function mount({ scene, islands, flows }) {
     writeHash();
     renderList();
     renderSheet();
+    paintRail();
   }
 
   function selectItem(islandId, itemId) {
@@ -224,6 +259,7 @@ export function mount({ scene, islands, flows }) {
     writeHash();
     renderList();
     renderSheet();
+    paintRail();
   }
 
   function selectFlow(id) {
@@ -235,6 +271,7 @@ export function mount({ scene, islands, flows }) {
     writeHash();
     renderList();
     renderSheet();
+    paintRail();
   }
 
   function clearSelection() {
@@ -244,14 +281,54 @@ export function mount({ scene, islands, flows }) {
     writeHash();
     renderList();
     renderSheet();
+    paintRail();
   }
 
   function syncToggles() {
     for (const button of document.querySelectorAll("[data-toggle]")) {
       button.setAttribute("aria-pressed", String(state[button.dataset.toggle]));
     }
-    $("play").textContent = state.playing ? t("pause") : t("play");
-    $("play").setAttribute("aria-pressed", String(state.playing));
+    const play = $("play");
+    play.textContent = state.playing ? "❚❚" : "▶";
+    play.setAttribute("aria-label", state.playing ? t("pause") : t("play"));
+    play.setAttribute("aria-pressed", String(state.playing));
+  }
+
+  function placeCoach(index) {
+    const card = modal.querySelector(".modal-card");
+    card.classList.remove("step-1", "step-2", "step-3", "step-4", "mode-static");
+    document.querySelectorAll(".head.pulse").forEach((el) => el.classList.remove("pulse"));
+    const mode = modal.dataset.mode;
+    const dots = $("modal-dots");
+    if (mode === "help" || mode === "about") {
+      card.classList.add("mode-static");
+      document.body.classList.remove("intro");
+      dots.hidden = true;
+      measureSafe();
+      return;
+    }
+    card.classList.add(`step-${index + 1}`);
+    document.body.classList.add("intro");
+    dots.hidden = false;
+    if (index === 1) document.querySelector("#tree .head")?.classList.add("pulse");
+    const desktop = window.matchMedia("(min-width: 981px)").matches;
+    if (index === 1 && desktop) ledger.classList.add("open");
+    else ledger.classList.remove("open", "half");
+    syncDrawerButton();
+    measureSafe();
+  }
+
+  function paintDots(index, total) {
+    $("modal-dots").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i === index ? "on" : ""}"></i>`).join("");
+  }
+
+  function openModal() {
+    if (modal.hidden) {
+      const active = document.activeElement;
+      lastFocus = active && active !== document.body ? active : null;
+    }
+    modal.hidden = false;
+    $("modal-next").focus();
   }
 
   function showIntro(index) {
@@ -259,13 +336,15 @@ export function mount({ scene, islands, flows }) {
     modal.dataset.mode = "";
     const steps = introSteps();
     const step = steps[index];
-    $("modal-kicker").textContent = step.kicker;
+    $("modal-kicker").textContent = `${index + 1} / ${steps.length}`;
     $("modal-title").textContent = step.title;
     $("modal-body").textContent = step.body;
     $("modal-next").textContent = index === steps.length - 1 ? t("start") : t("next");
     $("modal-skip").textContent = t("skip");
     $("modal-skip").hidden = index === steps.length - 1;
-    modal.hidden = false;
+    paintDots(index, steps.length);
+    placeCoach(index);
+    openModal();
     if (step.showFlows) {
       state.flows = true;
       scene.setShowAllFlows(true);
@@ -273,9 +352,31 @@ export function mount({ scene, islands, flows }) {
     }
   }
 
+  function showAbout() {
+    modal.dataset.mode = "about";
+    $("modal-kicker").textContent = t("aboutKicker");
+    $("modal-title").textContent = t("aboutTitle");
+    $("modal-body").innerHTML = `<ul class="about-lines"><li>${esc(t("about1"))}</li><li>${esc(t("about2"))}</li><li>${esc(t("about3"))}</li></ul>`;
+    $("modal-next").textContent = t("gotIt");
+    $("modal-skip").hidden = true;
+    placeCoach(0);
+    openModal();
+  }
+
   function closeModal() {
+    const wasIntro = document.body.classList.contains("intro");
     modal.hidden = true;
+    modal.dataset.mode = "";
+    document.body.classList.remove("intro");
+    document.querySelectorAll(".head.pulse").forEach((el) => el.classList.remove("pulse"));
+    if (wasIntro) {
+      ledger.classList.remove("open", "half");
+      syncDrawerButton();
+    }
     sessionStorage.setItem(INTRO_KEY, "1");
+    const back = lastFocus && document.contains(lastFocus) ? lastFocus : $("help");
+    back.focus();
+    measureSafe();
   }
 
   function refreshModal() {
@@ -285,6 +386,12 @@ export function mount({ scene, islands, flows }) {
       $("modal-title").textContent = t("helpTitle");
       $("modal-body").textContent = t("helpBody");
       $("modal-next").textContent = t("gotIt");
+      $("modal-skip").hidden = true;
+      placeCoach(0);
+      return;
+    }
+    if (modal.dataset.mode === "about") {
+      showAbout();
       return;
     }
     showIntro(introIndex);
@@ -302,7 +409,7 @@ export function mount({ scene, islands, flows }) {
     if (!event) return;
     const text = t("handoff", { from: byId.get(event.from).name, what: event.carried, to: byId.get(event.to).name });
     state.log.unshift({ time: fmt(state.minutes), text });
-    state.log.length = 12;
+    if (state.log.length > 12) state.log.length = 12;
     if (state.tab === "log") renderList();
   });
 
@@ -334,19 +441,14 @@ export function mount({ scene, islands, flows }) {
     if (flow) selectFlow(flow.dataset.flow);
   });
 
-  for (const button of document.querySelectorAll(".dial-tabs button")) {
-    button.addEventListener("click", () => {
-      for (const tab of document.querySelectorAll(".dial-tabs button")) tab.classList.toggle("on", tab === button);
-      for (const panel of document.querySelectorAll(".dial .panel")) {
-        panel.classList.toggle("on", panel.id === `panel-${button.dataset.panel}`);
-      }
-    });
-  }
   for (const button of document.querySelectorAll(".tabs button")) {
     button.addEventListener("click", () => {
-      state.tab = button.dataset.tab;
-      for (const tab of document.querySelectorAll(".tabs button")) tab.classList.toggle("on", tab === button);
-      renderList();
+      const tab = button.dataset.tab;
+      if (tab === "phase" || tab === "pillar") {
+        showFilter(tab);
+        return;
+      }
+      setPane(tab);
     });
   }
   search.addEventListener("input", () => {
@@ -358,7 +460,11 @@ export function mount({ scene, islands, flows }) {
     const button = event.target.closest("[data-phase]");
     if (!button) return;
     state.phase = button.dataset.phase;
-    for (const item of $("phase-buttons").querySelectorAll("button")) item.classList.toggle("on", item === button);
+    for (const item of $("phase-buttons").querySelectorAll("button")) {
+      const on = item === button;
+      item.classList.toggle("on", on);
+      item.setAttribute("aria-pressed", String(on));
+    }
     phaseNote.textContent = phases.find((phase) => phase.id === state.phase).note;
     scene.setPhase(state.phase);
     renderList();
@@ -371,7 +477,9 @@ export function mount({ scene, islands, flows }) {
     else state.pillars.add(button.dataset.pillar);
     for (const item of $("pillar-buttons").querySelectorAll("button")) {
       const id = item.dataset.pillar;
-      item.classList.toggle("on", id === "all" ? state.pillars.size === 0 : state.pillars.has(id));
+      const on = id === "all" ? state.pillars.size === 0 : state.pillars.has(id);
+      item.classList.toggle("on", on);
+      item.setAttribute("aria-pressed", String(on));
     }
     scene.setPillars(state.pillars);
   });
@@ -384,6 +492,7 @@ export function mount({ scene, islands, flows }) {
   $("play").addEventListener("click", () => {
     state.playing = !state.playing;
     syncToggles();
+    pokeCaption();
   });
   for (const button of document.querySelectorAll("[data-toggle]")) {
     button.addEventListener("click", () => {
@@ -402,26 +511,64 @@ export function mount({ scene, islands, flows }) {
   }
   $("home").addEventListener("click", clearSelection);
   $("list").addEventListener("click", () => {
-    ledger.classList.toggle("open");
-    search.focus();
+    if (ledger.classList.contains("open")) {
+      ledger.classList.remove("open", "half");
+    } else {
+      ledger.classList.remove("half");
+      ledger.classList.add("open");
+      if (window.matchMedia("(pointer: fine)").matches) search.focus();
+    }
+    syncDrawerButton();
+    measureSafe();
+  });
+  $("rail").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-rail]");
+    if (button) selectIsland(button.dataset.rail);
+  });
+  $("filter").addEventListener("click", (event) => {
+    event.stopPropagation();
+    showFilter("filter");
+  });
+  $("lang-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
+    const pop = $("lang-pop");
+    pop.hidden = !pop.hidden;
+    paintLangButton();
   });
   $("help").addEventListener("click", () => {
+    modal.dataset.mode = "help";
     $("modal-kicker").textContent = t("helpKicker");
     $("modal-title").textContent = t("helpTitle");
     $("modal-body").textContent = t("helpBody");
     $("modal-next").textContent = t("gotIt");
     $("modal-skip").hidden = true;
-    modal.hidden = false;
-    modal.dataset.mode = "help";
+    placeCoach(0);
+    openModal();
   });
+  $("about").addEventListener("click", showAbout);
   $("modal-skip").addEventListener("click", closeModal);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) closeModal();
+  modal.querySelector(".modal-card").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.tagName !== "BUTTON") {
+      event.preventDefault();
+      $("modal-next").click();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const items = [...modal.querySelectorAll(".modal-card button")].filter((el) => !el.hidden);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   });
   $("modal-next").addEventListener("click", () => {
-    if (modal.dataset.mode === "help") {
-      modal.hidden = true;
-      modal.dataset.mode = "";
+    if (modal.dataset.mode === "help" || modal.dataset.mode === "about") {
+      closeModal();
       return;
     }
     if (introIndex >= introSteps().length - 1) closeModal();
@@ -432,14 +579,22 @@ export function mount({ scene, islands, flows }) {
       event.preventDefault();
       $("help").click();
     } else if (event.key === "Escape") {
-      if (!modal.hidden) closeModal();
+      if (!$("lang-pop").hidden) {
+        $("lang-pop").hidden = true;
+        paintLangButton();
+      } else if (!$("filter-pop").hidden) {
+        $("filter-pop").hidden = true;
+        $("filter").setAttribute("aria-expanded", "false");
+        setPane(state.tab);
+      } else if (!modal.hidden) closeModal();
       else if (state.selected) clearSelection();
     }
   });
-  $("lang-switch").addEventListener("click", (event) => {
+  $("lang-pop").addEventListener("click", (event) => {
     const button = event.target.closest("[data-lang]");
     if (!button || button.dataset.lang === getLang()) return;
     applyLocale(button.dataset.lang);
+    $("lang-pop").hidden = true;
     scene.relabel?.();
     paintChrome();
     phaseNote.textContent = phases.find((phase) => phase.id === state.phase).note;
@@ -449,14 +604,176 @@ export function mount({ scene, islands, flows }) {
     renderSheet();
     refreshModal();
   });
-  $("theme-switch").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-theme-pick]");
-    if (!button) return;
-    state.playing = false;
-    state.minutes = THEME_MINUTES[button.dataset.themePick];
-    syncToggles();
-    paintClock();
+
+  function visibleBox(el) {
+    if (!el || el.hidden) return null;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return null;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return null;
+    if (rect.right < 0 || rect.bottom < 0 || rect.left > innerWidth || rect.top > innerHeight) return null;
+    return rect;
+  }
+
+  let safeFrame = 0;
+  function measureSafe() {
+    cancelAnimationFrame(safeFrame);
+    safeFrame = requestAnimationFrame(() => {
+      const width = innerWidth;
+      const height = innerHeight;
+      let top = 0;
+      let bottom = height;
+      let left = 0;
+      let right = width;
+      const nodes = [
+        document.querySelector(".brand"),
+        document.querySelector("#disclaimer-short"),
+        document.querySelector(".rail"),
+        ledger,
+        sheet,
+        document.querySelector(".dial"),
+      ];
+      for (const el of nodes) {
+        const desktopDrawer = el === ledger && ledger.classList.contains("open") && !window.matchMedia("(max-width: 980px)").matches;
+        let box = null;
+        if (desktopDrawer) {
+          const style = getComputedStyle(ledger);
+          if (style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) !== 0) {
+            const wide = 360;
+            box = { top: 16, bottom: height - 16, left: width - 16 - wide, right: width - 16, width: wide, height: height - 32 };
+          }
+        } else box = visibleBox(el);
+        if (!box) continue;
+        const tall = box.height > height * 0.45;
+        const wide = box.width > width * 0.55;
+        if (tall && !wide && box.left > width * 0.45) {
+          right = Math.min(right, box.left - 8);
+          continue;
+        }
+        if (tall && !wide && box.right < width * 0.55) {
+          left = Math.max(left, box.right + 8);
+          continue;
+        }
+        const midY = box.top + box.height / 2;
+        if (midY > height * 0.55) {
+          bottom = Math.min(bottom, box.top - 8);
+          continue;
+        }
+        if (box.bottom < height * 0.42) top = Math.max(top, box.bottom + 8);
+      }
+      scene.setSafeRect?.({ top, right, bottom, left });
+    });
+  }
+
+  function setPane(tab) {
+    state.tab = tab;
+    ledger.dataset.pane = tab;
+    $("filter-pop").hidden = true;
+    $("filter").setAttribute("aria-expanded", "false");
+    for (const item of document.querySelectorAll(".tabs button")) {
+      const on = item.dataset.tab === tab;
+      item.classList.toggle("on", on);
+      item.setAttribute("aria-selected", String(on));
+    }
+    renderList();
+  }
+
+  function showFilter(from) {
+    const pop = $("filter-pop");
+    const same = !pop.hidden && pop.dataset.from === from;
+    pop.hidden = same;
+    pop.dataset.from = same ? "" : from;
+    $("filter").setAttribute("aria-expanded", String(!pop.hidden));
+    for (const item of document.querySelectorAll(".tabs button")) {
+      const kind = item.dataset.tab;
+      const on = kind === "phase" || kind === "pillar" ? !pop.hidden && kind === from : kind === state.tab;
+      item.classList.toggle("on", on);
+      item.setAttribute("aria-selected", String(on));
+    }
+  }
+
+  let captionTimer = 0;
+  let captionText = "";
+  function pokeCaption() {
+    const cap = $("caption");
+    if (!cap) return;
+    const text = cap.textContent;
+    const changed = text !== captionText;
+    captionText = text;
+    if (state.playing) {
+      cap.classList.remove("idle");
+      window.clearTimeout(captionTimer);
+      captionTimer = 0;
+      return;
+    }
+    if (!changed && captionTimer) return;
+    cap.classList.remove("idle");
+    window.clearTimeout(captionTimer);
+    captionTimer = window.setTimeout(() => {
+      captionTimer = 0;
+      if (!state.playing) cap.classList.add("idle");
+    }, 4000);
+  }
+
+  const titleCard = $("title-card");
+  let titleGone = false;
+  function dismissTitle() {
+    if (titleGone || !titleCard) return;
+    titleGone = true;
+    titleCard.classList.add("gone");
+    window.setTimeout(() => { titleCard.hidden = true; }, 700);
+  }
+  window.setTimeout(dismissTitle, 3000);
+  document.addEventListener("pointerdown", dismissTitle, { once: true });
+
+  let dragY = null;
+  let dragId = null;
+  ledger.addEventListener("pointerdown", (event) => {
+    if (!window.matchMedia("(max-width: 980px)").matches) return;
+    if (window.matchMedia("(max-height: 500px) and (orientation: landscape)").matches) return;
+    if (event.target.closest("button, input, a, .ledger-scroll")) return;
+    dragY = event.clientY;
+    dragId = event.pointerId;
   });
+  window.addEventListener("pointerup", (event) => {
+    if (dragId == null || event.pointerId !== dragId) return;
+    const dy = dragY - event.clientY;
+    dragId = null;
+    const levels = ["peek", "half", "open"];
+    const index = levels.indexOf(ledger.classList.contains("open") ? "open" : ledger.classList.contains("half") ? "half" : "peek");
+    if (Math.abs(dy) <= 24) {
+      ledger.classList.remove("open", "half");
+      const next = levels[(index + 1) % levels.length];
+      if (next === "half") ledger.classList.add("half");
+      if (next === "open") ledger.classList.add("open");
+    } else if (dy > 40 && index < levels.length - 1) {
+      const next = levels[index + 1];
+      ledger.classList.remove("open", "half");
+      if (next !== "peek") ledger.classList.add(next);
+    } else if (dy < -40 && index > 0) {
+      const next = levels[index - 1];
+      ledger.classList.remove("open", "half");
+      if (next !== "peek") ledger.classList.add(next);
+    } else return;
+    syncDrawerButton();
+    measureSafe();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!$("lang-pop").hidden && !event.target.closest("#lang-pop, #lang-btn")) {
+      $("lang-pop").hidden = true;
+      paintLangButton();
+    }
+    if (!$("filter-pop").hidden && !event.target.closest("#filter-pop, #filter, #tab-phase, #tab-pillar")) {
+      $("filter-pop").hidden = true;
+      $("filter").setAttribute("aria-expanded", "false");
+      setPane(state.tab);
+    }
+  });
+  const watcher = new ResizeObserver(() => measureSafe());
+  for (const el of [document.querySelector(".brand"), document.querySelector(".dial"), ledger, sheet, document.querySelector(".rail"), document.querySelector("#disclaimer-short")]) {
+    if (el) watcher.observe(el);
+  }
+  window.addEventListener("resize", measureSafe);
 
   const params = new URLSearchParams(location.hash.replace(/^#/, ""));
   paintChrome();
@@ -470,6 +787,7 @@ export function mount({ scene, islands, flows }) {
   else if (!new URLSearchParams(location.search).has("quiet") && !sessionStorage.getItem(INTRO_KEY)) showIntro(0);
 
   $("source-link").href = SOURCE_INDEX;
+  measureSafe();
 
   return {
     tick(dt) {

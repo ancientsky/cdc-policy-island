@@ -4,103 +4,90 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6e3c8">
-  <title>疾管署政策發展島</title>
-  <meta name="description" content="一格政策，一座相連的防疫網。把疾病管制署公開的防治計畫排成可探索的政策島。">
+  <title>防疫島大冒險｜台灣防疫互動地圖（非官方）</title>
+  <meta name="description" content="病菌想登陸台灣？跟著防疫小隊長琵琵巡邏 14 座島，看醫生、檢驗員和里長伯怎麼接力把病菌擋下來。依疾管署公開資料整理的非官方互動地圖。">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+JP:wght@600;700&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+
 </head>
 <body>
   <div id="view">
-    <canvas id="c" aria-label="十四座六邊形組成臺灣輪廓的政策島。完整文字在右側清單。"></canvas>
+    <canvas id="c" aria-label="十四座六邊形組成臺灣輪廓的政策島。完整文字在清單。"></canvas>
   </div>
   <div class="hud">
     <header class="brand">
-      <div>
-        <p id="brand-kicker">疾管署</p>
-        <strong id="brand-title">政策發展島</strong>
-      </div>
-      <div class="compass" title="北方">
-        <div id="compass-rose"><b>北</b><i></i></div>
-      </div>
+      <strong id="brand-title">防疫島大冒險</strong>
+      <span id="badge" class="badge" title="本站非疾病管制署官方網站，內容依公開資料整理" aria-label="本站非疾病管制署官方網站，內容依公開資料整理">非官方</span>
       <nav class="tools" aria-label="地圖">
-        <button id="home" type="button">全景</button>
-        <button id="list" type="button">清單</button>
-        <button id="help" type="button" aria-label="操作說明">?</button>
+        <button id="home" type="button" class="btn">全景</button>
+        <button id="list" type="button" class="btn" aria-expanded="false">清單</button>
+        <button id="help" type="button" class="btn btn--icon" aria-label="操作說明">?</button>
+        <button id="lang-btn" type="button" class="btn" aria-haspopup="true" aria-expanded="false">中 ▾</button>
       </nav>
+      <div id="lang-pop" class="pop" hidden></div>
     </header>
-    <div class="modes">
-      <div class="seg" id="lang-switch" role="group"></div>
-      <div class="seg" id="theme-switch" role="group"></div>
+    <p id="disclaimer-short" class="disclaimer-short">非官方網站・依疾管署公開資料整理</p>
+    <div class="title-card" id="title-card">
+      <h1 id="hero-title">十四座島<br>排成臺灣輪廓</h1>
+      <p id="hero-lead">點一座島，看這項工作在做什麼。</p>
     </div>
-    <section class="hero">
-      <div class="hero-no">14</div>
-      <h2 id="hero-title">一格政策<br>一座相連的防疫網</h2>
-      <p id="hero-lead">從一個計畫開始，<br>看見防治工作在哪裡交會。</p>
-      <p class="stats" id="stats"></p>
-    </section>
-    <aside class="ledger" id="ledger" aria-label="政策清單">
+    <nav class="rail" id="rail" aria-label="政策島"></nav>
+    <aside class="ledger" id="ledger" aria-label="政策清單" data-pane="islands">
       <div class="ledger-head">
-        <p class="eyebrow" id="ledger-kicker">POLICY ISLANDS</p>
-        <h2 id="ledger-title">把防治工作接起來</h2>
-        <p id="ledger-lead">十四座島對應公開計畫與常設業務。點一項，看它和誰交件。</p>
+        <p id="disclaimer-peek" class="disclaimer-peek">非官方網站・依疾管署公開資料整理</p>
+        <p class="stats" id="stats"></p>
         <input id="search" type="search" placeholder="搜尋政策、PrEP、孳生源…" aria-label="搜尋政策或協作">
         <div class="tabs" role="tablist">
-          <button type="button" class="on" data-tab="islands" id="tab-islands">政策島</button>
-          <button type="button" data-tab="flows" id="tab-flows">協作 18</button>
-          <button type="button" data-tab="log" id="tab-log">紀錄</button>
+          <button type="button" class="btn on" data-tab="islands" id="tab-islands" aria-selected="true">政策島</button>
+          <button type="button" class="btn" data-tab="flows" id="tab-flows" aria-selected="false">協作 18</button>
+          <button type="button" class="btn" data-tab="log" id="tab-log" aria-selected="false">紀錄</button>
+          <button type="button" class="btn only-narrow" data-tab="phase" id="tab-phase" aria-selected="false">階段</button>
+          <button type="button" class="btn only-narrow" data-tab="pillar" id="tab-pillar" aria-selected="false">主軸</button>
         </div>
       </div>
-      <div id="tree" class="tree"></div>
-      <footer>
-        <span id="disclaimer">本島依疾管署公開計畫與常設業務整理，用來看出政策之間怎麼相連，不是疾病管制署官方網站。</span>
-        <a id="source-link" href="https://www.cdc.gov.tw/Category/Page/yZOu-4cGeu77HDyzE0ojqg" target="_blank" rel="noopener noreferrer">公開計畫清單</a>
-      </footer>
+      <div class="ledger-scroll">
+        <div id="tree" class="tree"></div>
+        <footer class="legal">
+          <span id="data-as-of">資料截至 2026-10</span>
+          <button type="button" class="btn btn--sm" id="about">關於這張地圖</button>
+          <a id="source-link" href="https://www.cdc.gov.tw/Category/MPage/kVzFWokFW3l9_YeB8idzuw" target="_blank" rel="noopener noreferrer">資料來源</a>
+        </footer>
+      </div>
     </aside>
     <article class="sheet" id="sheet" hidden aria-live="polite"></article>
+    <p class="caption" id="caption"><span id="day-note"></span> <span id="status" aria-live="polite"></span></p>
     <section class="dial" aria-label="時間與篩選">
-      <div class="dial-top">
-        <div class="dial-tabs" role="tablist">
-          <button type="button" class="on" data-panel="day" id="panel-tab-day">01　防疫的一天</button>
-          <button type="button" data-panel="phase" id="panel-tab-phase">02　政策階段</button>
-          <button type="button" data-panel="pillar" id="panel-tab-pillar">03　五大主軸</button>
-        </div>
-        <p id="status" aria-live="polite"></p>
-      </div>
-      <div class="panel on" id="panel-day">
-        <div class="day-row">
-          <button id="play" type="button" aria-pressed="false">播放一天</button>
-          <output id="clock">08:20</output>
-          <input id="day" type="range" min="0" max="1439" value="500" aria-label="防疫的一天，以分鐘計">
-        </div>
-        <div class="ticks"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
-        <p class="note" id="day-note"></p>
-      </div>
-      <div class="panel" id="panel-phase">
-        <div class="choices" id="phase-buttons"></div>
-        <p class="note" id="phase-note"></p>
-      </div>
-      <div class="panel" id="panel-pillar">
-        <div class="choices pills" id="pillar-buttons"></div>
-        <p class="note" id="pillar-note">可複選。沒有選取時，十四座島都留下。</p>
-      </div>
-      <div class="toggles" role="toolbar" aria-label="顯示">
-        <button type="button" data-toggle="names" aria-pressed="false">名牌</button>
-        <button type="button" data-toggle="cargo" aria-pressed="true">搬運</button>
-        <button type="button" data-toggle="flows" aria-pressed="false">協作線</button>
-        <button type="button" data-toggle="freeze" aria-pressed="false">暫停</button>
-        <button type="button" data-toggle="bird" aria-pressed="false">鳥瞰</button>
-      </div>
+      <button id="play" type="button" class="btn btn--icon btn--solid" aria-pressed="false" aria-label="播放一天">▶</button>
+      <output id="clock">08:20</output>
+      <input id="day" type="range" min="0" max="1439" value="500" aria-label="防疫的一天，以分鐘計">
+      <button id="filter" type="button" class="btn" aria-expanded="false" aria-haspopup="true">篩選</button>
     </section>
+    <div class="toggles" role="toolbar" aria-label="顯示">
+      <button type="button" class="btn" data-toggle="names" aria-pressed="false">名牌</button>
+      <button type="button" class="btn" data-toggle="cargo" aria-pressed="true">搬運</button>
+      <button type="button" class="btn" data-toggle="flows" aria-pressed="false">協作線</button>
+      <button type="button" class="btn" data-toggle="freeze" aria-pressed="false">暫停</button>
+      <button type="button" class="btn" data-toggle="bird" aria-pressed="false">鳥瞰</button>
+    </div>
+    <div id="filter-pop" class="pop filter-pop" hidden>
+      <div class="choices" id="phase-buttons"></div>
+      <p class="note" id="phase-note"></p>
+      <div class="choices pills" id="pillar-buttons"></div>
+      <p class="note" id="pillar-note">可複選。沒有選取時，十四座島都留下。</p>
+    </div>
+    <div class="compass" title="北方">
+      <div id="compass-rose"><b>北</b><i></i></div>
+    </div>
     <div class="modal" id="modal" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-card" role="dialog" aria-modal="false" aria-labelledby="modal-title" aria-describedby="modal-body">
         <p class="eyebrow" id="modal-kicker"></p>
         <h2 id="modal-title"></h2>
-        <p id="modal-body"></p>
+        <div id="modal-body"></div>
         <div class="modal-actions">
-          <button id="modal-skip" type="button">略過</button>
-          <button id="modal-next" type="button" class="primary">下一步</button>
+          <span class="dots" id="modal-dots" aria-hidden="true"></span>
+          <span class="modal-buttons">
+            <button id="modal-skip" type="button" class="btn">略過</button>
+            <button id="modal-next" type="button" class="btn btn--solid">下一步</button>
+          </span>
         </div>
       </div>
     </div>
