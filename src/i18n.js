@@ -1,0 +1,835 @@
+import { dayNotes, flows, islands, phaseLabel, phases, pillars } from "./data.js";
+
+const LANG_KEY = "cdc-island-lang";
+
+export const THEME_MINUTES = {
+  morning: 8 * 60 + 20,
+  noon: 12 * 60 + 30,
+  evening: 18 * 60 + 40,
+  night: 22 * 60,
+};
+
+export function themeFromMinutes(minutes) {
+  const hour = (((minutes % 1440) + 1440) % 1440) / 60;
+  if (hour >= 5 && hour < 10.5) return "morning";
+  if (hour >= 10.5 && hour < 16) return "noon";
+  if (hour >= 16 && hour < 19.75) return "evening";
+  return "night";
+}
+
+const ui = {
+  zh: {
+    brandKicker: "疾管署",
+    brandTitle: "政策發展島",
+    title: "疾管署政策發展島",
+    description: "一格政策，一座相連的防疫網。把疾病管制署公開的防治計畫排成可探索的政策島。",
+    compass: "北",
+    compassTitle: "北方",
+    home: "全景",
+    list: "清單",
+    help: "操作說明",
+    heroTitle: "一格政策\n一座相連的防疫網",
+    heroLead: "從一個計畫開始，\n看見防治工作在哪裡交會。",
+    eyebrow: "POLICY ISLANDS",
+    ledgerTitle: "把防治工作接起來",
+    ledgerLead: "十四座島對應公開計畫與常設業務。點一項，看它和誰交件。",
+    search: "搜尋政策、PrEP、孳生源…",
+    searchLabel: "搜尋政策或協作",
+    tabIslands: "政策島",
+    tabFlows: "協作 {n}",
+    tabLog: "紀錄",
+    disclaimer: "本島依疾管署公開計畫與常設業務整理，用來看出政策之間怎麼相連，不是疾病管制署官方網站。衛生福利部施政計畫和年度計畫評核是管考，沒有另做成一座島。海面上的病原和對岸的陰影是這張圖自己的警示，不是署的說法。",
+    shore: "對岸",
+    sourceLink: "公開計畫清單",
+    panelDay: "01　防疫的一天",
+    panelPhase: "02　政策階段",
+    panelPillar: "03　五大主軸",
+    play: "播放一天",
+    pause: "暫停一天",
+    dayLabel: "防疫的一天，以分鐘計",
+    pillarNote: "可複選。沒有選取時，十四座島都留下。",
+    toggleNames: "名牌",
+    toggleCargo: "搬運",
+    toggleFlows: "協作線",
+    toggleFreeze: "暫停",
+    toggleBird: "鳥瞰",
+    togglesLabel: "顯示",
+    close: "關閉",
+    flowEyebrow: "協作",
+    carried: "這條線上搬的是「{what}」。",
+    flowFine: "這是兩個計畫的交界，不是另一個獨立計畫。",
+    outTitle: "從這裡交出去",
+    carry: "攜帶 {what}",
+    emptyFlow: "沒有符合的協作。",
+    emptyLog: "協作線上的人開始走動之後，交件會記在這裡。",
+    emptyIsland: "沒有符合的政策。",
+    stats: "{islands} 座政策島　{items} 項工作　{flows} 條協作",
+    onDuty: "{n} 座島在這個時段有人值班",
+    handoff: "{from} 把{what}交到 {to}",
+    allPillars: "全部",
+    next: "下一步",
+    start: "開始看",
+    skip: "略過",
+    gotIt: "知道了",
+    helpKicker: "操作",
+    helpTitle: "怎麼看這座島",
+    helpBody: "拖曳旋轉，滾輪或兩指拉近。點島或房子打開說明，點海面回到全景。名牌、協作線和鳥瞰在下方切換。上方可換語言，以及清晨、正午、黃昏、夜裡四種佈景。本頁依疾管署公開資料整理，不是官方網站。",
+    veil: "正在把計畫排成島嶼…",
+    canvas: "十四座六邊形組成臺灣輪廓的政策島。完整文字在右側清單。",
+    fallback: "這台瀏覽器畫不了立體島嶼，請用右側清單閱讀。",
+    mapLabel: "地圖",
+    langLabel: "語言",
+    themeLabel: "佈景",
+    themeMorning: "晨",
+    themeNoon: "午",
+    themeEvening: "晚",
+    themeNight: "夜",
+    langZh: "中",
+    langEn: "EN",
+    langJa: "日",
+  },
+  en: {
+    brandKicker: "Taiwan CDC",
+    brandTitle: "Policy islands",
+    title: "Taiwan CDC policy islands",
+    description: "One cell, one program, joined into a prevention network. Public Taiwan CDC programs, arranged as islands you can walk.",
+    compass: "N",
+    compassTitle: "North",
+    home: "All",
+    list: "List",
+    help: "How to read this",
+    heroTitle: "One program\na connected net",
+    heroLead: "Start from a single plan\nand see where the work changes hands.",
+    eyebrow: "POLICY ISLANDS",
+    ledgerTitle: "Follow the handoff",
+    ledgerLead: "Fourteen islands, one public program or standing duty each. Open one and see what it passes on.",
+    search: "Search PrEP, vectors, quarantine…",
+    searchLabel: "Search programs or handoffs",
+    tabIslands: "Islands",
+    tabFlows: "Handoffs {n}",
+    tabLog: "Log",
+    disclaimer: "Arranged from public Taiwan CDC programs and standing work, to show how they connect. This is not an official Taiwan CDC website. The ministry’s annual administrative plan and the yearly self-review are governance, not another island. Pathogens on the water and the shadow on the far shore are this picture’s own warning, not a statement by Taiwan CDC.",
+    shore: "Far shore",
+    sourceLink: "Public program list",
+    panelDay: "01　A prevention day",
+    panelPhase: "02　Program phase",
+    panelPillar: "03　Five pillars",
+    play: "Play the day",
+    pause: "Pause the day",
+    dayLabel: "A prevention day, in minutes",
+    pillarNote: "Select more than one. With none selected, all fourteen islands stay.",
+    toggleNames: "Names",
+    toggleCargo: "Cargo",
+    toggleFlows: "Handoffs",
+    toggleFreeze: "Freeze",
+    toggleBird: "Overhead",
+    togglesLabel: "Display",
+    close: "Close",
+    flowEyebrow: "Handoff",
+    carried: "What moves on this line: “{what}”.",
+    flowFine: "This is the boundary between two programs, not a third program.",
+    outTitle: "Passed on from here",
+    carry: "Carries {what}",
+    emptyFlow: "No handoff matches.",
+    emptyLog: "Handoffs are written here after someone starts walking a line.",
+    emptyIsland: "No program matches.",
+    stats: "{islands} islands　{items} tasks　{flows} handoffs",
+    onDuty: "{n} islands have someone on duty now",
+    handoff: "{from} passes {what} to {to}",
+    allPillars: "All",
+    next: "Next",
+    start: "Enter",
+    skip: "Skip",
+    gotIt: "Got it",
+    helpKicker: "How",
+    helpTitle: "How to read the island",
+    helpBody: "Drag to orbit, scroll or pinch to zoom. Click an island or a building, and click the sea to return. Names, handoff lines, and the overhead view are toggles below. Language and the four lights — morning, noon, evening, night — are at the top. Built from public Taiwan CDC material. Not an official site.",
+    veil: "Laying the programs out as islands…",
+    canvas: "Fourteen hexes in the outline of Taiwan. The full text is in the list.",
+    fallback: "This browser cannot draw the islands. Read the list instead.",
+    mapLabel: "Map",
+    langLabel: "Language",
+    themeLabel: "Light",
+    themeMorning: "AM",
+    themeNoon: "Noon",
+    themeEvening: "Eve",
+    themeNight: "Night",
+    langZh: "中",
+    langEn: "EN",
+    langJa: "日",
+  },
+  ja: {
+    brandKicker: "台湾CDC",
+    brandTitle: "政策の島",
+    title: "台湾CDC 政策の島",
+    description: "一つの計画が一つの島。台湾疾病管制署の公開計画を、歩いて見られる政策の島に並べた。",
+    compass: "北",
+    compassTitle: "北",
+    home: "全景",
+    list: "一覧",
+    help: "見方",
+    heroTitle: "一マスの政策\nつながる防疫網",
+    heroLead: "一つの計画から始めて、\n仕事がどこで受け渡されるかを見る。",
+    eyebrow: "POLICY ISLANDS",
+    ledgerTitle: "受け渡しをたどる",
+    ledgerLead: "十四の島は公開計画か常設業務。一つ開くと、何を次へ渡すかが見える。",
+    search: "PrEP、発生源、検疫を検索…",
+    searchLabel: "政策か連携を検索",
+    tabIslands: "島",
+    tabFlows: "連携 {n}",
+    tabLog: "記録",
+    disclaimer: "台湾疾病管制署の公開計画と常設業務を、つながりが見えるように整理したもの。疾病管制署の公式サイトではない。衛生福利部の施政計画と年度の自己評核は管理であり、もう一つの島にはしていない。海面の病原体と対岸の影は、この図自身の警告であり、署の発言ではない。",
+    shore: "対岸",
+    sourceLink: "公開計画の一覧",
+    panelDay: "01　防疫の一日",
+    panelPhase: "02　計画の段階",
+    panelPillar: "03　五つの柱",
+    play: "一日を再生",
+    pause: "一日を止める",
+    dayLabel: "防疫の一日。分単位",
+    pillarNote: "複数選べる。何も選ばなければ十四島すべてが残る。",
+    toggleNames: "名札",
+    toggleCargo: "運搬",
+    toggleFlows: "連携線",
+    toggleFreeze: "停止",
+    toggleBird: "俯瞰",
+    togglesLabel: "表示",
+    close: "閉じる",
+    flowEyebrow: "連携",
+    carried: "この線で運ぶのは「{what}」。",
+    flowFine: "二つの計画の境界であり、別の計画ではない。",
+    outTitle: "ここから渡す",
+    carry: "運ぶもの {what}",
+    emptyFlow: "一致する連携はない。",
+    emptyLog: "連携線を人が歩き始めると、受け渡しがここに残る。",
+    emptyIsland: "一致する政策はない。",
+    stats: "政策の島 {islands}　仕事 {items}　連携 {flows}",
+    onDuty: "この時間帯、当番がある島は {n} 島",
+    handoff: "{from} が{what}を {to} へ渡した",
+    allPillars: "すべて",
+    next: "次へ",
+    start: "見始める",
+    skip: "飛ばす",
+    gotIt: "わかった",
+    helpKicker: "操作",
+    helpTitle: "この島の見方",
+    helpBody: "ドラッグで回し、ホイールかピンチで近づく。島か建物を押し、海を押すと全景に戻る。名札、連携線、俯瞰は下で切り替える。上で言語と、朝・昼・夕・夜の四つの光を替える。台湾CDCの公開資料による整理であり、公式サイトではない。",
+    veil: "計画を島に並べています…",
+    canvas: "台湾の輪郭に並んだ十四の六角形。全文は一覧にある。",
+    fallback: "このブラウザでは立体の島を描けない。一覧を読んでください。",
+    mapLabel: "地図",
+    langLabel: "言語",
+    themeLabel: "光",
+    themeMorning: "朝",
+    themeNoon: "昼",
+    themeEvening: "夕",
+    themeNight: "夜",
+    langZh: "中",
+    langEn: "EN",
+    langJa: "日",
+  },
+};
+
+const intro = {
+  zh: [
+    { kicker: "01  /  政策發展島", title: "十四座島，一張防疫網", body: "這裡把疾管署公開的防治計畫排成可以走進去的島。輪廓是臺灣：最北是口岸，最南是登革熱，離岸的那一座是抗藥性。" },
+    { kicker: "02", title: "點一格，看裡面的工作", body: "島上的房子是具體工作：通報、冷鏈、清孳生源、PrEP。點房子，或從右側清單進去。" },
+    { kicker: "03", title: "弧線是交件，不是裝飾", body: "兩座島之間的線，表示檢體、名單或物資要交過去。沒有這些接點，計畫會各做各的。", showFlows: true },
+    { kicker: "04", title: "底下有兩種時間", body: "「防疫的一天」看這個時段誰在值班。「政策階段」把工作分成本期、近期建設、中程目標，和要守到 2035 的長期消除。" },
+  ],
+  en: [
+    { kicker: "01  /  Policy islands", title: "Fourteen islands, one net", body: "Public Taiwan CDC programs, set out as islands you can enter. The outline is Taiwan: quarantine at the north, dengue at the south, and antimicrobial resistance just offshore." },
+    { kicker: "02", title: "Open a cell, read the work", body: "The buildings are concrete tasks: notification, the cold chain, clearing breeding sites, PrEP. Click a building, or enter from the list." },
+    { kicker: "03", title: "The arc is a handoff", body: "A line between two islands means a specimen, a list, or supplies has to cross. Without those joints, each program works alone.", showFlows: true },
+    { kicker: "04", title: "Two kinds of time", body: "“A prevention day” shows who is on duty at this hour. “Program phase” splits the work into this period, near-term build, the path to 2030, and what still has to hold through 2035." },
+  ],
+  ja: [
+    { kicker: "01  /  政策の島", title: "十四の島、一つの網", body: "台湾CDCの公開計画を、入れる島に並べた。輪郭は台湾。北端が水際、南端がデング熱、沖の一島が薬剤耐性。" },
+    { kicker: "02", title: "一マスを開くと仕事がある", body: "島の建物は具体的な仕事。届出、コールドチェーン、発生源の除去、PrEP。建物を押すか、右の一覧から入る。" },
+    { kicker: "03", title: "弧は受け渡し", body: "二つの島を結ぶ線は、検体、名簿、物資が渡ることを示す。この継ぎ目がなければ、計画はばらばらに動く。", showFlows: true },
+    { kicker: "04", title: "時間は二種類", body: "「防疫の一日」はこの時間に誰が当番かを見る。「計画の段階」は今期、近期の整備、2030年までの仕事、2035年まで残す仕事に分ける。" },
+  ],
+};
+
+const pillarsCopy = {
+  en: { sentinel: ["W", "Sentinel"], gate: ["G", "Border"], shield: ["S", "Immunity"], care: ["C", "Care"], ready: ["R", "Readiness"] },
+  ja: { sentinel: ["哨", "監視警報"], gate: ["門", "水際対策"], shield: ["盾", "免疫"], care: ["治", "対策網"], ready: ["備", "備え"] },
+};
+
+const phasesCopy = {
+  en: {
+    all: ["All phases", "See the work on all fourteen islands together."],
+    now: ["This period", "What this season is already doing: notification, vaccination, breeding sites, screening, stockpiles."],
+    near: ["Near term", "Work to push in this stretch: border-quarantine preparedness through 2027, latent TB treatment, and routes for unusual pathogens. The prevention-center building is not in this bucket."],
+    mid: ["To 2030", "Coverage after HIV phase I, the laboratory network, the AMR action plan, the vaccine-industry program, and the information base, running to about 2030."],
+    far: ["Through 2035", "What cannot be dropped after a program ends: TB elimination aligned with 2035, the vaccine fund, hepatitis C follow-up, dengue as routine city work. The prevention-center build runs to 2032."],
+    labels: { now: "This period", near: "Near term", mid: "To 2030", far: "Through 2035" },
+  },
+  ja: {
+    all: ["全段階", "十四の島の仕事を一緒に見る。"],
+    now: ["今期", "今季すでに動いている届出、接種、発生源の除去、スクリーニング、備蓄。"],
+    near: ["近期", "この区間で進める仕事。水際検疫の整備は2027年まで。潜在結核の治療と特殊病原体の動線。防疫中心の工期はこの枠に入れない。"],
+    mid: ["2030年まで", "HIV第1期のあとのカバー、検査室網、耐性の行動計画、ワクチン産業の計画、防疫情報基盤。2030年前後まで。"],
+    far: ["2035年まで", "計画が終わっても戻せないこと。結核根絶は2035年に合わせる。ワクチン基金、C型肝炎の追跡、デング熱の日常化。防疫中心の建設は2032年まで。"],
+    labels: { now: "今期", near: "近期", mid: "中期", far: "長期" },
+  },
+};
+
+const dayCopy = {
+  en: [
+    ["Night duty", "The epidemic center watches international reports and domestic alerts. Sequencing is still running, the port keeps a ship watch, and hospital infection control does not close."],
+    ["Handover and the dawn round", "The night shift leaves unfinished events for the morning. Communities start clearing standing water. The airport opens the early-peak quarantine."],
+    ["Clinics, schools, reports", "Vaccination clinics, school roll calls, and clinic notifications arrive together. The surveillance net is loudest in this block."],
+    ["Laboratory and visits", "The morning’s specimens reach the lab. TB care, hepatitis treatment, and hospital checks continue into the afternoon."],
+    ["The second community round", "Dengue inspection goes out again. Long-term care sends the day’s cluster signals into the notification system."],
+    ["Screening and explanation", "Anonymous testing is easier to enter in the evening. Public explanations, when needed, are usually scheduled here."],
+    ["The overnight crossing", "Red-eye flights and ships are still arriving. Exchange with other time zones picks up, and the sequencing room gets busy again."],
+  ],
+  ja: [
+    ["夜勤", "疫情中心は国際情報と国内警報を見る。ゲノム解析はまだ動いている。港は船舶当番を残し、病院の感染対策は閉まらない。"],
+    ["引き継ぎと早朝巡回", "夜勤は未完の事案を早番に渡す。地域は水たまりを掃除し始め、空港は朝のピークの検疫を開ける。"],
+    ["外来、学校、届出", "接種外来、学校の点呼、診療所の届出が一緒に入る。監視網が一番忙しい時間。"],
+    ["検査と訪問", "午前の検体が検査室に入る。結核のケア、肝炎治療、病院の点検は午後も続く。"],
+    ["地域の二巡目", "デング熱の巡回がもう一度出る。介護施設は日中の集団発生を届出に足す。"],
+    ["検査と説明", "匿名検査は夕方の方が入りやすい。公衆への説明が要るときは、だいたいこの時間に置かれる。"],
+    ["越境の夜勤", "深夜便と船舶はまだ入る。別の時間帯との情報交換が増え、解析室が再び忙しくなる。"],
+  ],
+};
+
+function item(name, text, keywords) {
+  return { name, text, keywords };
+}
+
+const body = {
+  en: {
+    watch: {
+      name: "Surveillance", pin: "Watch",
+      blurb: "Signals from inside and outside the country have to land on one duty screen before testing, stockpiles, and public explanation can connect. This island sits in the north-center because it is the knot of the net.",
+      source: "Phase IV of acute infectious-disease risk monitoring and management (2025–2028). A four-year umbrella: risk monitoring, vectors and breeding sites, surveillance, laboratories, training, early care, vaccination completion, cross-agency work, and smart monitoring. Vaccine procurement sits in the vaccine fund.",
+      hrefLabel: "National infectious disease statistics",
+      items: {
+        "watch-notify": item("Statutory notification", "Clinicians and laboratories report within the deadlines in the Communicable Disease Control Act. The center needs the reports complete, not another form.", ["notification", "statutory", "clinician"]),
+        "watch-duty": item("Epidemic-center duty", "Someone is watching domestic and international alerts, and someone takes the handover. Crossing a threshold starts an investigation, not the next business day.", ["duty", "24 hours", "epidemic center"]),
+        "watch-signal": item("More than case reports", "Emergency and outpatient trends move before individual confirmations. Wastewater and other environmental signals, if added, fill the delay in notification. They do not replace cases.", ["visits", "ILI", "wastewater", "alert"]),
+        "watch-level": item("A level a county can use", "Surveillance indicators become a risk level a locality can use this week: more vaccination, more breeding-site work, or a facility cluster.", ["level", "alert", "local"]),
+      },
+    },
+    border: {
+      name: "Port quarantine", pin: "Border",
+      blurb: "A pathogen from abroad reaches the airport and the port before it reaches a neighborhood. Quarantine sits on the northernmost cell, as the door of this net, not as a wall by itself.",
+      source: "Preparedness and border quarantine for emerging infections and an influenza pandemic (2022–2027)",
+      hrefLabel: "Public program list",
+      items: {
+        "border-port": item("Airport and seaport", "Travelers, crews, and ships are questioned and assessed for symptoms. An abnormality is diverted and sampled. The queue itself must not become the risk.", ["airport", "seaport", "quarantine", "temperature"]),
+        "border-travel": item("Travel history and symptoms", "Fever, respiratory symptoms, and travel through a mosquito-borne area have to become a list the epidemic center can see the same day.", ["travel history", "entry", "fever"]),
+        "border-surge": item("Quarantine capacity", "Routes, isolation space, and shift staffing have to exist in ordinary time so they can expand for a novel pathogen or an influenza pandemic. This item sits in the 2022–2027 preparedness program. The plan says this period is preparation before an outbreak, not the mobilization once one has begun.", ["isolation", "staffing", "pandemic"]),
+        "border-vector": item("Vectors on conveyances", "Aircraft and ships are checked for vectors and environmental hygiene. Dengue should not wait for a neighborhood case before anyone notices that the mosquitoes landed first.", ["ship", "aircraft", "vector", "dengue"]),
+      },
+    },
+    lab: {
+      name: "Laboratory network", pin: "Lab",
+      blurb: "Surveillance without a type only says that people are ill. It does not say what is spreading. The laboratory sits against the surveillance island so specimens do not get lost between two programs.",
+      source: "Post-COVID laboratory testing network (2025–2030); Ministry of Health and Welfare prevention-center construction (2021–2032)",
+      hrefLabel: "Public program list",
+      items: {
+        "lab-net": item("Who tests what", "Routine specimens stay local. Unusual pathogens go to a reference laboratory. The division of labor has to name the pathogen and the laboratory level.", ["testing", "reference laboratory", "contract"]),
+        "lab-seq": item("Genomic sequencing", "Circulating strains of influenza, COVID-19, enterovirus, and other pathogens have to be identifiable. The network program runs to 2030. Sequencing is capacity to hold, not a one-off project.", ["sequencing", "genome", "influenza", "COVID"]),
+        "lab-biosafety": item("Biosafety and security", "High-risk pathogens are handled, stored, and staffed by biosafety level. When capacity grows, that system has to grow with it.", ["biosafety", "pathogen", "inventory"]),
+        "lab-campus": item("Prevention-center build", "The Executive Yuan’s second revision, March 2026, runs the work from 2021 through 2032. The national health command center, national laboratories, and administration move into one building at the Kunyang site, including a high-containment laboratory. The building finishes in 2032, not 2027. The building is not the prevention.", ["prevention center", "high-containment laboratory", "2032"]),
+      },
+    },
+    vax: {
+      name: "Vaccination", pin: "Vaccines",
+      blurb: "Vaccination sits on the populated western side of the north. The vaccine fund is about being able to buy, ship, and give the dose. The industry program is a different plan: being able to make doses, and to surge.",
+      source: "Phase IV of the national vaccine fund and population-immunity program (2024–2028); national vaccine-industry resilience program (2026–2030)",
+      hrefLabel: "Public program list",
+      items: {
+        "vax-routine": item("Routine public vaccines", "The routine schedule for infants and existing groups has to hold. Measles and Japanese encephalitis stay controlled because each birth cohort is still vaccinated.", ["public vaccine", "measles", "Japanese encephalitis", "infant"]),
+        "vax-season": item("Seasonal influenza and COVID-19", "Each season opens with people at higher risk and older adults first, to reduce severe disease and death. Opening day is not the end. Stock and coverage are.", ["influenza vaccine", "COVID", "older adults", "high risk"]),
+        "vax-cold": item("Cold chain and transfer", "From lot release and cold storage to the county health bureau, temperature and stock have to be visible, and doses have to move between counties.", ["cold chain", "lot release", "health bureau", "stock"]),
+        "vax-fund": item("A fund that outlasts the phase", "The official name of phase IV is the program to replenish the national vaccine fund and raise population immunity. It runs through 2028. What has to remain is the financing and emergency procurement. This line buys, ships, and gives. It is not the industry program.", ["vaccine fund", "financing", "emergency procurement"]),
+        "vax-industry": item("Vaccine-industry resilience", "A separate plan from the fund, from 1 January 2026 through 31 December 2030, run by the Ministry of Health and Welfare with the Ministry of Economic Affairs. The work is pandemic-vaccine preparedness and advance purchase, research, resilience of domestic supply, and international industry links. The fund buys. This item is about being able to make doses and to surge.", ["vaccine industry", "advance purchase", "research", "2026"]),
+      },
+    },
+    flu: {
+      name: "Influenza and respiratory", pin: "Flu",
+      blurb: "Seasonal influenza is the stress test that arrives every year. The same surveillance, antivirals, and facility response are what pandemic preparedness looks like on the community end.",
+      source: "Standing work at the boundary of the preparedness and border-quarantine program (2022–2027) and phase IV of acute surveillance (2025–2028)",
+      hrefLabel: "Taiwan CDC",
+      items: {
+        "flu-severe": item("Severe influenza", "Track severe cases, deaths, and virus type to judge how hard this season is, not only how crowded the clinics are.", ["influenza", "severe", "type"]),
+        "flu-drug": item("Antiviral drugs", "Contract hospitals have to be able to move stock and watch expiry during the season. Drugs and vaccines are two supply lines. One does not stand in for the other.", ["antiviral", "contract hospital", "stock"]),
+        "flu-cluster": item("Facility clusters", "When a nursing home, a school, or a correctional institution has a cluster, it gets sampling, treatment, and isolation advice, and the signal goes back to surveillance.", ["nursing home", "cluster", "school"]),
+        "flu-novel": item("A script for a new respiratory virus", "Surveillance, drugs, and a communication script are held for an influenza pandemic or a new respiratory virus. The preparedness program runs to 2027. The script has to be rehearsable before then.", ["pandemic", "emerging", "script"]),
+      },
+    },
+    entero: {
+      name: "Enterovirus and schools", pin: "Schools",
+      blurb: "Severe enterovirus is in young children. Transmission is in classrooms and households. This island sits in the middle of the lived map because a school feels the wave before a laboratory does.",
+      source: "The enterovirus and enteric-disease chapters of phase IV of acute infectious-disease risk monitoring and management (2025–2028). The start of term is still done with schools and childcare.",
+      hrefLabel: "Taiwan CDC",
+      items: {
+        "entero-sign": item("Warning signs for parents", "Parents are told to recognize drowsiness, myoclonic jerks, and persistent vomiting, and to seek care. The message has to be out before the wave rises, not after the news.", ["drowsiness", "myoclonus", "vomiting", "parents"]),
+        "entero-school": item("Schools and childcare", "Absences, closures, and clusters in preschools and primary schools are reported to the health authority. This is the front of surveillance, not a school’s internal statistic.", ["preschool", "closure", "absence"]),
+        "entero-hand": item("Hands and surfaces", "Soap and water, and disinfection of toys and frequently touched surfaces. Enterovirus is held by that routine more reliably than by a closure notice.", ["handwashing", "disinfection", "soap"]),
+        "entero-term": item("One school routine at term start", "Around the start of term, enterovirus, influenza, and mosquito precautions become one set of actions a school can actually do, instead of three separate memos.", ["term", "influenza", "COVID"]),
+      },
+    },
+    dengue: {
+      name: "Dengue and vectors", pin: "Dengue",
+      blurb: "Community control is clearing breeding sites, not waiting for a confirmed case before spraying. The south carries the highest risk, so this island is the southern tip of the outline.",
+      source: "Vector monitoring and breeding-site clearance in phase IV of acute infectious-disease risk monitoring and management (2025–2028). Clearing standing water in neighborhoods remains standing work.",
+      hrefLabel: "Taiwan CDC",
+      items: {
+        "dengue-source": item("Breeding sites", "Containers, flower pots, and standing water are inspected and emptied. The gap after rain decides the next week’s index more often than the stock of insecticide.", ["standing water", "container", "flower pot"]),
+        "dengue-index": item("Mosquito density", "Density is how this area’s risk is read. When the index rises and there is still no local case, clearing comes first. Confirmation does not.", ["ovitrap", "index", "adult mosquito"]),
+        "dengue-crew": item("The neighborhood crew", "The borough, environmental services, and the health unit clear together. Chemistry alone does not hold the next rain.", ["borough", "environment", "health bureau"]),
+        "dengue-routine": item("Routine, not a mobilization", "What has to remain is clearing water as ordinary municipal work. Emergency spraying and medical surge are added when transmission rises. They are not the steady state.", ["routine", "municipal"]),
+      },
+    },
+    tb: {
+      name: "TB elimination", pin: "TB",
+      blurb: "Phase III runs from 2026 to 2030. The name points at the WHO 2035 end-TB target year. It is not a membership claim, and incidence has not reached elimination. Finding people, and finishing the medicine, lowers incidence more than printing another handbook.",
+      source: "Phase III of joining the WHO 2035 end-TB targets (2026–2030). The year 2035 in the name is the target year, not a membership claim, and elimination has not been reached.",
+      hrefLabel: "Tuberculosis pages",
+      items: {
+        "tb-find": item("Active case finding", "Find people who are ill among contacts and higher-risk groups, instead of waiting until symptoms reach a clinic on their own.", ["contacts", "screening", "high risk"]),
+        "tb-dots": item("DOTS and completion", "Directly observed treatment and follow-up exist for completion, not for a check-in. An unfinished course leaves resistance in the community.", ["DOTS", "completion"]),
+        "tb-ltbi": item("Latent TB treatment", "Offer treatment of latent infection to contacts, to reduce later disease. This is work phase III still has to push. It is not a finished routine.", ["latent", "LTBI", "contacts"]),
+        "tb-2035": item("Holding the elimination line", "After the 2030 program ends, someone in 2035 still has to watch incidence and drug-resistant TB. A faster molecular test shortens the diagnostic gap. It does not replace follow-up.", ["2035", "incidence", "resistance"]),
+      },
+    },
+    hiv: {
+      name: "HIV elimination", pin: "HIV",
+      blurb: "Phase I of Taiwan’s HIV elimination program runs through 2026. Screening, PrEP, and treatment have to land in this phase. The 2030 elimination goal is still ahead, so this island has a visible mid-course.",
+      source: "Phase I of the 2030 HIV-elimination program (2022–2026). The elimination goal is aligned with 2030. Phase I is not finished.",
+      hrefLabel: "Public program list",
+      items: {
+        "hiv-test": item("Wider testing", "Anonymous testing, self-testing, and testing offered in care are there to find people who do not yet know they are infected.", ["anonymous", "self-test", "screening"]),
+        "hiv-prep": item("PrEP", "People at risk of infection are offered PrEP and regular follow-up. It is prevention in addition to treatment. It does not replace condoms or testing.", ["PrEP"]),
+        "hiv-treat": item("Treatment as prevention", "Treatment soon after diagnosis, and an undetectable viral load, are what lower onward transmission. The slow part is usually the handoff, not the drug.", ["U=U", "viral load", "treatment"]),
+        "hiv-2030": item("Coverage before 2030", "Phase I ends in 2026. 2030 is still the goal, not an elimination already reached. The 2025 review still records people who do not know they are infected, and delayed diagnosis. If stigma is still there, the people who most need to enter do not appear in the statistics.", ["2030", "stigma", "coverage"]),
+      },
+    },
+    hepa: {
+      name: "Viral hepatitis", pin: "Hepatitis",
+      blurb: "Hepatitis B is held by the vaccinated birth cohorts. Hepatitis C is held by finding people and finishing treatment. This island sits in the south because screening and treatment have to follow where people live, not stop at a medical-center clinic.",
+      source: "Standing hepatitis work: the hepatitis B vaccine cohort, and hepatitis C oral antivirals plus referral. The major-policy list has no standalone hepatitis program.",
+      hrefLabel: "Taiwan CDC",
+      items: {
+        "hepa-b": item("The hepatitis B vaccine cohort", "Infant hepatitis B vaccination continues, holding down chronic carriage that has already fallen. This dose and the vaccine fund are different diseases on one cold chain.", ["hepatitis B", "infant", "carriage"]),
+        "hepa-c": item("Hepatitis C treatment", "Hepatitis C is treated with oral antivirals. A positive screen has to reach a clinic that can prescribe. It should not stop on a laboratory report.", ["hepatitis C", "oral antiviral"]),
+        "hepa-screen": item("Screening by age and risk", "Hepatitis B and C screening is offered at set ages and risks, so it does not depend on someone feeling ill. By the time there are symptoms, it is often past the point public health needed.", ["screening", "age"]),
+        "hepa-follow": item("Someone still watches after treatment", "After a course ends, new infections and people who need follow-up still need a door. Elimination is not a closed file. It is an incidence that does not climb back.", ["follow-up", "reinfection"]),
+      },
+    },
+    ipc: {
+      name: "Infection control", pin: "Hospitals",
+      blurb: "Hospitals and long-term care are where a pathogen gets amplified. Infection control sits on the eastern care belt: cluster reports on one side, antibiotic use passed to the offshore resistance island on the other.",
+      source: "The communicable-disease care network in the preparedness program, and infection prevention in the AMR action plan. Hospital and long-term-care inspections remain standing work.",
+      hrefLabel: "Hospital infection control and resistance surveillance",
+      items: {
+        "ipc-hospital": item("Hospital infection control", "Isolation space, protective equipment, and cluster notification have to meet the ward. An inspection looks at whether it can be done, not at whether the plan mentions the chapter.", ["hospital", "isolation", "inspection"]),
+        "ipc-ltc": item("Clusters in long-term care", "Influenza, gastrointestinal, and respiratory clusters need early detection, cohorting, and a visit. One late report inside a facility becomes a week on the surveillance island.", ["long-term care", "nursing home", "cluster"]),
+        "ipc-hand": item("Hands at the point of care", "Sinks and compliance are the cheapest measure and the one that fails most often. In a hospital this one does not go off duty, because the shift change itself is the riskiest seam.", ["handwashing", "compliance"]),
+        "ipc-route": item("A route for an unusual pathogen", "The route, the protection, and the receiving hospital for an unusual pathogen have to be agreed beforehand. Looking for a negative-pressure room after the patient reaches the emergency department is not preparedness.", ["route", "transfer", "isolation"]),
+      },
+    },
+    amr: {
+      name: "AMR, One Health", pin: "AMR",
+      blurb: "Resistance does not live in one department. Human medicine, animals, and the environment each hold a share, so this island sits offshore and bridges back to the laboratory and the hospital instead of being built on the hospital roof.",
+      source: "National One Health antimicrobial-resistance action plan (2025–2029, revised March 2026); Executive Yuan national One Health joint-action program (2026–2030)",
+      hrefLabel: "Resistance surveillance system",
+      items: {
+        "amr-steward": item("Stewardship in human medicine", "Hospital antibiotic-stewardship programs cut unnecessary broad-spectrum use. The input is the prescription, not a slogan.", ["antibiotic", "stewardship", "hospital"]),
+        "amr-watch": item("Resistance surveillance", "The resistance share of clinical isolates is fed back to hospitals by organism. Without a continuous upload of susceptibilities, the action plan is an empty percentage.", ["resistance", "isolate", "THAS"]),
+        "amr-animal": item("Animals and the environment", "Align animal-use medicines and environmental resistance with agriculture and environment agencies. The near-term job is to connect data from outside human medicine.", ["One Health", "animal", "environment"]),
+        "amr-joint": item("One cross-ministry table", "On 30 April 2025 the Executive Yuan approved the national One Health policy council. The joint-action program covers 2026 through 2030 and puts human medicine, animals, food, and the environment at one table. It is wider than resistance. The AMR action plan is the resistance slice, through 2029, revised in March 2026. Core capacities stay a self-review or an external review against international tools.", ["policy council", "joint action", "2029", "self-review"]),
+      },
+    },
+    ready: {
+      name: "Preparedness", pin: "Ready",
+      blurb: "Supplies, the command structure, and exercises sit east of the laboratory. When surveillance crosses a threshold, this island changes from stock to deployment. It does not start by writing the first plan.",
+      source: "Preparedness and border quarantine for emerging infections and an influenza pandemic (2022–2027); resilient public-health information base (2026–2030)",
+      hrefLabel: "Preparedness and response",
+      items: {
+        "ready-stock": item("Stockpiles", "Personal protective equipment, test reagents, and treatments need a safety stock, an expiry date, and an order of release. An expired stockpile is no stockpile.", ["supplies", "PPE", "reagents", "expiry"]),
+        "ready-command": item("Command and the information line", "When several ministries are needed, the ordinary epidemic center has to be able to rise into a command center. Authorities written in advance are what keep the day of the event from inventing them.", ["command center", "epidemic center", "authority"]),
+        "ready-beds": item("Agreed medical capacity", "Severe beds, sampling, and staff are agreed with the care network so one pathogen does not close the emergency department. This is the part of preparedness that is not yet ordinary work.", ["beds", "sampling", "emergency"]),
+        "ready-drill": item("Exercises", "Tabletops and field exercises find the paragraphs that read well and cannot be done on site. An exercise without a follow-up list is an event.", ["exercise", "tabletop", "field"]),
+        "ready-info": item("Information base", "The information-base program runs from 2026 through 2030. Five strategies: a resilient and secure information base, including a security-standard machine room tied to the prevention-center building; data governance; exchange and notification standards; artificial intelligence in prevention services; and information staff. This item is the information on the preparedness island. It does not replace exercises.", ["information", "security", "data governance", "AI"]),
+      },
+    },
+    global: {
+      name: "International health", pin: "IHR",
+      blurb: "A report from outside has to reach the duty screen before a domestic case appears. This island sits in the northeast, facing outward. Taiwan reviews itself against the core capacities of the International Health Regulations and exchanges information with partners.",
+      source: "Standing international cooperation and the IHR national focal point",
+      hrefLabel: "IHR national focal point",
+      items: {
+        "global-intel": item("Exchanging outbreak news", "Events in partner countries and nearby areas have to enter the epidemic center’s duty, not stop in a forwarded newsletter.", ["intelligence", "neighbors", "exchange"]),
+        "global-ihr": item("Core-capacity review", "A self-review against IHR core capacities: detection, notification, response, and points of entry. The joint-action program also says self-review or external review against international tools. The focal point needs a name and a roster, not only a mailbox.", ["IHR", "core capacities", "focal point"]),
+        "global-people": item("People and technical cooperation", "Field training and technical cooperation are channels to keep in the near term. A network of people outlasts an ad-hoc video call.", ["training", "FETP", "technical"]),
+        "global-say": item("One set of facts, inside and out", "What is said to the public and what is reported to partners has to be the same set of facts. Two versions of a number will be noticed at home first.", ["risk communication", "briefing"]),
+      },
+    },
+  },
+  ja: {
+    watch: {
+      name: "流行監視", pin: "監視",
+      blurb: "国内外のシグナルは、一つの当番画面に着いてから検査、備蓄、説明につながる。この島を北部の中央に置いたのは、網の結び目だから。",
+      source: "急性感染症の流行リスク監視・管理 第4期（2025–2028）。四年の傘の計画で、リスク監視、媒介と発生源、能動・受動監視、検査、人材、早期診療、接種の完了、機関横断、スマート監視が入る。ワクチン調達はワクチン基金。",
+      hrefLabel: "全国感染症統計システム",
+      items: {
+        "watch-notify": item("法定感染症の届出", "医師と検査機関は感染症防治法の期限内に届ける。疫情中心が要るのは揃った届出であり、帳票を一枚増やすことではない。", ["届出", "法定", "医師"]),
+        "watch-duty": item("疫情中心の当番", "国内外の警報を見る人がいて、引き継ぐ人がいる。閾値を超えたら調査を始める。次の営業日に回さない。", ["当番", "二十四時間", "疫情中心"]),
+        "watch-signal": item("症例以外のシグナル", "救急と外来の受診は、個々の確定より先に動く。下水などの環境シグナルを足すなら、届出の遅れを補うためであり、症例の代わりではない。", ["受診", "インフルエンザ様", "下水", "警報"]),
+        "watch-level": item("地方が今週使える等級", "監視指標を、地方が今週使えるリスク等級にする。足すのは接種か、発生源の除去か、施設の集団発生か。", ["等級", "警報", "地方"]),
+      },
+    },
+    border: {
+      name: "水際検疫", pin: "水際",
+      blurb: "外から来た病原体は、地域に入る前に空港と港に着く。検疫を輪郭の最北に置き、この網の扉にした。単独の壁ではない。",
+      source: "新興感染症・インフルエンザ大流行の応変整備および水際検疫計画（2022–2027）",
+      hrefLabel: "公開計画の一覧",
+      items: {
+        "border-port": item("空港と港の検疫", "入国者、乗務員、船舶に質問し、症状を見る。異常は分流して検体を採る。列そのものをリスクにしない。", ["空港", "港", "検疫", "体温"]),
+        "border-travel": item("渡航歴と症状", "発熱、呼吸器症状、蚊媒介の流行地への渡航歴は、その日のうちに疫情中心が見られる名簿になる。", ["渡航歴", "入国", "発熱"]),
+        "border-surge": item("検疫の余力", "動線、隔離空間、交代要員は普段から残しておき、新しい病原体やインフルエンザ大流行で広げられるようにする。この項目は2022年から2027年の整備計画に入る。計画はこの期間を発生前の準備と書き、応変の動員段階ではないと書いている。", ["隔離", "人員", "大流行"]),
+        "border-vector": item("乗物の媒介生物", "航空機と船舶の媒介生物と環境衛生を調べる。デング熱は、地域で患者が出てから、蚊が先に降りていたと気づくものではない。", ["船舶", "航空機", "媒介", "デング熱"]),
+      },
+    },
+    lab: {
+      name: "検査室網", pin: "検査",
+      blurb: "型がなければ、監視は人が病気だとしか言えない。何が広がっているかはわからない。検査室を監視の島に付けたのは、検体が二つの計画のあいだで迷わないようにするため。",
+      source: "新型コロナ後の感染症検査網計画（2025–2030）。衛生福利部防疫中心の建設（2021–2032）",
+      hrefLabel: "公開計画の一覧",
+      items: {
+        "lab-net": item("全国の検査分担", "一般の検体は現地で行い、特殊な病原体は参照検査室へ送る。分担は、どの病原体をどの等級の検査室が行うかまで書けていなければならない。", ["検査", "参照検査室", "契約"]),
+        "lab-seq": item("ゲノム解析", "インフルエンザ、新型コロナ、エンテロウイルス、その他の流行株を同定できなければならない。網の計画は2030年まで。解析は中期に据える能力であり、一度きりの事業ではない。", ["解析", "ゲノム", "インフルエンザ", "新型コロナ"]),
+        "lab-biosafety": item("バイオセーフティ", "高リスク病原体の操作、保管、人員管理は安全等級による。能力が大きくなるとき、この制度も一緒に大きくなる。", ["バイオセーフティ", "病原体", "在庫"]),
+        "lab-campus": item("防疫中心の建設", "行政院が2026年3月に二度目の修正。工期は2021年から2032年。国家衛生指揮中心、国家級の検査室、行政部門を昆陽の同じ建物に入れ、高防護の検査室を含む。建物が終わるのは2032年であり、2027年ではない。建物そのものが防疫ではない。", ["防疫中心", "高防護検査室", "2032"]),
+      },
+    },
+    vax: {
+      name: "予防接種", pin: "接種",
+      blurb: "接種は北部の西側、人口の多い側に置いた。ワクチン基金が解くのは、買える、届けられる、打てる。産業の計画は別で、作れることと、急ぐときに広げられることを解く。",
+      source: "国家ワクチン基金の充実と国民免疫の計画 第4期（2024–2028）。国家ワクチン産業の強靭性計画（2026–2030）",
+      hrefLabel: "公開計画の一覧",
+      items: {
+        "vax-routine": item("定期の公費ワクチン", "乳児と既存対象の定期日程を維持する。麻疹や日本脳炎のように抑えられた疾病は、生まれた世代が打ち続けることで保たれる。", ["公費", "麻疹", "日本脳炎", "乳児"]),
+        "vax-season": item("季節性インフルエンザと新型コロナ", "毎季、高リスクと高齢者を先に打つ。重症と死亡を減らすため。開始日が終わりではない。在庫と接種率が終わりである。", ["インフルエンザワクチン", "新型コロナ", "高齢者", "高リスク"]),
+        "vax-cold": item("コールドチェーンと融通", "封緘、冷蔵保管から県市の衛生局まで、温度と在庫が見え、県市のあいだで動かせなければならない。", ["コールドチェーン", "封緘", "衛生局", "在庫"]),
+        "vax-fund": item("期を越えて残る基金", "第4期の正式名称は、国家ワクチン基金を充実させ国民の免疫を高める計画。2028年まで。長く残すのは財源と緊急調達。この線は買い、届け、打つ。産業の計画とは別である。", ["ワクチン基金", "財源", "緊急調達"]),
+        "vax-industry": item("ワクチン産業の強靭性", "基金とは別の計画。2026年1月1日から2030年12月31日まで、衛生福利部と経済部が一緒に行う。仕事は大流行ワクチンの準備と事前購入、研究開発、国内供給の強靭性、産業の国際的なつながり。基金は買う。この項目は、作れることと急ぐときに広げられること。", ["ワクチン産業", "事前購入", "研究開発", "2026"]),
+      },
+    },
+    flu: {
+      name: "インフルエンザと呼吸器", pin: "呼吸器",
+      blurb: "季節性インフルエンザは毎年来る負荷試験である。同じ監視、治療薬、施設対応が、大流行整備の地域側の形でもある。",
+      source: "常設業務。新興感染症・インフルエンザ大流行の応変整備および水際検疫計画（2022–2027）と、急性監視第4期（2025–2028）の境界。",
+      hrefLabel: "疾病管制署",
+      items: {
+        "flu-severe": item("重症インフルエンザの監視", "重症、死亡、ウイルス型を追い、この季の厳しさを判断する。外来の混雑だけを見ない。", ["インフルエンザ", "重症", "型"]),
+        "flu-drug": item("抗ウイルス薬", "契約病院の在庫と使用期限は流行期に動かせなければならない。薬とワクチンは二本の補給線であり、互いに代われない。", ["抗ウイルス", "契約病院", "在庫"]),
+        "flu-cluster": item("施設の集団発生", "介護施設、学校、矯正施設で集団発生があれば、検体、投薬、隔離の助言を出し、監視へ戻す。", ["介護施設", "集団", "学校"]),
+        "flu-novel": item("新しい呼吸器ウイルスの脚本", "インフルエンザ大流行や新しい呼吸器ウイルスのために、監視、薬剤、説明の脚本を残す。整備計画は2027年まで。それより前に演習できる脚本でなければならない。", ["大流行", "新興", "脚本"]),
+      },
+    },
+    entero: {
+      name: "エンテロウイルスと学校", pin: "学校",
+      blurb: "エンテロウイルスの重症は乳幼児にあり、伝播は教室と家庭にある。この島を生活帯の中ほどに置いたのは、検査室より学校の方が先に波を感じるから。",
+      source: "急性感染症の流行リスク監視・管理 第4期（2025–2028）のうち、エンテロウイルスと腸管感染症の章。学期始めは今も学校・保育と一緒に進める。",
+      hrefLabel: "疾病管制署",
+      items: {
+        "entero-sign": item("重症の前兆", "保護者に、傾眠、ミオクローヌス、持続する嘔吐を見分け、早く受診するよう伝える。周知は流行が上がる前にあり、ニュースの後ではない。", ["傾眠", "ミオクローヌス", "嘔吐", "保護者"]),
+        "entero-school": item("保育と学校の監視", "幼稚園と小学校の欠席、休校、集団発生は衛生機関に戻す。これは監視の前段であり、学校内部の統計ではない。", ["幼稚園", "休校", "欠席"]),
+        "entero-hand": item("手と環境", "石けんで手を洗い、玩具とよく触る面を消毒する。エンテロウイルスは休校通知より、この一式の方が頼りになる。", ["手洗い", "消毒", "石けん"]),
+        "entero-term": item("学期始めの一つの動作", "学期の前後に、エンテロウイルス、インフルエンザ、蚊の対策を、学校が実行できる一つの動作にまとめる。三通の文書が別々に話さない。", ["学期", "インフルエンザ", "新型コロナ"]),
+      },
+    },
+    dengue: {
+      name: "デング熱と媒介蚊", pin: "デング",
+      blurb: "地域対策の本体は発生源を除くことであり、確定を待ってから散布することではない。南の危険が最も高いので、この島は台湾の輪郭の最南端に置いた。",
+      source: "急性感染症の流行リスク監視・管理 第4期（2025–2028）のうち、媒介蚊の監視と発生源の除去。地域の水たまり掃除は今も常設業務。",
+      hrefLabel: "疾病管制署",
+      items: {
+        "dengue-source": item("発生源の除去", "容器、植木鉢、水たまりを見回り、空ける。雨のあとの空白は、薬剤の在庫より次の週の指数を決めることが多い。", ["水たまり", "容器", "植木鉢"]),
+        "dengue-index": item("媒介蚊の密度", "密度でこの区域のリスクを見る。指数が上がり、まだ国内例がないとき、先に除く。確定を待たない。", ["オビトラップ", "指数", "成虫"]),
+        "dengue-crew": item("地域の動員", "里、環境、衛生が一緒に除く。化学的防除だけでは次の雨を支えられない。", ["里", "環境", "衛生局"]),
+        "dengue-routine": item("日常であって緊急動員ではない", "長く残すのは、水たまりの除去が日常の市政になること。緊急散布と医療の増強は流行が上がったときの追加であり、平常そのものではない。", ["制度化", "市政"]),
+      },
+    },
+    tb: {
+      name: "結核の根絶", pin: "結核",
+      blurb: "第3期は2026年から2030年。名称が指すのは WHO 2035 年の結核根絶の目標年であり、加盟を言うものではなく、発生率もまだ根絶に達していない。発生率を下げるのは、見つけて薬を飲み切ることであり、手引をもう一冊刷ることではない。",
+      source: "WHO 2035 年結核根絶目標に参加する第3期計画（2026–2030）。名称の2035年は目標年であり、加盟の主張ではなく、根絶にもまだ達していない。",
+      hrefLabel: "結核対策のページ",
+      items: {
+        "tb-find": item("能動的な発見", "接触者と高リスクの人のなかから発病した人を見つける。症状が自分で外来に来るのを待たない。", ["接触者", "スクリーニング", "高リスク"]),
+        "tb-dots": item("DOTSと治療完了", "直接服薬確認とケアは完了率のためであり、打刻のためではない。飲み残した治療は耐性を地域に残す。", ["DOTS", "完了率"]),
+        "tb-ltbi": item("潜在結核の治療", "接触者に潜在感染の治療を出し、後の発病を減らす。これは第3期がまだ進める仕事であり、終わった日常業務ではない。", ["潜在", "LTBI", "接触者"]),
+        "tb-2035": item("根絶の線を守る", "2030年の計画が終わったあとも、2035年には発生率と耐性結核を見る人が要る。分子迅速検査が縮めるのは診断の空白であり、その後の追跡の代わりではない。", ["2035", "発生率", "耐性"]),
+      },
+    },
+    hiv: {
+      name: "HIVの根絶", pin: "HIV",
+      blurb: "台湾のHIV根絶第1期は2026年まで。スクリーニング、PrEP、治療をこの期に着地させる。2030年の根絶目標はまだ先にあるので、この島にははっきりした中期の仕事がある。",
+      source: "2030年HIV根絶の第1期計画（2022–2026）。根絶目標は2030年に合わせる。第1期はまだ終わっていない。",
+      hrefLabel: "公開計画の一覧",
+      items: {
+        "hiv-test": item("検査を広げる", "匿名検査、自己検査、受診時に出す検査は、自分が感染しているとまだ知らない人を見つけるため。", ["匿名", "自己検査", "スクリーニング"]),
+        "hiv-prep": item("PrEP", "感染のリスクがある人にPrEPと定期的な追跡を出す。治療以外の予防であり、コンドームや検査の代わりではない。", ["PrEP", "曝露前"]),
+        "hiv-treat": item("治療が予防になる", "診断後すぐに治療し、ウイルス量が検出されなければ、次の感染を下げられる。遅れる区間はたいてい薬ではなく、つなぎである。", ["U=U", "ウイルス量", "治療"]),
+        "hiv-2030": item("2030年より前のカバー", "第1期は2026年に終わる。2030年は今も目標であり、すでに根絶したのではない。2025年の点検にも、自分が感染していると知らない人と、診断の遅れが残っている。汚名が残っていれば、最も入るべき人は統計に現れない。", ["2030", "スティグマ", "カバー率"]),
+      },
+    },
+    hepa: {
+      name: "ウイルス性肝炎", pin: "肝炎",
+      blurb: "B型はワクチンを打った世代で守る。C型は見つけて治療を終える。この島を南に置いたのは、スクリーニングと治療が人のいる場所についていき、医学中心の外来で止まらないようにするため。",
+      source: "肝炎対策の常設業務（B型ワクチンの世代、C型の経口抗ウイルス薬と紹介）。重大政策の一覧に、肝炎だけの計画はない。",
+      hrefLabel: "疾病管制署",
+      items: {
+        "hepa-b": item("B型肝炎ワクチンの世代", "乳児のB型接種を維持し、すでに下がった慢性保有を守る。この一件とワクチン基金は、同じコールドチェーンの別の疾病である。", ["B型", "乳児", "保有"]),
+        "hepa-c": item("C型肝炎の治療", "C型は経口抗ウイルス薬で治療する。スクリーニング陽性は、薬を出せる医療機関までつなぐ。検査報告書で止めない。", ["C型", "経口", "抗ウイルス"]),
+        "hepa-screen": item("年齢とリスクのスクリーニング", "決めた年齢とリスクでB型とC型を調べ、自覚症状だけに頼らない。症状が出たときは、公衆衛生が欲しかった時点を過ぎていることが多い。", ["スクリーニング", "年齢"]),
+        "hepa-follow": item("治療のあとも見る人がいる", "一区切りのあとにも、新しい感染と追跡が要る人に出口が要る。根絶は結了の公文ではない。発生率が戻り上がらないことである。", ["追跡", "再燃", "新規感染"]),
+      },
+    },
+    ipc: {
+      name: "感染対策", pin: "医療機関",
+      blurb: "病院と介護施設は病原体が増幅される場所。感染対策は東側の医療帯に置き、一方で集団発生の届出を受け、もう一方で抗菌薬の使用を沖の耐性の島へ渡す。",
+      source: "整備計画のなかの感染症対策の医療網と、耐性行動計画のなかの感染予防。病院と介護施設の点検は常設業務。",
+      hrefLabel: "医療機関の感染対策と耐性監視",
+      items: {
+        "ipc-hospital": item("病院の感染対策", "隔離空間、防護具、集団発生の届出が臨床につながっていなければならない。点検が見るのは実行できるかであり、計画書にその章があるかではない。", ["病院", "隔離", "点検"]),
+        "ipc-ltc": item("介護施設の集団発生", "インフルエンザ、消化器、呼吸器の集団発生は早く見つけ、区画し、訪問する。施設の一つの遅い届出は、監視の島の一週間になる。", ["介護", "介護施設", "集団"]),
+        "ipc-hand": item("ケアの場の手指衛生", "手洗い設備と遵守は最も安く、最もよく失効する対策である。病院のこれは下班しない。引き継ぎそのものが最も危ない継ぎ目だから。", ["手洗い", "遵守"]),
+        "ipc-route": item("特殊病原体の動線", "特殊病原体の患者の動線、防護、後送先の病院は先に決めておく。救急に着いてから陰圧を探すのは整備ではない。", ["動線", "後送", "隔離"]),
+      },
+    },
+    amr: {
+      name: "薬剤耐性 One Health", pin: "耐性",
+      blurb: "耐性は一つの診療科のなかだけにはない。人の医療、動物、環境がそれぞれ一份を持つ。だからこの島は沖にあり、病院の屋根ではなく、検査室と病院へ橋を架ける。",
+      source: "国家級・防疫一体の抗菌薬耐性管理行動計画（2025–2029、2026年3月改訂）。行政院の国家防疫一体・共同行動方案（2026–2030）",
+      hrefLabel: "耐性監視システム",
+      items: {
+        "amr-steward": item("人医療の抗菌薬管理", "病院の抗菌薬管理は、不要な広域薬を減らす。入力は処方であり、標語ではない。", ["抗菌薬", "管理", "病院"]),
+        "amr-watch": item("耐性の監視", "臨床分離株の耐性割合を、菌種ごとに病院へ返す。薬剤感受性が継続して上がらなければ、行動計画は百分率の空欄だけになる。", ["耐性", "菌株", "THAS"]),
+        "amr-animal": item("動物と環境", "動物用の薬と環境中の耐性を、農業、環境の部門と揃える。近期にやるのは、人医療以外のデータをつなぐこと。", ["One Health", "動物", "環境"]),
+        "amr-joint": item("省庁をまたぐ一つの席", "行政院は2025年4月30日に国家防疫一体の政策会議を核定した。共同行動方案は2026年から2030年で、人の医療、動物、食品、環境を一つの席に置く。範囲は耐性より広い。耐性の行動計画はその耐性の切片で、2029年まで、2026年3月に改訂。中核能力は、国際的な道具に照らした自己点検か外部評価のまま。", ["政策会議", "共同行動", "2029", "自己点検"]),
+      },
+    },
+    ready: {
+      name: "防疫の備え", pin: "備え",
+      blurb: "物資、指揮の枠、演習は検査室の東に置く。監視が閾値を超えたとき、ここは在庫の状態から配置の状態に変わる。最初の計画書を書き始める場所ではない。",
+      source: "新興感染症・インフルエンザ大流行の応変整備および水際検疫計画（2022–2027）。強靭な防疫安全網の情報基盤計画（2026–2030）",
+      hrefLabel: "整備と応変",
+      items: {
+        "ready-stock": item("防疫物資の備蓄", "個人防護具、検査試薬、治療薬には安全在庫、使用期限、払い出しの順が要る。期限切れの備蓄は備蓄がないのと同じ。", ["物資", "防護", "試薬", "期限"]),
+        "ready-command": item("指揮と情報の枠", "省庁をまたぐときは、日常の疫情中心から指揮中心へ上げられなければならない。権限を先に書いておく。事案の当日に発明しない。", ["指揮中心", "疫情中心", "権限"]),
+        "ready-beds": item("医療能力の取り決め", "重症床、検体、人員を医療網と決めておき、一つの病原体で救急が潰れないようにする。これは整備計画のうち、まだ日常になりきっていない部分。", ["病床", "検体", "救急"]),
+        "ready-drill": item("演習", "卓上演習と実動で、計画には書けて現場ではできない段落を見つける。事後の一覧がない演習は、行事である。", ["演習", "卓上", "実動"]),
+        "ready-info": item("防疫の情報基盤", "情報基盤の計画は2026年から2030年。五つの戦略は、強靭で安全な情報の基礎（防疫中心の建設に合わせたセキュリティ基準の機械室を含む）、データガバナンス、交換と届出の標準、防疫サービスのなかの人工知能、情報の人材。この項目は備えの島の情報であり、演習の代わりではない。", ["情報", "セキュリティ", "データ", "AI"]),
+      },
+    },
+    global: {
+      name: "国際保健", pin: "IHR",
+      blurb: "外の流行情報は、国内で患者が出る前に当番画面へ入る。この島は北東に置き、外に向けた。台湾は国際保健規則の中核能力で自らを点検し、協力先と情報を交換する。",
+      source: "国際協力と IHR 国家連絡窓口の常設業務",
+      hrefLabel: "IHR 国家連絡窓口",
+      items: {
+        "global-intel": item("国際の流行情報", "協力する国と近隣の事案は、疫情中心の当番に入る。転送されたニュースレターで止まらない。", ["情報", "近隣", "交換"]),
+        "global-ihr": item("中核能力の点検", "国際保健規則の中核能力で自ら点検する。探知、通報、応変、入国地点。共同行動方案が書くのも、国際的な道具に照らした自己点検か外部評価である。窓口には名前と当番表が要る。メールボックス一つでは足りない。", ["IHR", "中核能力", "窓口"]),
+        "global-people": item("人と技術協力", "防疫の訓練と技術協力は、近期に保つ経路である。人の網は、その場限りのテレビ会議より長持ちする。", ["研修", "FETP", "技術"]),
+        "global-say": item("内と外で同じ事実", "公衆への説明と、協力先への通報は同じ事実でなければならない。二つの版の数字は、まず国内で見つかる。", ["リスクコミュニケーション", "説明"]),
+      },
+    },
+  },
+};
+
+const flowCopy = {
+  en: {
+    f01: ["Entry signals into surveillance", "travel-history list", "Abnormal symptoms and travel history at the port become a signal the epidemic center can see the same day."],
+    f02: ["Identifying a cross-border specimen", "specimen", "A specimen taken at the port goes to a reference laboratory, to confirm a known pathogen or a novel one that needs a higher level of handling."],
+    f03: ["Notification, then a test", "specimen", "If surveillance rises without a laboratory type, the only known fact is that people are ill, not which pathogen is spreading."],
+    f04: ["An alert starts preparedness", "alert", "Once surveillance crosses the threshold, supplies, beds, and the communication script move from stock to deployment."],
+    f05: ["Seasonal immunity", "vaccine", "Influenza vaccine goes to the higher-risk groups that severe-disease surveillance points to, rather than checking severity only after the campaign."],
+    f06: ["Moving antivirals", "medicine", "When contract hospitals run short during the season, the stockpile moves along the severe-disease curve."],
+    f07: ["Both ends of a pandemic", "preparedness plan", "Influenza-pandemic preparedness is one plan: antivirals in the community at one end, expanded quarantine at the port at the other."],
+    f08: ["A report from school", "absences", "Closures and absences in preschools tell the surveillance net that a wave has started, earlier than an individual severe case."],
+    f09: ["The same handwashing", "guidance", "Hand hygiene in a school and hand hygiene in a hospital are the same measure, for different people."],
+    f10: ["Density before cases", "density", "When the mosquito index rises and there is still no local case, breeding sites are cleared first. Confirmation is not the start."],
+    f11: ["Vectors do not get to enter", "inspection", "While neighborhoods clear standing water, conveyance quarantine has to stop mosquitoes from abroad."],
+    f12: ["One screen, two eliminations", "screening form", "The people at risk for HIV and for viral hepatitis overlap. Screening and referral can use one route."],
+    f13: ["Genotype finds the cluster", "isolate", "A TB contact investigation plus a genotype can tell one chain of transmission from a coincidence."],
+    f14: ["Resistance needs an isolate", "isolate", "The percentage on a stewardship plan comes from susceptibilities the laboratory keeps uploading."],
+    f15: ["Control data feeds stewardship", "usage", "Clusters and antibiotic use seen by hospital infection control are the human-medicine input to One Health."],
+    f16: ["International reports change shifts", "report", "A partner’s event has to reach the duty screen before a domestic case appears."],
+    f17: ["Sequences inform the judgment", "sequence", "The genome of a domestic strain is the basis for what is said outward and for the risk judgment, not only a domestic news item."],
+    f18: ["Cold chain, then emergency allocation", "cold chain", "The vaccine fund’s ordinary cold chain has to be able to become the distribution net for emergency vaccination in a pandemic."],
+  },
+  ja: {
+    f01: ["入国シグナルを監視へ", "渡航歴の名簿", "水際の異常な症状と渡航歴は、その日のうちに疫情中心が見られるシグナルになる。"],
+    f02: ["越境検体の同定", "検体", "水際で採った検体は参照検査室へ行き、既知の病原体か、格上げが要る新しいものかを確かめる。"],
+    f03: ["届出の次は検査", "検体", "監視が上がっても型がなければ、人が病気だとはわかっても、何が広がっているかはわからない。"],
+    f04: ["警報が備えを起こす", "警報", "監視が閾値を超えると、物資、病床、説明の脚本は在庫から配置に変わる。"],
+    f05: ["季節の免疫", "ワクチン", "インフルエンザワクチンは、重症監視が指した高リスクへ打つ。打ち終えてから重症度を見に戻らない。"],
+    f06: ["抗ウイルス薬の融通", "薬剤", "流行期に契約病院の薬が足りなければ、備蓄は重症の曲線に合わせて移す。"],
+    f07: ["大流行の両端", "整備計画", "インフルエンザ大流行の整備は一つの計画。一端は地域の投薬、一端は水際で検疫を広げる。"],
+    f08: ["学校からの報告", "欠席", "幼稚園の休校と欠席は、個別の重症届出より早く、監視網にこの波の始まりを知らせる。"],
+    f09: ["同じ手洗い", "周知", "学校の手指衛生と病院の手指衛生は同じ対策で、対象が違う。"],
+    f10: ["密度が症例を補正する", "密度", "媒介蚊の指数が上がり、まだ国内例がないとき、発生源を先に除く。確定を待たない。"],
+    f11: ["媒介を入れない", "点検", "地域が水たまりを除くあいだ、乗物の検疫は外からの蚊を止める。"],
+    f12: ["一度の検査、二つの根絶", "検査票", "HIVとウイルス性肝炎のリスクは重なる。スクリーニングと紹介は同じ動線を通せる。"],
+    f13: ["分子型別で集団を見つける", "菌株", "結核の接触者調査に遺伝子型を足して、同じ伝播鎖か偶然かを分ける。"],
+    f14: ["耐性には菌株が要る", "菌株", "管理計画の百分率は、検査室が上げ続ける薬剤感受性から来る。"],
+    f15: ["対策のデータが管理を養う", "使用量", "病院の感染対策が見た集団発生と抗菌薬使用は、One Health の人医療側の入力である。"],
+    f16: ["国際情報が当番を替わる", "情報", "協力先の事案は、国内で患者が出る前に当番画面へ入る。"],
+    f17: ["配列が判断を支える", "配列", "国内流行株のゲノムは、外への説明とリスク判断の根拠であり、国内ニュース一則だけではない。"],
+    f18: ["コールドチェーンと緊急配分", "コールドチェーン", "ワクチン基金の平常のコールドチェーンは、大流行のとき緊急接種の配送網に変えられなければならない。"],
+  },
+};
+
+let lang = "zh";
+let shot = null;
+
+function snapshot() {
+  if (shot) return;
+  shot = {
+    pillars: pillars.map((pillar) => ({ mark: pillar.mark, name: pillar.name })),
+    phases: phases.map((phase) => ({ label: phase.label, note: phase.note })),
+    phaseLabel: { ...phaseLabel },
+    dayNotes: dayNotes.map((note) => ({ title: note.title, text: note.text })),
+    islands: Object.fromEntries(islands.map((island) => [island.id, {
+      name: island.name,
+      pin: island.pin,
+      blurb: island.blurb,
+      source: island.source,
+      hrefLabel: island.hrefLabel,
+      items: Object.fromEntries(island.items.map((itemRow) => [itemRow.id, {
+        name: itemRow.name,
+        text: itemRow.text,
+        keywords: [...(itemRow.keywords ?? [])],
+      }])),
+    }])),
+    flows: Object.fromEntries(flows.map((flow) => [flow.id, { title: flow.title, text: flow.text, carried: flow.carried }])),
+  };
+}
+
+function restore() {
+  pillars.forEach((pillar, index) => Object.assign(pillar, shot.pillars[index]));
+  phases.forEach((phase, index) => Object.assign(phase, shot.phases[index]));
+  Object.assign(phaseLabel, shot.phaseLabel);
+  dayNotes.forEach((note, index) => Object.assign(note, shot.dayNotes[index]));
+  for (const island of islands) {
+    const saved = shot.islands[island.id];
+    island.name = saved.name;
+    island.pin = saved.pin;
+    island.blurb = saved.blurb;
+    island.source = saved.source;
+    island.hrefLabel = saved.hrefLabel;
+    for (const itemRow of island.items) {
+      const savedItem = saved.items[itemRow.id];
+      itemRow.name = savedItem.name;
+      itemRow.text = savedItem.text;
+      itemRow.keywords = [...savedItem.keywords];
+    }
+  }
+  for (const flow of flows) {
+    Object.assign(flow, shot.flows[flow.id]);
+    flow._alias = "";
+  }
+}
+
+function paint(code) {
+  for (const pillar of pillars) {
+    const [mark, name] = pillarsCopy[code][pillar.id];
+    pillar.mark = mark;
+    pillar.name = name;
+  }
+  const phasePack = phasesCopy[code];
+  for (const phase of phases) {
+    const [label, note] = phasePack[phase.id];
+    phase.label = label;
+    phase.note = note;
+  }
+  Object.assign(phaseLabel, phasePack.labels);
+  dayCopy[code].forEach(([title, text], index) => {
+    dayNotes[index].title = title;
+    dayNotes[index].text = text;
+  });
+  const islandPack = body[code];
+  for (const island of islands) {
+    const row = islandPack[island.id];
+    island.name = row.name;
+    island.pin = row.pin;
+    island.blurb = row.blurb;
+    island.source = row.source;
+    island.hrefLabel = row.hrefLabel;
+    const savedIsland = shot.islands[island.id];
+    for (const itemRow of island.items) {
+      const translated = row.items[itemRow.id];
+      const saved = savedIsland.items[itemRow.id];
+      itemRow.name = translated.name;
+      itemRow.text = translated.text;
+      itemRow.keywords = [...translated.keywords, ...saved.keywords, saved.name];
+    }
+    island.items[0].keywords.push(savedIsland.name, savedIsland.pin);
+  }
+  for (const flow of flows) {
+    const [title, carried, text] = flowCopy[code][flow.id];
+    const saved = shot.flows[flow.id];
+    flow.title = title;
+    flow.carried = carried;
+    flow.text = text;
+    flow._alias = [saved.title, saved.carried, saved.text].join(" ");
+  }
+}
+
+export function getLang() {
+  return lang;
+}
+
+export function t(key, vars = {}) {
+  let value = ui[lang]?.[key] ?? ui.zh[key] ?? key;
+  for (const [name, replacement] of Object.entries(vars)) value = value.replaceAll(`{${name}}`, String(replacement));
+  return value;
+}
+
+export function introSteps() {
+  return intro[lang] ?? intro.zh;
+}
+
+export function applyLocale(next) {
+  snapshot();
+  lang = next === "en" || next === "ja" ? next : "zh";
+  if (lang === "zh") restore();
+  else paint(lang);
+  try { localStorage.setItem(LANG_KEY, lang); } catch { /* private mode */ }
+  return lang;
+}
+
+export function savedLang() {
+  try {
+    const value = localStorage.getItem(LANG_KEY);
+    return value === "en" || value === "ja" ? value : "zh";
+  } catch {
+    return "zh";
+  }
+}
+
+export function localeGaps(code) {
+  const gaps = [];
+  const islandPack = body[code];
+  if (!islandPack) return ["missing pack"];
+  for (const island of islands) {
+    const row = islandPack[island.id];
+    if (!row) {
+      gaps.push(island.id);
+      continue;
+    }
+    for (const itemRow of island.items) if (!row.items[itemRow.id]) gaps.push(itemRow.id);
+  }
+  for (const flow of flows) if (!flowCopy[code][flow.id]) gaps.push(flow.id);
+  return gaps;
+}
