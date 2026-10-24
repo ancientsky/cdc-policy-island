@@ -277,7 +277,7 @@ const ui = {
 
 const intro = {
   zh: [
-    { kicker: "01  /  政策發展島", title: "十四座島，一張防疫網", body: "這裡把疾管署公開的防治計畫排成可以走進去的島。輪廓是臺灣：最北是口岸，最南是登革熱，離岸的那一座是抗藥性。" },
+    { kicker: "01  /  政策發展島", title: "十四座島，一張防疫網", body: "這裡把疾管署公開的防治計畫排成可以走進去的島。輪廓是臺灣：最北是邊境，最南是登革熱，離岸的那一座是抗藥性。" },
     { kicker: "02", title: "點一格，看裡面的工作", body: "島上的房子是具體工作：通報、冷鏈、清孳生源、PrEP。點房子，或從清單進去。" },
     { kicker: "03", title: "弧線是交件，不是裝飾", body: "兩座島之間的線，表示檢體、名單或物資要交過去。沒有這些接點，計畫會各做各的。", showFlows: true },
     { kicker: "04", title: "底下有兩種時間", body: "「防疫的一天」看這個時段誰在值班。「政策階段」把工作分成本期、近期建設、中程目標，和要守到 2035 的長期消除。" },
@@ -360,10 +360,10 @@ const body = {
       },
     },
     border: {
-      name: "Port quarantine", pin: "Border",
+      name: "Border quarantine", pin: "Border",
       blurb: "A pathogen from abroad reaches the airport and the port before it reaches a neighborhood. Quarantine sits on the northernmost cell, as the door of this net, not as a wall by itself.",
       source: "Preparedness and border quarantine for emerging infections and an influenza pandemic (2022–2027)",
-      hrefLabel: "Taiwan CDC home (search port quarantine)",
+      hrefLabel: "Taiwan CDC home (search border quarantine)",
       items: {
         "border-port": item("Airport and seaport", "Travelers, crews, and ships are questioned and assessed for symptoms. An abnormality is diverted and sampled. The queue itself must not become the risk.", ["airport", "seaport", "quarantine", "temperature"]),
         "border-travel": item("Travel history and symptoms", "Fever, respiratory symptoms, and travel through a mosquito-borne area have to become a list the epidemic center can see the same day.", ["travel history", "entry", "fever"]),
@@ -694,13 +694,13 @@ const body = {
 
 const flowCopy = {
   en: {
-    f01: ["Entry signals into surveillance", "travel-history list", "Abnormal symptoms and travel history at the port become a signal the epidemic center can see the same day."],
-    f02: ["Identifying a cross-border specimen", "specimen", "A specimen taken at the port goes to a reference laboratory, to confirm a known pathogen or a novel one that needs a higher level of handling."],
+    f01: ["Entry signals into surveillance", "travel-history list", "Abnormal symptoms and travel history at the border become a signal the epidemic center can see the same day."],
+    f02: ["Identifying a cross-border specimen", "specimen", "A specimen taken at the border goes to a reference laboratory, to confirm a known pathogen or a novel one that needs a higher level of handling."],
     f03: ["Notification, then a test", "specimen", "If surveillance rises without a laboratory type, the only known fact is that people are ill, not which pathogen is spreading."],
     f04: ["An alert starts preparedness", "alert", "Once surveillance crosses the threshold, supplies, beds, and the communication script move from stock to deployment."],
     f05: ["Seasonal immunity", "vaccine", "Influenza vaccine goes to the higher-risk groups that severe-disease surveillance points to, rather than checking severity only after the campaign."],
     f06: ["Moving antivirals", "medicine", "When contract hospitals run short during the season, the stockpile moves along the severe-disease curve."],
-    f07: ["Both ends of a pandemic", "preparedness plan", "Influenza-pandemic preparedness is one plan: antivirals in the community at one end, expanded quarantine at the port at the other."],
+    f07: ["Both ends of a pandemic", "preparedness plan", "Influenza-pandemic preparedness is one plan: antivirals in the community at one end, expanded quarantine at the border at the other."],
     f08: ["A report from school", "absences", "Closures and absences in preschools tell the surveillance net that a wave has started, earlier than an individual severe case."],
     f09: ["The same handwashing", "guidance", "Hand hygiene in a school and hand hygiene in a hospital are the same measure, for different people."],
     f10: ["Density before cases", "density", "When the mosquito index rises and there is still no local case, breeding sites are cleared first. Confirmation is not the start."],

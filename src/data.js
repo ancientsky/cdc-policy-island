@@ -68,8 +68,8 @@ export const islands = [
   {
     id: "border",
     no: "02",
-    name: "口岸檢疫",
-    pin: "口岸",
+    name: "邊境檢疫",
+    pin: "邊境",
     col: 1,
     row: 0,
     pillars: ["gate", "ready"],
@@ -79,7 +79,7 @@ export const islands = [
     blurb: "境外病原先進機場和港口，才進社區。檢疫放在輪廓最北的那一格，當作這張網的門，而不是一道單獨的牆。",
     source: "新興傳染病暨流感大流行應變整備及邊境檢疫計畫（2022–2027）",
     href: CDC_HOME,
-    hrefLabel: "疾管署首頁（查詢口岸檢疫）",
+    hrefLabel: "疾管署首頁（查詢邊境檢疫）",
     items: [
       { id: "border-port", name: "航空港口檢疫", phase: "now", hours: [[5, 23]], keywords: ["機場", "港口", "檢疫", "體溫"], text: "對入境旅客、機組與船舶做檢疫詢問和症狀評估。異常就分流、採檢，不讓隊伍本身變成風險。" },
       { id: "border-travel", name: "旅遊史與症狀", phase: "now", hours: [[5, 23]], keywords: ["旅遊史", "入境", "發燒"], text: "發熱、呼吸道症狀和蚊媒疫區旅遊史，當天要變成疫情中心看得到的名單。" },
@@ -348,7 +348,7 @@ export const islands = [
     hrefLabel: "看國際衛生條例對口頁",
     items: [
       { id: "global-intel", name: "國際疫情交換", phase: "now", hours: [[9, 21]], keywords: ["情資", "鄰近", "交換"], text: "合作國家和鄰近地區的事件，要進到疫情中心的值勤，而不是停在一份轉寄的電子報。" },
-      { id: "global-ihr", name: "核心能力檢視", phase: "now", hours: [[9, 17]], keywords: ["IHR", "核心能力", "對口"], text: "依國際衛生條例的核心能力自我檢視：偵測、通報、應變和口岸。聯合行動方案寫的也是對照國際工具做自評或外部評核。對口要有名字和班表，不能只有一個信箱。" },
+      { id: "global-ihr", name: "核心能力檢視", phase: "now", hours: [[9, 17]], keywords: ["IHR", "核心能力", "對口"], text: "依國際衛生條例的核心能力自我檢視：偵測、通報、應變和邊境。聯合行動方案寫的也是對照國際工具做自評或外部評核。對口要有名字和班表，不能只有一個信箱。" },
       { id: "global-people", name: "人才與技術合作", phase: "near", hours: [[9, 17]], keywords: ["培訓", "FETP", "技術"], text: "防疫訓練和技術合作是近期要維持的管道。人的網絡比臨時的視訊會議耐用。" },
       { id: "global-say", name: "對內說明與對外同步", phase: "now", hours: [[10, 21]], keywords: ["風險溝通", "記者會", "說明"], text: "對公眾的說明和對合作對象的通報要是同一套事實。兩個版本的數字，會先在國內被發現。" },
     ],
@@ -356,13 +356,13 @@ export const islands = [
 ];
 
 export const flows = [
-  { id: "f01", a: "border", b: "watch", title: "入境訊號進監測", carried: "旅遊史名單", text: "口岸的異常症狀和旅遊史，當天就要變成疫情中心看得到的訊號。" },
-  { id: "f02", a: "border", b: "lab", title: "跨境檢體鑑定", carried: "檢體", text: "口岸採到的檢體走參考實驗室，確認是已知病原，還是需要升級處理的新型。" },
+  { id: "f01", a: "border", b: "watch", title: "入境訊號進監測", carried: "旅遊史名單", text: "邊境的異常症狀和旅遊史，當天就要變成疫情中心看得到的訊號。" },
+  { id: "f02", a: "border", b: "lab", title: "跨境檢體鑑定", carried: "檢體", text: "邊境採到的檢體走參考實驗室，確認是已知病原，還是需要升級處理的新型。" },
   { id: "f03", a: "watch", b: "lab", title: "通報接著檢驗", carried: "檢體", text: "監視上升若沒有檢驗型別，只知道有人病了，不知道是哪一種在傳。" },
   { id: "f04", a: "watch", b: "ready", title: "預警啟動整備", carried: "預警單", text: "監測跨過門檻，物資、床位和溝通腳本從庫存狀態改成部署狀態。" },
   { id: "f05", a: "vax", b: "flu", title: "季節免疫", carried: "疫苗", text: "流感疫苗打在重症監視指出的高風險族群，而不是打完才回頭看嚴重度。" },
   { id: "f06", a: "ready", b: "flu", title: "抗病毒調度", carried: "藥品", text: "流行期合約醫院的藥量不夠時，儲備庫存要按重症曲線調過去。" },
-  { id: "f07", a: "flu", b: "border", title: "大流行的兩端", carried: "整備計畫", text: "流感大流行整備是同一份計畫：一端在社區用藥，一端在口岸放大檢疫。" },
+  { id: "f07", a: "flu", b: "border", title: "大流行的兩端", carried: "整備計畫", text: "流感大流行整備是同一份計畫：一端在社區用藥，一端在邊境放大檢疫。" },
   { id: "f08", a: "entero", b: "watch", title: "校園回報", carried: "缺勤", text: "幼兒園的停課和缺勤，比個別重症通報更早告訴監測網這一波開始了。" },
   { id: "f09", a: "entero", b: "ipc", title: "同一套洗手", carried: "衛教", text: "校園的手部衛生和醫院的手部衛生是同一種措施，對象不同。" },
   { id: "f10", a: "dengue", b: "watch", title: "密度校正病例", carried: "密度", text: "病媒蚊指數上升而還沒有本土病例時，就該先清孳生源，不等確診。" },
