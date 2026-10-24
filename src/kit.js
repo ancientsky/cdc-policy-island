@@ -8,12 +8,12 @@ import {
   MeshStandardMaterial,
   Object3D,
 } from "three";
-import { glowLamp } from "./palette.js";
+import { glowLamp, trim } from "./palette.js";
 
 // One solid material and one glowing material. Instance color carries the paint.
 // Windows and lamps share the glow material and a per-instance aGlow.
 const glowMat = new MeshStandardMaterial({
-  color: "#ffffff",
+  color: trim,
   emissive: glowLamp, emissiveIntensity: 0,
   roughness: 0.28,
   metalness: 0,
@@ -130,7 +130,7 @@ export function createKit() {
       rx: opts.rx || 0,
       ry: opts.ry || 0,
       rz: opts.rz || 0,
-      color: new Color(opts.color || "#ffffff"),
+      color: new Color(opts.color || trim),
       glowAmount: glow ? 1 : 0,
       alive: opts.alive || null,
       mesh: null,

@@ -36,7 +36,7 @@ const lookShallow = new THREE.Color();
 const lookFoam = new THREE.Color();
 const lookHaze = new THREE.Color();
 
-function sideGeo(base, landHex, coastHex) {
+function layerGeo(base, bottomHex, topHex) {
   const geo = base.clone();
   const pos = geo.attributes.position;
   let minY = Infinity;
@@ -46,15 +46,15 @@ function sideGeo(base, landHex, coastHex) {
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   }
-  const land = new THREE.Color(landHex);
-  const coast = new THREE.Color(coastHex);
-  const top = land.clone().lerp(new THREE.Color(P.cffffff), 0.3);
-  const foot = coast.clone().lerp(new THREE.Color(P.c49c8d2), 0.45);
+  const bottom = new THREE.Color(bottomHex);
+  const top = new THREE.Color(topHex);
   const colors = new Float32Array(pos.count * 3);
   const tmp = new THREE.Color();
   const span = Math.max(0.0001, maxY - minY);
   for (let i = 0; i < pos.count; i += 1) {
-    tmp.copy(foot).lerp(top, (pos.getY(i) - minY) / span);
+    const t = (pos.getY(i) - minY) / span;
+    const band = t < 0.72 ? 0 : (t - 0.72) / 0.28;
+    tmp.copy(bottom).lerp(top, band);
     colors[i * 3] = tmp.r;
     colors[i * 3 + 1] = tmp.g;
     colors[i * 3 + 2] = tmp.b;
@@ -63,11 +63,35 @@ function sideGeo(base, landHex, coastHex) {
   return geo;
 }
 
+function hexTopGeometry() {
+  const radius = MESH_R * 0.88;
+  const shape = new THREE.Shape();
+  for (let k = 0; k < 6; k += 1) {
+    const angle = (k * Math.PI) / 3;
+    const x = radius * Math.cos(angle);
+    const y = -radius * Math.sin(angle);
+    if (k === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: 0.14,
+    bevelEnabled: true,
+    bevelThickness: 0.04,
+    bevelSize: 0.05,
+    bevelSegments: 1,
+    curveSegments: 1,
+  });
+  // Vertex on +X stays on world +X, the same angles as coast.rotateY(PI/6).
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+}
+
 function groundMap(island) {
   const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 256;
-  P.paintGround(canvas.getContext("2d"), island.id, island.land, island.coast);
+  P.paintGround(canvas.getContext("2d"), island.id, island.land);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
@@ -200,7 +224,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
     `,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(150, 28, 18), skyMat);
+  const sky = new THREE.Mesh(new THREE.IcosahedronGeometry(150, 3), skyMat);
   sky.frustumCulled = false;
   scene.add(sky);
 
@@ -378,10 +402,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   const skirtGeo = new THREE.CylinderGeometry(MESH_R * 1.08, MESH_R * 1.18, 0.1, 6);
   const coastGeo = new THREE.CylinderGeometry(MESH_R, MESH_R * 0.94, 0.38, 6);
-  const topGeo = new THREE.CylinderGeometry(MESH_R * 0.86, MESH_R * 0.92, 0.18, 6);
+  const topGeo = hexTopGeometry();
   skirtGeo.rotateY(Math.PI / 6);
   coastGeo.rotateY(Math.PI / 6);
-  topGeo.rotateY(Math.PI / 6);
   const shadeCanvas = document.createElement("canvas");
   shadeCanvas.width = 128;
   shadeCanvas.height = 128;
@@ -399,7 +422,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const box = new THREE.BoxGeometry(1, 1, 1);
   const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
   const unitCone = new THREE.ConeGeometry(0.5, 1, 6);
-  const unitSphere = new THREE.SphereGeometry(0.5, 12, 10);
+  // Radius 0.5. Crew and walker heads scale it by 0.2, which is a 0.1 head.
+  const unitSphere = new THREE.IcosahedronGeometry(0.5, 1);
   const unitTorus = new THREE.TorusGeometry(0.5, 0.1, 6, 16);
   const roofGeo = new THREE.ConeGeometry(0.24, 0.3, 4);
   roofGeo.rotateY(Math.PI / 4);
@@ -442,6 +466,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const leafGeo = new THREE.IcosahedronGeometry(0.5, 1);
   prepareLeaf(leafGeo);
   kit.geo("leaf", leafGeo);
+  kit.geo("pine", new THREE.ConeGeometry(0.5, 1, 6));
+  kit.geo("round", new THREE.IcosahedronGeometry(0.17, 0));
+  kit.geo("frond", new THREE.ConeGeometry(0.05, 0.28, 3));
+  const pathGeo = new THREE.PlaneGeometry(1, 1);
+  pathGeo.rotateX(-Math.PI / 2);
+  kit.geo("path", pathGeo);
   const hitGeo = new THREE.CylinderGeometry(MESH_R, MESH_R, 1.2, 6);
   hitGeo.rotateY(Math.PI / 6);
   const hitMat = new THREE.MeshBasicMaterial({ color: P.cffffff });
@@ -525,15 +555,15 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     group.position.set(x, reduced ? 0 : -1.25, z);
     scene.add(group);
 
-    const skirtMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.97, vertexColors: true });
-    const coastMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.9, vertexColors: true });
-    const landMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.92, map: groundMap(island) });
-    const skirt = new THREE.Mesh(sideGeo(skirtGeo, island.land, island.coast), skirtMat);
+    const skirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, vertexColors: true });
+    const coastMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, vertexColors: true });
+    const landMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, map: groundMap(island) });
+    const skirt = new THREE.Mesh(layerGeo(skirtGeo, P.skirtSoil, P.skirtSoil), skirtMat);
     skirt.position.y = 0.04;
-    const coast = new THREE.Mesh(sideGeo(coastGeo, island.land, island.coast), coastMat);
+    const coast = new THREE.Mesh(layerGeo(coastGeo, P.cliff, P.beach), coastMat);
     coast.position.y = 0.22;
     const top = new THREE.Mesh(topGeo, landMat);
-    top.position.y = 0.46;
+    top.position.y = 0.37;
     const shade = new THREE.Mesh(shadeGeo, shadeMat);
     shade.position.y = 0.01;
     shade.userData = { kind: "island", islandId: island.id };
@@ -939,7 +969,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     fx.visible = false;
     if (threat.tool === "shield") {
       const bubble = new THREE.Mesh(
-        new THREE.SphereGeometry(0.5, 24, 16),
+        new THREE.IcosahedronGeometry(0.5, 1),
         new THREE.MeshBasicMaterial({ color: P.ce1992d, transparent: true, opacity: 0.35, depthWrite: false }),
       );
       bubble.position.y = 0.35;
@@ -1940,6 +1970,13 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   addSeaDecor(scene, kit, placed);
   kit.build(scene);
+  scene.traverse((obj) => {
+    const mat = obj.material;
+    if (mat && mat.isMeshStandardMaterial && !obj.userData.smooth) {
+      mat.flatShading = true;
+      mat.needsUpdate = true;
+    }
+  });
   refresh();
   applyClock();
   paintedMinutes = minutes;
@@ -2220,6 +2257,19 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (Math.hypot(shadeAt.x - isleAt.x, shadeAt.z - isleAt.z) > 0.05) errors.push("contact shade left the island");
       const shadeW = sample.shade.geometry.parameters && sample.shade.geometry.parameters.width;
       if (!(shadeW >= MESH_R * 3)) errors.push("contact shade is not the wide plane");
+      const seenMat = new Set();
+      scene.traverse((obj) => {
+        const geo = obj.geometry;
+        if (geo && geo.type === "SphereGeometry") {
+          const wide = geo.parameters?.widthSegments ?? 0;
+          const tall = geo.parameters?.heightSegments ?? 0;
+          if (wide > 12 || tall > 12) errors.push(`sphere segments ${wide}x${tall}`);
+        }
+        const mat = obj.material;
+        if (!mat || !mat.isMeshStandardMaterial || obj.userData.smooth || seenMat.has(mat)) return;
+        seenMat.add(mat);
+        if (mat.flatShading !== true) errors.push("a standard material is still smooth");
+      });
       return errors;
     },
   };

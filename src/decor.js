@@ -2,8 +2,9 @@
 import { Color, Group } from "three";
 import { MESH_R } from "./hex.js";
 import {
-  bamboo, bloom, board, bucket, bulb, cloth, cream, crate, cross, leaf, leafB, leafLit,
-  paper, pollen, pot, reed, sail, sand, stone, wallA, wallB, wallC, wood, woodB,
+  bamboo, bloom, board, bucket, bulb, chimneyClay, cloth, cream, crate, cross, doorBrown,
+  leaf, leafB, leafLit, palmLeaf, paper, pathSand, pineA, pineB, plinth, pollen, pot,
+  reed, roundA, roundB, sail, sand, stone, trunkWood, wallA, wallC, wood, woodB,
 } from "./palette.js";
 
 // Colors come from palette.js. Nothing here is a national flag.
@@ -20,7 +21,6 @@ const STONE = stone;
 const CREAM = cream;
 const PAPER = paper;
 const WALL_A = wallA;
-const WALL_B = wallB;
 const WALL_C = wallC;
 const BOARD = board;
 const TEAL = sail;
@@ -34,7 +34,6 @@ const CLOTH = cloth;
 const CROSS = cross;
 const GROUND = 0.552;
 
-const WALLS = [WALL_A, WALL_B, WALL_C, PAPER];
 const FENCE_OF = {
   watch: "rail",
   border: "post",
@@ -607,6 +606,78 @@ function placeCluster(put, occ, rng, parts) {
   return parts.length >= 3 ? 1 : 0;
 }
 
+function layPath(put, spots) {
+  const pts = spots.length <= 1 ? [[0, 0], ...(spots.length ? spots : [])] : spots;
+  for (let i = 0; i < pts.length - 1; i += 1) {
+    const [x1, z1] = pts[i];
+    const [x2, z2] = pts[i + 1];
+    const dx = x2 - x1;
+    const dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.05) continue;
+    put({
+      logical: "path",
+      kind: "path",
+      color: pathSand,
+      x: (x1 + x2) / 2,
+      y: 0.003,
+      z: (z1 + z2) / 2,
+      sx: 0.12,
+      sy: 1,
+      sz: len,
+      ry: Math.atan2(dx, dz),
+    });
+  }
+}
+
+function placeTree(put, form, x, z, scale, ry) {
+  if (form === "pine") {
+    put({ logical: "tree", kind: "bole", color: trunkWood, x, y: 0.16 * scale, z, sx: 0.07 * scale, sy: 0.32 * scale, sz: 0.07 * scale, ry });
+    put({ logical: "tree", kind: "pine", color: pineB, x, y: 0.4 * scale, z, sx: 0.46 * scale, sy: 0.36 * scale, sz: 0.46 * scale, ry });
+    put({ logical: "tree", kind: "pine", color: pineA, x, y: 0.62 * scale, z, sx: 0.32 * scale, sy: 0.34 * scale, sz: 0.32 * scale, ry });
+    return;
+  }
+  if (form === "round") {
+    put({ logical: "tree", kind: "bole", color: trunkWood, x, y: 0.18 * scale, z, sx: 0.08 * scale, sy: 0.36 * scale, sz: 0.08 * scale, ry });
+    put({ logical: "tree", kind: "round", color: roundA, x, y: 0.5 * scale, z, sx: scale * 1.7, sy: scale * 1.7, sz: scale * 1.7, ry });
+    put({
+      logical: "tree",
+      kind: "round",
+      color: roundB,
+      x: x + Math.cos(ry) * 0.06 * scale,
+      y: 0.64 * scale,
+      z: z - Math.sin(ry) * 0.06 * scale,
+      sx: scale * 1.25,
+      sy: scale * 1.25,
+      sz: scale * 1.25,
+      ry,
+    });
+    return;
+  }
+  const lean = 0.28;
+  put({ logical: "tree", kind: "bole", color: trunkWood, x, y: 0.16 * scale, z, sx: 0.06 * scale, sy: 0.34 * scale, sz: 0.06 * scale, rx: lean * 0.45, ry });
+  const ox = Math.sin(ry) * 0.06 * scale;
+  const oz = Math.cos(ry) * 0.06 * scale;
+  put({ logical: "tree", kind: "bole", color: trunkWood, x: x + ox, y: 0.42 * scale, z: z + oz, sx: 0.05 * scale, sy: 0.3 * scale, sz: 0.05 * scale, rx: lean, ry });
+  const crownY = 0.58 * scale;
+  for (let i = 0; i < 5; i += 1) {
+    const ang = ry + (i * Math.PI * 2) / 5;
+    put({
+      logical: "tree",
+      kind: "frond",
+      color: palmLeaf,
+      x: x + ox + Math.sin(ang) * 0.04 * scale,
+      y: crownY,
+      z: z + oz + Math.cos(ang) * 0.04 * scale,
+      sx: scale,
+      sy: scale,
+      sz: scale * 0.38,
+      rx: Math.PI / 2.35,
+      ry: ang,
+    });
+  }
+}
+
 export function addIslandDecor(group, island, kit, lamps, placed, houseSpots) {
   const tally = {
     pieces: 0,
@@ -614,6 +685,8 @@ export function addIslandDecor(group, island, kit, lamps, placed, houseSpots) {
     vignettes: 0,
     interior: 0,
     sprigs: 0,
+    trees: 0,
+    forms: [],
     bridges: [],
     at: null,
   };
@@ -693,41 +766,33 @@ export function addIslandDecor(group, island, kit, lamps, placed, houseSpots) {
     tally.vignettes += placeCluster(put, occ, rng, parts);
   }
 
+  layPath(put, houseSpots);
+
+  const treeRng = mulberry(seedFrom(`${island.id}:trees`));
+  const treeWant = 4 + Math.floor(treeRng() * 3);
+  const palmIsland = island.id === "dengue" || island.id === "hepa";
+  const forms = new Set();
   let trees = 0;
-  for (let n = 0; n < 8 && trees < 5; n += 1) {
-    const ang = 0.4 + n * 1.05;
-    const rad = 0.78 + (n % 2) * 0.08;
+  let treeTries = 0;
+  while (trees < treeWant && treeTries < 80) {
+    treeTries += 1;
+    const ang = treeRng() * Math.PI * 2;
+    const rad = 0.75 + treeRng() * 0.4;
     const x = Math.cos(ang) * rad;
     const z = Math.sin(ang) * rad;
-    if (occ.hit(x, z, 0.16)) continue;
-    occ.add(x, z, 0.16);
-    const clumps = 4 + Math.floor(rng() * 3);
-    const scale = 0.9 + rng() * 0.22;
-    put({ logical: "tree", kind: "bole", color: WOOD, x, y: 0.22 * scale, z, sx: 0.08 * scale, sy: 0.44 * scale, sz: 0.08 * scale });
-    const crown = [
-      [0, 0.5, 0, 0.32, "base"],
-      [0.1, 0.4, 0.04, 0.24, "dark"],
-      [-0.09, 0.42, -0.05, 0.22, "dark"],
-      [0.03, 0.6, -0.02, 0.2, "lit"],
-      [-0.04, 0.56, 0.07, 0.18, "base"],
-      [0.08, 0.52, -0.06, 0.16, "lit"],
-    ];
-    for (let c = 0; c < clumps; c += 1) {
-      const bit = crown[c];
-      put({
-        logical: "tree",
-        kind: "leaf",
-        color: leafHex(bit[4]),
-        x: x + bit[0] * scale,
-        y: bit[1] * scale,
-        z: z + bit[2] * scale,
-        sx: bit[3] * scale,
-        sy: bit[3] * scale * 0.9,
-        sz: bit[3] * scale,
-      });
-    }
+    if (houseSpots.some(([sx, sz]) => Math.hypot(x - sx, z - sz) < 0.3)) continue;
+    if (occ.hit(x, z, 0.2)) continue;
+    const scale = 0.75 + treeRng() * 0.6;
+    const ry = treeRng() * Math.PI * 2;
+    let form = treeRng() < 0.5 ? "pine" : "round";
+    if (palmIsland && (trees === 0 || treeRng() < 0.45)) form = "palm";
+    occ.add(x, z, 0.22);
+    placeTree(put, form, x, z, scale, ry);
+    forms.add(form);
     trees += 1;
   }
+  tally.trees = trees;
+  tally.forms = [...forms].sort();
 
   const spacing = 0.042;
   const rowH = spacing * Math.sqrt(3) / 2;
@@ -935,6 +1000,8 @@ export function decorReport() {
       vignettes: row.vignettes,
       interior: row.interior,
       sprigs: row.sprigs,
+      trees: row.trees,
+      forms: row.forms,
       bridges: row.bridges,
       at: row.at,
     };
@@ -958,13 +1025,19 @@ export function buildingParts(id, accent) {
   const body = id % 5;
   const cap = Math.floor(id / 5) % 4;
   const wing = Math.floor(id / 20) % 2;
-  const wall = WALLS[id % WALLS.length];
+  const wall = wallA;
   const roof = muteAccent(accent);
   const parts = [];
   const push = (kind, color, x, y, z, sx, sy, sz, rot = null, glow = false) => {
     parts.push({ kind, color, x, y, z, sx, sy, sz, rot, glow });
   };
   let top = 0.3;
+  let footW = 0.34;
+  let footD = 0.26;
+  let frontZ = 0.13;
+  let sideX = 0.17;
+  let wallH = 0.28;
+  let wallY = 0.14;
   if (body === 0) {
     push("box", wall, 0, 0.14, 0, 0.34, 0.28, 0.26);
     push("box", CREAM, 0, 0.16, 0.14, 0.1, 0.08, 0.02, null, true);
@@ -974,24 +1047,54 @@ export function buildingParts(id, accent) {
     push("box", wall, 0, h / 2, 0, 0.22, h, 0.2);
     push("box", CREAM, 0, h * 0.55, 0.11, 0.08, 0.1, 0.02, null, true);
     top = h;
+    footW = 0.22;
+    footD = 0.2;
+    frontZ = 0.1;
+    sideX = 0.11;
+    wallH = h;
+    wallY = h / 2;
   } else if (body === 2) {
     push("cyl", wall, 0, 0.18, 0, 0.26, 0.36, 0.26);
     push("box", CREAM, 0, 0.2, 0.14, 0.08, 0.1, 0.02, null, true);
     top = 0.38;
+    footW = 0.26;
+    footD = 0.26;
+    frontZ = 0.13;
+    sideX = 0.13;
+    wallH = 0.36;
+    wallY = 0.18;
   } else if (body === 3) {
     push("box", wall, 0, 0.12, 0, 0.48, 0.24, 0.22);
     push("box", CREAM, -0.12, 0.14, 0.12, 0.08, 0.08, 0.02, null, true);
     push("box", CREAM, 0.12, 0.14, 0.12, 0.08, 0.08, 0.02, null, true);
     top = 0.26;
+    footW = 0.48;
+    footD = 0.22;
+    frontZ = 0.11;
+    sideX = 0.24;
+    wallH = 0.24;
+    wallY = 0.12;
   } else {
     push("cone", wall, 0, 0.2, 0, 0.36, 0.4, 0.32);
     push("sphere", CREAM, 0, 0.18, 0.1, 0.06, 0.06, 0.04, null, true);
     top = 0.4;
+    footW = 0.36;
+    footD = 0.32;
+    frontZ = 0.12;
+    sideX = 0.16;
+    wallH = 0.28;
+    wallY = 0.16;
   }
-  if (cap === 0) push("roof", roof, 0, top + 0.08, 0, 1.15, 0.7, 1.05);
+  const foundationKind = body === 2 ? "cyl" : "box";
+  push(foundationKind, plinth, 0, 0.015, 0, footW * 1.12, 0.03, footD * 1.12);
+  push("box", doorBrown, 0, 0.07, frontZ + 0.012, 0.06, 0.11, 0.02);
+  push("box", wallC, sideX, wallY, 0, 0.02, wallH * 0.92, footD * 0.82);
+  push("box", wallC, -sideX, wallY, 0, 0.02, wallH * 0.92, footD * 0.82);
+  if (cap === 0) push("roof", roof, 0, top + 0.08, 0, 1.15 * 1.15, 0.7, 1.05 * 1.15);
   else if (cap === 1) push("box", roof, 0, top + 0.03, 0, body === 3 ? 0.52 : 0.38, 0.06, 0.3);
   else if (cap === 2) push("torus", roof, 0, top + 0.06, 0, 0.28, 0.2, 0.28, { x: 1.15 });
   else push("sphere", roof, 0, top + 0.06, 0, 0.2, 0.14, 0.2);
+  if (body === 0 || body === 3) push("box", chimneyClay, 0.07, top + 0.14, -0.04, 0.04, 0.1, 0.04);
   if (wing === 1) push("box", WOOD, 0.2, 0.08, 0.02, 0.12, 0.14, 0.14);
   else push("cyl", WOOD_B, -0.14, 0.16, -0.02, 0.035, 0.16, 0.035);
   const mark = id % 4;
