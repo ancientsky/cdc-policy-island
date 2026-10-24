@@ -4,7 +4,10 @@ import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer
 import { MESH_R, offsetToWorld } from "./hex.js";
 import { hourCovers } from "./data.js";
 import { t } from "./i18n.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createKit } from "./kit.js";
+import * as P from "./palette.js";
+import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, resetDecor } from "./decor.js";
 
 // Meeple front is local -z: the nose sits at z < 0, the pack sits at z > 0.
 // rotation.y = atan2(-dir.x, -dir.z) turns that -z axis onto dir.
@@ -24,20 +27,65 @@ const mixB = new THREE.Color();
 const lookTop = new THREE.Color();
 const lookHor = new THREE.Color();
 const lookBot = new THREE.Color();
-const lookWater = new THREE.Color();
 const lookSun = new THREE.Color();
 const lookHemi = new THREE.Color();
 const lookGround = new THREE.Color();
 const lookFill = new THREE.Color();
+const lookDeep = new THREE.Color();
+const lookShallow = new THREE.Color();
+const lookFoam = new THREE.Color();
+const lookHaze = new THREE.Color();
 
+function sideGeo(base, landHex, coastHex) {
+  const geo = base.clone();
+  const pos = geo.attributes.position;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i += 1) {
+    const y = pos.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const land = new THREE.Color(landHex);
+  const coast = new THREE.Color(coastHex);
+  const top = land.clone().lerp(new THREE.Color(P.cffffff), 0.3);
+  const foot = coast.clone().lerp(new THREE.Color(P.c49c8d2), 0.45);
+  const colors = new Float32Array(pos.count * 3);
+  const tmp = new THREE.Color();
+  const span = Math.max(0.0001, maxY - minY);
+  for (let i = 0; i < pos.count; i += 1) {
+    tmp.copy(foot).lerp(top, (pos.getY(i) - minY) / span);
+    colors[i * 3] = tmp.r;
+    colors[i * 3 + 1] = tmp.g;
+    colors[i * 3 + 2] = tmp.b;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+function groundMap(island) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  P.paintGround(canvas.getContext("2d"), island.id, island.land, island.coast);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// deep / shallow / foam / haze feed the sea. Numbers, not #rrggbb strings.
+// Night exposure 1.05 and hemiI 0.85 stay until the time-of-day pass.
 const LOOKS = [
-  { h: 0, top: "#070b12", hor: "#121a24", bot: "#05080e", water: "#07141c", sun: "#b7c6ea", hemi: "#4a6280", ground: "#1c2834", fill: "#c5d4ee", exposure: 1.05, hemiI: 0.85, stars: 1 },
-  { h: 5, top: "#1a1424", hor: "#4a3040", bot: "#141820", water: "#0c1e28", sun: "#e7b090", hemi: "#4a3848", ground: "#241810", fill: "#c49880", exposure: 0.74, hemiI: 0.32, stars: 0.55 },
-  { h: 8.33, top: "#f3c7a0", hor: "#f7e6cf", bot: "#7eaea8", water: "#3eb0b4", sun: "#fff1d4", hemi: "#f4dcc0", ground: "#8d7348", fill: "#f0c4a0", exposure: 1.12, hemiI: 0.78, stars: 0 },
-  { h: 12.5, top: "#7ec4dc", hor: "#e7f7f6", bot: "#b7ddd6", water: "#49c8d2", sun: "#fffaf2", hemi: "#e9f7f5", ground: "#a09068", fill: "#c5e6ee", exposure: 1.22, hemiI: 0.88, stars: 0 },
-  { h: 18.67, top: "#3a1844", hor: "#e07a48", bot: "#1a2030", water: "#1a3c48", sun: "#ffb089", hemi: "#e8a888", ground: "#4a2c1c", fill: "#e09070", exposure: 0.92, hemiI: 0.5, stars: 0.2 },
-  { h: 22, top: "#070b12", hor: "#162230", bot: "#05080e", water: "#07141c", sun: "#9eb0dc", hemi: "#4a6280", ground: "#1c2834", fill: "#c5d4ee", exposure: 1.05, hemiI: 0.85, stars: 0.95 },
-  { h: 24, top: "#070b12", hor: "#121a24", bot: "#05080e", water: "#07141c", sun: "#b7c6ea", hemi: "#4a6280", ground: "#1c2834", fill: "#c5d4ee", exposure: 1.05, hemiI: 0.85, stars: 1 },
+  { h: 0, top: P.c070b12, hor: P.c121a24, bot: P.c070b12, water: P.c07141c, sun: P.cb7c6ea, hemi: P.c4a6280, ground: P.c1c2834, fill: P.cc5d4ee, exposure: 1.05, hemiI: 0.85, stars: 1, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, haze: 0x0f1c2e },
+  { h: 5, top: P.c1a1424, hor: P.c4a3040, bot: P.c121a24, water: P.c0c1e28, sun: P.ce7b090, hemi: P.c4a3848, ground: P.c241810, fill: P.cc49880, exposure: 0.74, hemiI: 0.32, stars: 0.55, deep: 0x1a2f45, shallow: 0x4a6a80, foam: 0xb8a0b0, haze: 0x6a5a78 },
+  { h: 8.33, top: P.cf3c7a0, hor: P.cf7e6cf, bot: P.c7eaea8, water: P.c3eb0b4, sun: P.cfff1d4, hemi: P.cf4dcc0, ground: P.c8d7348, fill: P.cf0c4a0, exposure: 1.12, hemiI: 0.78, stars: 0, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, haze: 0xf6e2c8 },
+  { h: 12.5, top: P.c7ec4dc, hor: P.ce7f7f6, bot: P.cb7ddd6, water: P.c49c8d2, sun: P.cfffaf2, hemi: P.ce9f7f5, ground: P.ca09068, fill: P.cc5e6ee, exposure: 1.22, hemiI: 0.88, stars: 0, deep: 0x2a86a0, shallow: 0x86e3d4, foam: 0xffffff, haze: 0xd8eef0 },
+  { h: 18.67, top: P.c3a1844, hor: P.ce07a48, bot: P.c1a2030, water: P.c1a3c48, sun: P.cffb089, hemi: P.ce8a888, ground: P.c4a2c1c, fill: P.ce09070, exposure: 0.92, hemiI: 0.5, stars: 0.2, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, haze: 0xe9a07e },
+  { h: 22, top: P.c070b12, hor: P.c162230, bot: P.c070b12, water: P.c07141c, sun: P.c9eb0dc, hemi: P.c4a6280, ground: P.c1c2834, fill: P.cc5d4ee, exposure: 1.05, hemiI: 0.85, stars: 0.95, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, haze: 0x0f1c2e },
+  { h: 24, top: P.c070b12, hor: P.c121a24, bot: P.c070b12, water: P.c07141c, sun: P.cb7c6ea, hemi: P.c4a6280, ground: P.c1c2834, fill: P.cc5d4ee, exposure: 1.05, hemiI: 0.85, stars: 1, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, haze: 0x0f1c2e },
 ];
 
 function norm(s) {
@@ -76,7 +124,10 @@ function lookAtHour(hour) {
     top: mixHex(a.top, b.top, t, lookTop),
     hor: mixHex(a.hor, b.hor, t, lookHor),
     bot: mixHex(a.bot, b.bot, t, lookBot),
-    water: mixHex(a.water, b.water, t, lookWater),
+    deep: mixHex(a.deep, b.deep, t, lookDeep),
+    shallow: mixHex(a.shallow, b.shallow, t, lookShallow),
+    foam: mixHex(a.foam, b.foam, t, lookFoam),
+    haze: mixHex(a.haze, b.haze, t, lookHaze),
     sun: mixHex(a.sun, b.sun, t, lookSun),
     hemi: mixHex(a.hemi, b.hemi, t, lookHemi),
     ground: mixHex(a.ground, b.ground, t, lookGround),
@@ -101,19 +152,19 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   renderer.shadowMap.needsUpdate = true;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#f7e6cf");
-  scene.fog = new THREE.Fog("#f7e6cf", 42, 118);
+  scene.background = new THREE.Color(P.cf7e6cf);
+  scene.fog = new THREE.FogExp2(0xd8eef0, 0.013);
 
   const skySunDir = new THREE.Vector3(0.45, 0.7, 0.3);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      top: { value: new THREE.Color("#f3c7a0") },
-      horizon: { value: new THREE.Color("#f7e6cf") },
-      bottom: { value: new THREE.Color("#7eaea8") },
+      top: { value: new THREE.Color(P.cf3c7a0) },
+      horizon: { value: new THREE.Color(P.cf7e6cf) },
+      bottom: { value: new THREE.Color(P.c7eaea8) },
       sunDir: { value: skySunDir },
-      sunColor: { value: new THREE.Color("#ffe6bf") },
+      sunColor: { value: new THREE.Color(P.cffe6bf) },
       sunAmt: { value: 1 },
     },
     vertexShader: `
@@ -144,6 +195,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         float glow = pow(d, 36.0) * 0.45 + pow(d, 6.0) * 0.18;
         col += sunColor * (disc * 1.15 + glow) * sunAmt;
         gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }
     `,
   });
@@ -174,76 +227,128 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   fill.position.set(-14, 8, -10);
   scene.add(fill);
 
-  const waterGeo = new THREE.PlaneGeometry(200, 200, 64, 64);
+  const waterGeo = new THREE.PlaneGeometry(200, 200, 160, 160);
   waterGeo.rotateX(-Math.PI / 2);
-  const waterBase = Float32Array.from(waterGeo.attributes.position.array);
-  const waterDeep = new THREE.Color("#0a3c48");
-  const waterCrest = new THREE.Color("#8ee4dc");
   const waterMat = new THREE.ShaderMaterial({
-    uniforms: {
-      deepColor: { value: waterDeep },
-      crestColor: { value: waterCrest },
-      sunDir: { value: skySunDir },
-      sunColor: { value: new THREE.Color("#ffe6bf") },
-      sunAmt: { value: 1 },
-      stars: { value: 0 },
-      uTime: { value: 0 },
-      isle: { value: Array.from({ length: 14 }, () => new THREE.Vector2()) },
-    },
+    fog: true,
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      {
+        deepColor: { value: new THREE.Color(0x1b86a0) },
+        shallowColor: { value: new THREE.Color(0x86e3d4) },
+        foamColor: { value: new THREE.Color(0xffffff) },
+        sunDir: { value: skySunDir },
+        sunColor: { value: new THREE.Color(P.cffe6bf) },
+        sunAmt: { value: 1 },
+        stars: { value: 0 },
+        uTime: { value: 0 },
+        isle: { value: Array.from({ length: 14 }, () => new THREE.Vector2()) },
+        isleRise: { value: new Float32Array(14) },
+        hexR: { value: MESH_R },
+      },
+    ]),
     vertexShader: `
+      #include <fog_pars_vertex>
       varying vec3 vWorld;
       varying vec3 vNormal;
-      varying float vHeight;
+      uniform float uTime;
+      vec3 gerstner(vec2 p, vec2 dir, float steep, float wl, float speed, inout vec3 tx, inout vec3 tz) {
+        float k = 6.28318 / wl;
+        float c = sqrt(9.8 / k) * speed;
+        vec2 d = normalize(dir);
+        float f = k * (dot(d, p) - c * uTime);
+        float a = steep / k;
+        float s = sin(f);
+        float co = cos(f);
+        tx.x += -d.x * d.x * a * k * s;
+        tx.y += a * co * k * d.x;
+        tx.z += -d.y * d.x * a * k * s;
+        tz.x += -d.x * d.y * a * k * s;
+        tz.y += a * co * k * d.y;
+        tz.z += -d.y * d.y * a * k * s;
+        return vec3(d.x * a * co, a * s, d.y * a * co);
+      }
       void main() {
-        vec4 world = modelMatrix * vec4(position, 1.0);
+        vec2 p = position.xz;
+        vec3 tx = vec3(1.0, 0.0, 0.0);
+        vec3 tz = vec3(0.0, 0.0, 1.0);
+        vec3 disp = gerstner(p, vec2(1.0, 0.3), 0.10, 18.0, 0.12, tx, tz);
+        disp += gerstner(p, vec2(-0.4, 1.0), 0.08, 9.0, 0.15, tx, tz);
+        disp += gerstner(p, vec2(0.7, -0.6), 0.05, 4.0, 0.20, tx, tz);
+        vec4 world = modelMatrix * vec4(position + disp, 1.0);
         vWorld = world.xyz;
-        vNormal = normalize(mat3(modelMatrix) * normal);
-        vHeight = position.y;
-        gl_Position = projectionMatrix * viewMatrix * world;
+        vNormal = normalize(mat3(modelMatrix) * normalize(cross(tz, tx)));
+        vec4 mvPosition = viewMatrix * world;
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
       }
     `,
     fragmentShader: `
+      #include <fog_pars_fragment>
       varying vec3 vWorld;
       varying vec3 vNormal;
-      varying float vHeight;
       uniform vec3 deepColor;
-      uniform vec3 crestColor;
+      uniform vec3 shallowColor;
+      uniform vec3 foamColor;
       uniform vec3 sunDir;
       uniform vec3 sunColor;
       uniform float sunAmt;
       uniform float stars;
       uniform float uTime;
       uniform vec2 isle[14];
+      uniform float isleRise[14];
+      uniform float hexR;
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+      }
+      float sdHex(vec2 p, float r) {
+        p = abs(p);
+        return max(dot(p, vec2(0.8660254, 0.5)), p.y) - r;
+      }
       void main() {
         vec3 n = normalize(vNormal);
         vec3 viewDir = normalize(cameraPosition - vWorld);
-        float fres = pow(1.0 - max(dot(n, viewDir), 0.0), 2.2);
-        float crest = smoothstep(-0.02, 0.08, vHeight);
-        float swell = 0.5 + 0.5 * sin(vWorld.x * 0.46 + vWorld.z * 0.16 - uTime * 0.32);
-        float rip = 0.5 + 0.5 * sin(vWorld.x * 1.15 - vWorld.z * 0.82 + uTime * 0.85);
-        vec3 col = mix(deepColor, crestColor, swell * 0.72 + rip * 0.16 + crest * 0.28);
-        col = mix(col, crestColor, fres * 0.18);
-        float foam = smoothstep(0.035, 0.09, vHeight) * rip;
-        float ring = 0.0;
+        float d = 99.0;
+        float rise = 0.0;
         for (int i = 0; i < 14; i++) {
-          float d = distance(vWorld.xz, isle[i]);
-          ring = max(ring, smoothstep(2.35, 1.72, d) * (1.0 - smoothstep(1.72, 1.42, d)));
+          float di = sdHex(vWorld.xz - isle[i], hexR * 0.97);
+          if (di < d) { d = di; rise = isleRise[i]; }
         }
-        foam = max(foam, ring);
-        col = mix(col, vec3(0.94, 0.98, 0.97), foam * 0.55 * (1.0 - stars * 0.8));
+        float depth = smoothstep(0.0, 3.0, d);
+        vec3 col = mix(shallowColor, deepColor, depth);
+        float swell = 0.5 + 0.5 * sin(vWorld.x * 0.46 + vWorld.z * 0.16 - uTime * 0.32);
+        col *= 0.96 + swell * 0.08;
+        float band = smoothstep(0.08, 0.14, d) * (1.0 - smoothstep(0.16, 0.46, d));
+        float lines = smoothstep(0.42, 0.78, 0.5 + 0.5 * sin(d * 22.0 - uTime * 1.6));
+        float foam = band * max(lines, 1.0 - smoothstep(0.08, 0.16, d)) * rise;
+        foam *= step(0.45, noise(vWorld.xz * 3.0 + uTime * 0.3));
+        col = mix(col, foamColor, foam * 0.85 * (1.0 - stars * 0.7));
         vec3 halfV = normalize(normalize(sunDir) + viewDir);
-        float spec = pow(max(dot(n, halfV), 0.0), 36.0);
-        float glint = pow(max(dot(n, halfV), 0.0), 8.0) * rip;
-        col += sunColor * (spec * 0.55 + glint * 0.14) * sunAmt * (1.0 - stars * 0.82);
+        float spec = pow(max(dot(n, halfV), 0.0), 64.0);
+        col += sunColor * spec * 0.35 * sunAmt * (1.0 - stars * 0.8);
         gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
       }
     `,
   });
+  waterMat.uniforms.sunDir.value = skySunDir;
   const water = new THREE.Mesh(waterGeo, waterMat);
   water.receiveShadow = false;
   scene.add(water);
 
-  const sandMat = new THREE.MeshBasicMaterial({ color: "#e9d6a8", transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
+  const sandMat = new THREE.MeshBasicMaterial({ color: P.ce9d6a8, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
   const sandGeo = new THREE.CircleGeometry(0.6, 6);
   sandGeo.rotateX(-Math.PI / 2);
   const sand = new THREE.InstancedMesh(sandGeo, sandMat, 3);
@@ -277,9 +382,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   skirtGeo.rotateY(Math.PI / 6);
   coastGeo.rotateY(Math.PI / 6);
   topGeo.rotateY(Math.PI / 6);
-  const shadeGeo = new THREE.CircleGeometry(MESH_R * 1.22, 6);
+  const shadeCanvas = document.createElement("canvas");
+  shadeCanvas.width = 128;
+  shadeCanvas.height = 128;
+  const shadeG = shadeCanvas.getContext("2d");
+  const shadeGrad = shadeG.createRadialGradient(64, 64, 0, 64, 64, 64);
+  shadeGrad.addColorStop(0, "rgba(11,42,53,0.35)");
+  shadeGrad.addColorStop(1, "rgba(11,42,53,0)");
+  shadeG.fillStyle = shadeGrad;
+  shadeG.fillRect(0, 0, 128, 128);
+  const shadeTex = new THREE.CanvasTexture(shadeCanvas);
+  shadeTex.colorSpace = THREE.SRGBColorSpace;
+  const shadeGeo = new THREE.PlaneGeometry(MESH_R * 3.2, MESH_R * 3.2);
   shadeGeo.rotateX(-Math.PI / 2);
-  const shadeMat = new THREE.MeshBasicMaterial({ color: "#041014", transparent: true, opacity: 0.14, depthWrite: false });
+  const shadeMat = new THREE.MeshBasicMaterial({ map: shadeTex, transparent: true, depthWrite: false });
   const box = new THREE.BoxGeometry(1, 1, 1);
   const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
   const unitCone = new THREE.ConeGeometry(0.5, 1, 6);
@@ -312,9 +428,23 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   kit.geo("trunk", trunkGeo);
   kit.geo("crown", crownGeo);
   kit.geo("crown2", crownGeo);
+  kit.geo("cone6", new THREE.ConeGeometry(0.5, 1, 6));
+  kit.geo("rbox", new RoundedBoxGeometry(1, 1, 1, 2, 0.12));
+  kit.geo("tetra", new THREE.TetrahedronGeometry(0.5));
+  const sprigGeo = new THREE.BufferGeometry();
+  sprigGeo.setAttribute("position", new THREE.Float32BufferAttribute([
+    -0.5, 0, 0, 0.5, 0, 0, 0, 1, 0,
+    -0.5, 0, 0, 0, 1, 0, 0.5, 0, 0,
+  ], 3));
+  sprigGeo.computeVertexNormals();
+  kit.geo("sprig", sprigGeo);
+  kit.geo("bole", new THREE.CylinderGeometry(0.32, 0.5, 1, 9));
+  const leafGeo = new THREE.IcosahedronGeometry(0.5, 1);
+  prepareLeaf(leafGeo);
+  kit.geo("leaf", leafGeo);
   const hitGeo = new THREE.CylinderGeometry(MESH_R, MESH_R, 1.2, 6);
   hitGeo.rotateY(Math.PI / 6);
-  const hitMat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+  const hitMat = new THREE.MeshBasicMaterial({ color: P.cffffff });
   const hitboxes = [];
 
   function tag(mesh, islandId, cast = true) {
@@ -325,21 +455,30 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     return mesh;
   }
 
-  function tree(parent, x, z, leaf) {
-    const alive = () => parent.userData.lit !== false;
-    kit.part({ kind: "trunk", parent, x, y: 0.62, z, color: "#6b4a32", alive, glow: false });
-    kit.part({ kind: "crown", parent, x, y: 0.86, z, color: leaf, alive });
-    kit.part({ kind: "crown2", parent, x: x + 0.05, y: 0.98, z: z - 0.04, sx: 0.72, sy: 0.72, sz: 0.72, color: leaf, alive });
+  const recipeUsed = new Map();
+  let recipeCursor = 0;
+  function takeRecipe(islandId) {
+    let used = recipeUsed.get(islandId);
+    if (!used) {
+      used = new Set();
+      recipeUsed.set(islandId, used);
+    }
+    let id = recipeCursor % 40;
+    let guard = 0;
+    while (used.has(id) && guard < 40) {
+      recipeCursor += 1;
+      id = recipeCursor % 40;
+      guard += 1;
+    }
+    used.add(id);
+    recipeCursor += 1;
+    return id;
   }
 
   function house(parent, item, x, z, index, island) {
     const group = new THREE.Group();
     group.position.set(x, 0.55, z);
     const windows = [];
-    const wall = "#f7f1e4";
-    const roof = island.accent;
-    const wood = "#8d5a3c";
-    const stone = "#d9d0c2";
     const alive = () => group.visible;
     const add = (kind, color, px, py, pz, sx = 1, sy = 1, sz = 1, rot = null, glow = false) => {
       const rec = kit.part({
@@ -361,94 +500,21 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (glow) windows.push(rec);
       return rec;
     };
-    const v = index % 4;
-    const shape = island.kit;
-    const win = true;
-    if (shape === "tower") {
-      const h = 0.48 + v * 0.14;
-      add("box", wall, 0, h / 2, 0, 0.18, h, 0.18);
-      add("box", roof, 0, h + 0.03, 0, 0.26, 0.05, 0.26);
-      add("cyl", "#fff6d8", 0, h * 0.62, 0.1, 0.08, 0.08, 0.03, null, win);
-      add("torus", roof, 0, h + 0.16, 0, 0.16, 0.16, 0.16, { x: 1.05 });
-    } else if (shape === "port") {
-      if (v === 0) {
-        add("cyl", wall, 0, 0.28, 0, 0.16, 0.5, 0.16);
-        add("cyl", roof, 0, 0.58, 0, 0.22, 0.08, 0.22);
-        add("sphere", "#fff6d8", 0, 0.7, 0, 0.12, 0.12, 0.12, null, win);
-      } else {
-        add("box", wall, 0, 0.16, 0, 0.42, 0.22, 0.28);
-        add("roof", roof, 0, 0.38, 0, 0.7, 0.55, 0.7);
-        add("box", "#fff6d8", 0, 0.18, 0.15, 0.1, 0.08, 0.02, null, win);
-        add("cyl", wood, 0.22, 0.1, 0.16, 0.05, 0.16, 0.05);
-      }
-    } else if (shape === "lab") {
-      add("box", wall, 0, 0.2, 0, 0.4, 0.32, 0.28);
-      add("box", roof, 0, 0.38, 0, 0.44, 0.04, 0.32);
-      add("box", "#fff6d8", 0, 0.22, 0.15, 0.22, 0.1, 0.02, null, win);
-      add("cyl", stone, v === 1 ? 0.16 : -0.16, 0.48, 0, 0.05, 0.22, 0.05);
-      add("sphere", "#fff6d8", v === 1 ? 0.16 : -0.16, 0.62, 0, 0.08, 0.08, 0.08, null, win);
-    } else if (shape === "clinic") {
-      add("box", wall, 0, 0.16, 0, 0.36, 0.26, 0.28);
-      add("roof", roof, 0, 0.4, 0, 0.62, 0.5, 0.62);
-      add("box", "#d4544a", 0, 0.22, 0.15, 0.05, 0.14, 0.02);
-      add("box", "#d4544a", 0, 0.22, 0.15, 0.14, 0.05, 0.02);
-      if (v % 2 === 0) add("box", "#fff6d8", 0.16, 0.12, 0, 0.1, 0.14, 0.1, null, win);
-    } else if (shape === "houses") {
-      add("box", wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
-      add("roof", roof, 0, 0.36, 0, 0.58, 0.48, 0.58);
-      add("box", "#fff6d8", 0, 0.14, 0.14, 0.08, 0.08, 0.02, null, win);
-      add("cyl", wood, 0.1, 0.4, -0.04, 0.04, 0.14, 0.04);
-    } else if (shape === "school") {
-      add("box", wall, 0, 0.16, 0, 0.46, 0.26, 0.3);
-      add("roof", roof, 0, 0.42, 0, 0.78, 0.46, 0.7);
-      add("box", "#fff6d8", -0.1, 0.16, 0.16, 0.08, 0.08, 0.02, null, win);
-      add("box", "#fff6d8", 0.1, 0.16, 0.16, 0.08, 0.08, 0.02, null, win);
-      add("sphere", roof, 0, 0.58, 0, 0.08, 0.08, 0.08);
-    } else if (shape === "yard") {
-      add("box", wall, 0, 0.22, 0, 0.28, 0.2, 0.24);
-      add("box", wood, -0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
-      add("box", wood, 0.12, 0.1, 0.1, 0.04, 0.2, 0.04);
-      add("roof", roof, 0, 0.4, 0, 0.5, 0.36, 0.5);
-      add("cyl", "#c47a4a", 0.16, 0.08, -0.08, 0.1, 0.1, 0.1);
-      add("box", "#fff6d8", 0, 0.24, 0.13, 0.1, 0.06, 0.02, null, win);
-    } else if (shape === "dots") {
-      add("box", wall, 0, 0.12, 0, 0.5, 0.16, 0.24);
-      add("box", roof, 0, 0.22, 0, 0.54, 0.04, 0.28);
-      add("box", "#fff6d8", 0, 0.12, 0.13, 0.12, 0.06, 0.02, null, win);
-      for (let i = 0; i < 3; i += 1) add("sphere", stone, -0.12 + i * 0.12, 0.28, 0, 0.05, 0.05, 0.05);
-    } else if (shape === "ribbon") {
-      add("box", wall, 0, 0.14, 0, 0.28, 0.22, 0.22);
-      add("box", "#fff6d8", 0, 0.16, 0.12, 0.08, 0.1, 0.02, null, win);
-      add("torus", "#c4546a", 0, 0.34, 0, 0.28, 0.28, 0.28, { x: Math.PI / 2 });
-    } else if (shape === "tent") {
-      add("cone", wall, 0, 0.22, 0, 0.36, 0.4, 0.36, { y: Math.PI / 4 });
-      add("box", roof, 0, 0.08, 0.12, 0.1, 0.12, 0.02);
-      add("sphere", "#fff6d8", 0, 0.16, 0.14, 0.06, 0.06, 0.04, null, win);
-    } else if (shape === "hospital") {
-      const h = 0.34 + (v % 2) * 0.16;
-      add("box", wall, 0, h / 2, 0, 0.32, h, 0.26);
-      add("box", roof, 0, h + 0.03, 0, 0.36, 0.04, 0.3);
-      add("box", "#e15a4a", 0, h * 0.72, 0.14, 0.05, 0.16, 0.02);
-      add("box", "#e15a4a", 0, h * 0.72, 0.14, 0.16, 0.05, 0.02);
-      add("box", "#fff6d8", 0, h * 0.4, 0.14, 0.1, 0.06, 0.02, null, win);
-    } else if (shape === "rings") {
-      add("cyl", wall, 0, 0.14, 0, 0.28, 0.24, 0.28);
-      add("torus", roof, 0, 0.3, 0, 0.34, 0.34, 0.34, { x: Math.PI / 2 });
-      add("box", "#fff6d8", 0, 0.16, 0.15, 0.08, 0.08, 0.02, null, win);
-    } else if (shape === "warehouse") {
-      add("box", "#e4d3a8", 0, 0.16, 0, 0.46, 0.26, 0.32);
-      add("roof", roof, 0, 0.38, 0, 0.72, 0.4, 0.62);
-      add("box", wood, 0.2, 0.1, 0.18, 0.12, 0.1, 0.12);
-      add("box", "#fff6d8", -0.08, 0.16, 0.17, 0.08, 0.08, 0.02, null, win);
-    } else {
-      add("box", wall, 0, 0.14, 0, 0.34, 0.22, 0.26);
-      add("cyl", stone, 0, 0.42, 0, 0.03, 0.36, 0.03);
-      add("sphere", "#fff6d8", 0, 0.64, 0, 0.08, 0.08, 0.08, null, win);
-      add("torus", roof, 0, 0.5, 0, 0.16, 0.16, 0.16, { x: Math.PI / 2 });
+    const recipe = takeRecipe(island.id);
+    void index;
+    for (const part of buildingParts(recipe, island.accent)) {
+      add(part.kind, part.color, part.x, part.y, part.z, part.sx, part.sy, part.sz, part.rot, part.glow);
     }
     parent.add(group);
-    return { group, item, windows };
+    return { group, item, windows, recipe };
   }
+
+  const placed = raw.map((point) => ({
+    id: point.island.id,
+    x: point.x - cx,
+    z: point.z - cz,
+  }));
+  resetDecor();
 
   for (const point of raw) {
     const island = point.island;
@@ -459,17 +525,17 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     group.position.set(x, reduced ? 0 : -1.25, z);
     scene.add(group);
 
-    const skirtMat = new THREE.MeshStandardMaterial({ color: island.coast, roughness: 0.97 });
-    const coastMat = new THREE.MeshStandardMaterial({ color: island.coast, roughness: 0.9 });
-    const landMat = new THREE.MeshStandardMaterial({ color: island.land, roughness: 0.86 });
-    const skirt = new THREE.Mesh(skirtGeo, skirtMat);
+    const skirtMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.97, vertexColors: true });
+    const coastMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.9, vertexColors: true });
+    const landMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.92, map: groundMap(island) });
+    const skirt = new THREE.Mesh(sideGeo(skirtGeo, island.land, island.coast), skirtMat);
     skirt.position.y = 0.04;
-    const coast = new THREE.Mesh(coastGeo, coastMat);
+    const coast = new THREE.Mesh(sideGeo(coastGeo, island.land, island.coast), coastMat);
     coast.position.y = 0.22;
     const top = new THREE.Mesh(topGeo, landMat);
     top.position.y = 0.46;
     const shade = new THREE.Mesh(shadeGeo, shadeMat);
-    shade.position.y = 0.012;
+    shade.position.y = 0.01;
     shade.userData = { kind: "island", islandId: island.id };
     group.add(shade, skirt, coast, top);
     tag(skirt, island.id, false);
@@ -516,21 +582,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     pin.position.set(0, 1.25, 0);
     group.add(pin);
 
+    const spots = [
+      [-0.58, 0.22],
+      [0.56, 0.26],
+      [-0.22, 0.64],
+      [0.32, 0.6],
+      [0.02, -0.35],
+    ];
     const buildings = island.items.map((item, index) => {
-      const spots = [
-        [-0.58, 0.22],
-        [0.56, 0.26],
-        [-0.22, 0.64],
-        [0.32, 0.6],
-        [0.02, -0.35],
-      ];
       const [sx, sz] = spots[index] ?? spots[index % spots.length];
       return house(group, item, sx, sz, index, island);
     });
 
-    tree(group, 0.92, -0.15, island.id === "dengue" ? "#c4a24a" : "#3e6a3c");
-    tree(group, -0.96, 0.05, "#4e7a48");
     addKit(group, island, lamps, kit);
+    addIslandDecor(group, island, kit, lamps, placed, spots.slice(0, island.items.length));
     group.traverse((child) => {
       if (!child.isMesh) return;
       if (!child.userData.kind) child.userData = { kind: "island", islandId: island.id };
@@ -579,9 +644,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const accent = new THREE.Color(views.get(flow.a).island.accent);
     const ribbonMat = new THREE.MeshStandardMaterial({
       color: accent,
-      emissive: accent,
-      emissiveIntensity: 0.55,
-      roughness: 0.32,
+      roughness: 0.45,
     });
     const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.055, 8, false), ribbonMat);
     const halo = new THREE.Mesh(
@@ -605,7 +668,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     return { flow, curve, tube, len };
   });
 
-  const skinHex = ["#f0c7a4", "#d9a57a", "#c48a6a", "#8d5a3c"];
+  const skinHex = [P.cf0c7a4, P.cd9a57a, P.cc48a6a, P.c8d5a3c];
   let cargoOn = true;
   const TOOL_KEY = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
 
@@ -622,10 +685,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const mesh = new THREE.Group();
     const skin = skinHex[index % skinHex.length];
     const alive = () => mesh.visible;
-    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: "#14756f", alive });
+    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: P.c14756f, alive });
     kit.part({ kind: "sphere", parent: mesh, y: 0.44, sx: 0.2, sy: 0.2, sz: 0.2, color: skin, alive });
     kit.part({ kind: "sphere", parent: mesh, y: 0.43, z: -0.085, sx: 0.056, sy: 0.056, sz: 0.056, color: skin, alive });
-    kit.part({ kind: "box", parent: mesh, y: 0.28, z: 0.09, sx: 0.1, sy: 0.09, sz: 0.045, color: "#f3efe4", alive });
+    kit.part({ kind: "box", parent: mesh, y: 0.28, z: 0.09, sx: 0.1, sy: 0.09, sz: 0.045, color: P.cf3efe4, alive });
     kit.part({
       kind: "box",
       parent: mesh,
@@ -635,7 +698,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       sx: 0.11,
       sy: 0.09,
       sz: 0.09,
-      color: "#e39a3a",
+      color: P.ce39a3a,
       alive: () => mesh.visible && cargoOn,
     });
     const { head, nose } = anchorFront(mesh, 0.44, new THREE.Vector3(0, 0.43, -0.085));
@@ -769,7 +832,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (tool === "finish") {
       const cells = crew.fx.children;
       for (let i = 0; i < cells.length; i += 1) {
-        cells[i].material.emissiveIntensity = crew.t >= i * 0.15 ? 0.85 : 0;
+        cells[i].visible = crew.t >= i * 0.15;
       }
       if (crew.t >= 1.05) {
         if (!crew.applied) {
@@ -868,7 +931,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     mesh.userData = { kind: "crew" };
     const skin = skinHex[crews.length % skinHex.length];
     const alive = () => mesh.visible;
-    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: "#14756f", alive });
+    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: P.c14756f, alive });
     kit.part({ kind: "sphere", parent: mesh, y: 0.44, sx: 0.2, sy: 0.2, sz: 0.2, color: skin, alive });
     kit.part({ kind: "sphere", parent: mesh, y: 0.43, z: -0.085, sx: 0.056, sy: 0.056, sz: 0.056, color: skin, alive });
     const { head, nose } = anchorFront(mesh, 0.44, new THREE.Vector3(0, 0.43, -0.085));
@@ -877,29 +940,29 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (threat.tool === "shield") {
       const bubble = new THREE.Mesh(
         new THREE.SphereGeometry(0.5, 24, 16),
-        new THREE.MeshBasicMaterial({ color: "#e1992d", transparent: true, opacity: 0.35, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: P.ce1992d, transparent: true, opacity: 0.35, depthWrite: false }),
       );
       bubble.position.y = 0.35;
       fx.add(bubble);
     } else if (threat.tool === "clean") {
       const bucket = new THREE.Mesh(
         new THREE.CylinderGeometry(0.08, 0.06, 0.12, 8),
-        new THREE.MeshStandardMaterial({ color: "#d7e4ea", roughness: 0.55 }),
+        new THREE.MeshStandardMaterial({ color: P.cd7e4ea, roughness: 0.55 }),
       );
       bucket.position.set(0.12, 0.32, -0.02);
       bucket.name = "bucket";
-      const drops = makeDrops(20, "#b7d7ea");
+      const drops = makeDrops(20, P.cb7d7ea);
       drops.name = "drops";
       fx.add(bucket, drops);
     } else if (threat.tool === "wash") {
-      const bubbles = makeDrops(12, "#ffffff");
+      const bubbles = makeDrops(12, P.cffffff);
       bubbles.name = "bubbles";
       fx.add(bubbles);
     } else if (threat.tool === "finish") {
       for (let i = 0; i < 7; i += 1) {
         const cell = new THREE.Mesh(
           new THREE.BoxGeometry(0.045, 0.03, 0.03),
-          new THREE.MeshStandardMaterial({ color: "#f4f0e6", roughness: 0.5, emissive: "#f2d48a", emissiveIntensity: 0 }),
+          new THREE.MeshStandardMaterial({ color: P.cf4f0e6, roughness: 0.5 }),
         );
         cell.position.set((i - 3) * 0.05, 0.36, -0.06);
         fx.add(cell);
@@ -920,7 +983,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (threat.tool === "check") {
       gate = new THREE.Mesh(
         new THREE.PlaneGeometry(1.4, 0.9),
-        new THREE.MeshBasicMaterial({ color: "#0e8a80", transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: P.c0e8a80, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
       );
       gate.position.set(threat.halt.x, 0.7, threat.halt.z);
       const towardHome = new THREE.Vector3(threat.home.x - threat.halt.x, 0, threat.home.z - threat.halt.z);
@@ -1031,12 +1094,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       color,
       roughness: 0.55,
       flatShading: true,
-      emissive: color,
-      emissiveIntensity: 0,
     });
     group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 1), bodyMat));
     const spikeGeo = new THREE.ConeGeometry(0.035, 0.09, 5);
-    const spikeMat = new THREE.MeshStandardMaterial({ color: "#ffd0a8", roughness: 0.6, emissiveIntensity: 0 });
+    const spikeMat = new THREE.MeshStandardMaterial({ color: P.cffd0a8, roughness: 0.6 });
     const spikes = new THREE.InstancedMesh(spikeGeo, spikeMat, 12);
     const dummy = new THREE.Object3D();
     const up = new THREE.Vector3(0, 1, 0);
@@ -1057,11 +1118,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function makeRod() {
     const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: "#8ed15a", roughness: 0.55, emissive: "#3f6e24", emissiveIntensity: 0 });
+    const mat = new THREE.MeshStandardMaterial({ color: P.c8ed15a, roughness: 0.55 });
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.32, 4, 12), mat);
     body.rotation.x = Math.PI / 2;
     group.add(body);
-    const tailMat = new THREE.MeshStandardMaterial({ color: "#e7f0cf", roughness: 0.45 });
+    const tailMat = new THREE.MeshStandardMaterial({ color: P.ce7f0cf, roughness: 0.45 });
     for (let i = 0; i < 4; i += 1) {
       const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.003, 0.26, 4), tailMat);
       tail.rotation.x = Math.PI / 2;
@@ -1074,8 +1135,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function makeMosquito() {
     const group = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: "#2a2630", roughness: 0.62 });
-    const pale = new THREE.MeshStandardMaterial({ color: "#f2ede2", roughness: 0.55 });
+    const dark = new THREE.MeshStandardMaterial({ color: P.c2a2630, roughness: 0.62 });
+    const pale = new THREE.MeshStandardMaterial({ color: P.cf2ede2, roughness: 0.55 });
     for (let i = 0; i < 5; i += 1) {
       const seg = new THREE.Mesh(new THREE.SphereGeometry(0.05 - i * 0.005, 8, 6), i % 2 ? pale : dark);
       seg.scale.set(1, 0.7, 1.2);
@@ -1090,7 +1151,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     beak.rotation.x = Math.PI / 2;
     beak.position.set(0, -0.012, -0.28);
     const wingMat = new THREE.MeshStandardMaterial({
-      color: "#dff3ff",
+      color: P.cdff3ff,
       transparent: true,
       opacity: 0.35,
       roughness: 0.12,
@@ -1143,8 +1204,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const roster = [
       { make: () => makeMosquito(), id: "dengue", tool: "clean", rate: 0.046 },
       { make: () => makeMosquito(), id: "border", tool: "check", rate: 0.04 },
-      { make: () => makeVirus("#d2694a"), id: "flu", tool: "shield", rate: 0.038 },
-      { make: () => makeVirus("#5aa86a"), id: "entero", tool: "wash", rate: 0.04 },
+      { make: () => makeVirus(P.cd2694a), id: "flu", tool: "shield", rate: 0.038 },
+      { make: () => makeVirus(P.c5aa86a), id: "entero", tool: "wash", rate: 0.04 },
       { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034 },
     ];
     roster.forEach((spec, index) => {
@@ -1159,7 +1220,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   blobGeo.rotateX(-Math.PI / 2);
   const blobs = new THREE.InstancedMesh(
     blobGeo,
-    new THREE.MeshBasicMaterial({ color: "#041014", transparent: true, opacity: 0.25, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: P.c041014, transparent: true, opacity: 0.25, depthWrite: false }),
     threats.length + crews.length,
   );
   blobs.frustumCulled = false;
@@ -1302,11 +1363,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function placeCamera() {
     const sp = Math.sin(cam.phi);
-    camera.position.set(
-      cam.target.x + cam.radius * sp * Math.sin(cam.theta),
-      cam.target.y + cam.radius * Math.cos(cam.phi),
-      cam.target.z + cam.radius * sp * Math.cos(cam.theta),
-    );
+    const x = cam.target.x + cam.radius * sp * Math.sin(cam.theta);
+    const y = cam.target.y + cam.radius * Math.cos(cam.phi);
+    const z = cam.target.z + cam.radius * sp * Math.cos(cam.theta);
+    const look = camera.userData;
+    if (camera.position.x === x && camera.position.y === y && camera.position.z === z
+      && look._lx === cam.target.x && look._ly === cam.target.y && look._lz === cam.target.z) return;
+    look._lx = cam.target.x;
+    look._ly = cam.target.y;
+    look._lz = cam.target.z;
+    camera.position.set(x, y, z);
     camera.lookAt(cam.target);
     camera.updateMatrixWorld();
   }
@@ -1375,30 +1441,19 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const hour = minutes / 60;
     const look = lookAtHour(hour);
     skyMat.uniforms.top.value.copy(look.top);
-    skyMat.uniforms.horizon.value.copy(look.hor);
+    skyMat.uniforms.horizon.value.copy(look.haze);
     skyMat.uniforms.bottom.value.copy(look.bot);
-    scene.background.copy(look.hor);
-    scene.fog.color.copy(look.hor);
-    scene.fog.near = 34 + (1 - look.stars) * 18;
-    scene.fog.far = 96 + (1 - look.stars) * 28;
+    scene.background.copy(look.haze);
+    scene.fog.color.copy(look.haze);
     renderer.toneMappingExposure = look.exposure;
     hemi.color.copy(look.hemi);
     hemi.groundColor.copy(look.ground);
     hemi.intensity = look.hemiI;
     fill.color.copy(look.fill);
     fill.intensity = 0.18 + look.stars * 0.22;
-    waterDeep.copy(look.water);
-    waterCrest.copy(look.water);
-    if (look.stars < 0.5) {
-      waterDeep.offsetHSL(0.02, 0.12, -0.07);
-      waterCrest.offsetHSL(-0.05, 0.02, 0.16);
-    } else {
-      waterCrest.offsetHSL(-0.02, -0.02, 0.045);
-    }
-    waterMat.uniforms.deepColor.value.copy(waterDeep);
-    waterMat.uniforms.crestColor.value.copy(waterCrest);
-    waterMat.uniforms.sunColor.value.copy(skyMat.uniforms.sunColor.value);
-    waterMat.uniforms.sunAmt.value = skyMat.uniforms.sunAmt.value;
+    waterMat.uniforms.deepColor.value.copy(look.deep);
+    waterMat.uniforms.shallowColor.value.copy(look.shallow);
+    waterMat.uniforms.foamColor.value.copy(look.foam);
     waterMat.uniforms.stars.value = look.stars;
     const ang = ((hour - 6) / 12) * Math.PI;
     const elev = Math.sin(ang);
@@ -1408,8 +1463,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       nightSky ? 0.62 : Math.max(elev, 0.06),
       nightSky ? -0.45 : 0.32,
     ).normalize();
-    skyMat.uniforms.sunColor.value.set(nightSky ? "#d5e4ff" : "#ffe6bf");
+    skyMat.uniforms.sunColor.value.set(nightSky ? P.cd5e4ff : P.cffe6bf);
     skyMat.uniforms.sunAmt.value = nightSky ? 0.9 : THREE.MathUtils.clamp(elev + 0.55, 0.35, 1);
+    waterMat.uniforms.sunColor.value.copy(skyMat.uniforms.sunColor.value);
+    waterMat.uniforms.sunAmt.value = skyMat.uniforms.sunAmt.value;
     sun.position.set(Math.cos(ang) * 26, Math.max(elev, 0.08) * 24 + 2, 9);
     const dayLit = 1 - look.stars;
     sun.intensity = 0.05 + dayLit * (0.45 + Math.max(elev, 0) * 1.15);
@@ -1422,7 +1479,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   function paintGlow() {
     const hour = minutes / 60;
     const night = nightAmount(hour);
-    kit.glowMat.emissiveIntensity = 0.04 + night * 1.7;
+    kit.glowMat.emissiveIntensity = night * 1.1;
     for (const lamp of lamps) lamp.glowAmount = 0.35 + night * 0.85;
     for (const view of views.values()) {
       const active = view.buildings.some((building) => building.group.visible && hourCovers(building.item.hours, hour));
@@ -1433,6 +1490,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         for (const win of building.windows) win.glowAmount = amount;
       }
     }
+    kit.touch();
   }
 
   function resize() {
@@ -1462,28 +1520,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const ease = 1 - (1 - risen) ** 3;
       const want = hoverId === view.island.id || selected.has(view.island.id) ? 1 : 0;
       view.hover += (want - view.hover) * hoverK;
-      view.group.position.y = -1.25 * (1 - ease) + view.hover * 0.1;
+      const lift = -1.25 * (1 - ease) + view.hover * 0.1;
+      if (view.group.position.y !== lift) view.group.position.y = lift;
       for (const building of view.buildings) {
         const hot = building.item.id === hotItem ? 1.12 : 1;
-        building.group.scale.setScalar(hot);
+        if (building.group.scale.x !== hot) building.group.scale.setScalar(hot);
       }
     }
-    if (!frozen && !reduced) {
-      const arr = waterGeo.attributes.position.array;
-      const time = elapsed;
-      for (let i = 0; i < arr.length; i += 3) {
-        const x = waterBase[i];
-        const z = waterBase[i + 2];
-        arr[i + 1] = Math.sin(x * 0.05 + time * 0.16) * 0.1
-          + Math.sin(z * 0.035 - time * 0.11) * 0.055
-          + Math.sin(x * 0.22 + z * 0.08 + time * 0.38) * 0.04
-          + Math.cos(z * 0.18 + time * 0.3) * 0.028
-          + Math.sin(x * 0.72 + time * 0.9) * 0.016;
-      }
-      waterGeo.attributes.position.needsUpdate = true;
-      waterGeo.computeVertexNormals();
-      waterMat.uniforms.uTime.value = time;
+    const riseU = waterMat.uniforms.isleRise.value;
+    let riseI = 0;
+    for (const view of views.values()) {
+      riseU[riseI] = view.group.position.y < -0.2 ? 0 : 1;
+      riseI += 1;
     }
+    if (!frozen && !reduced) waterMat.uniforms.uTime.value = elapsed;
     if (!frozen && !reduced) {
       for (const threat of threats) {
         if (threat.fading && !threat.gone) {
@@ -1514,17 +1564,28 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     const phiGoal = bird ? 0.58 : userPhi;
     const k = 1 - Math.exp(-step * (reduced ? 28 : 3.4));
+    const dTheta = wrapAngle(goal.theta - cam.theta);
+    const dPhi = phiGoal - cam.phi;
+    const dRadius = goal.radius - cam.radius;
+    const dTarget = cam.target.distanceTo(goalTarget);
     if (pointers.size) {
       cam.theta = goal.theta;
       cam.phi = phiGoal;
       cam.radius = goal.radius;
+      cam.target.copy(goalTarget);
+    } else if (Math.abs(dTheta) < 1e-4 && Math.abs(dPhi) < 1e-4 && Math.abs(dRadius) < 1e-3 && dTarget < 1e-3) {
+      cam.theta = goal.theta;
+      cam.phi = phiGoal;
+      cam.radius = goal.radius;
+      cam.target.copy(goalTarget);
     } else {
-      cam.theta += wrapAngle(goal.theta - cam.theta) * k;
-      cam.phi += (phiGoal - cam.phi) * k;
-      cam.radius += (goal.radius - cam.radius) * k;
+      cam.theta += dTheta * k;
+      cam.phi += dPhi * k;
+      cam.radius += dRadius * k;
+      cam.target.lerp(goalTarget, k);
     }
-    cam.target.lerp(goalTarget, pointers.size ? 1 : k);
     placeCamera();
+    scene.fog.density = 0.32 / cam.radius;
     const routesOn = elapsed > 1.15 || reduced;
     for (const walker of walkers) {
       const show = Boolean(routesOn && walker.route.tube.visible === true);
@@ -1587,9 +1648,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     poseBlobs();
     kit.sync();
     renderer.render(scene, camera);
-    labels.render(scene, camera);
-    shadePins();
-    markCrowding();
+    if (!labelsStill()) {
+      labels.render(scene, camera);
+      shadePins();
+      markCrowding();
+    }
   }
 
   let hoverSample = null;
@@ -1599,6 +1662,38 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let shadowWarm = true;
   const frameMs = [];
   let occTick = 0;
+
+  const labelCam = new Float64Array(16);
+  let labelCamReady = false;
+  let labelForce = false;
+
+  function labelsStill() {
+    if (handoffPops.length) {
+      labelForce = true;
+      return false;
+    }
+    for (const view of views.values()) {
+      if (view.group.position.y !== 0) {
+        labelForce = true;
+        return false;
+      }
+    }
+    camera.updateMatrixWorld();
+    const src = camera.matrixWorld.elements;
+    if (!labelCamReady || labelForce) {
+      labelCam.set(src);
+      labelCamReady = true;
+      labelForce = false;
+      return false;
+    }
+    for (let i = 0; i < 16; i += 1) {
+      if (labelCam[i] !== src[i]) {
+        labelCam.set(src);
+        return false;
+      }
+    }
+    return true;
+  }
 
   function shadePins() {
     occTick = (occTick + 1) % 6;
@@ -1843,6 +1938,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     applyFit();
   }
 
+  addSeaDecor(scene, kit, placed);
   kit.build(scene);
   refresh();
   applyClock();
@@ -1851,11 +1947,21 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   placeCamera();
   if (import.meta.env.DEV) {
     window.__island = Object.assign(window.__island ?? {}, {
-      stats: () => ({
-        draws: renderer.info.render.calls,
-        instances: kit.instanceCount(),
-        meshes: kit.meshCount(),
-      }),
+      stats: () => {
+        const decor = decorReport();
+        const shapes = {};
+        for (const [id, view] of views) shapes[id] = view.buildings.map((building) => building.recipe);
+        return {
+          draws: renderer.info.render.calls,
+          drawCalls: renderer.info.render.calls,
+          instances: kit.instanceCount(),
+          triangles: renderer.info.render.triangles,
+          meshes: kit.meshCount(),
+          decorByIsland: decor.decorByIsland,
+          decor,
+          shapes,
+        };
+      },
     });
   }
 
@@ -2095,7 +2201,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const sample = views.get("amr");
       const coastA = rimAngles(sample.coast, MESH_R * 0.97);
       const ringA = rimAngles(sample.ring, MESH_R * 1.02);
-      const shadeA = rimAngles(sample.shade, MESH_R * 1.05);
       if (coastA.length !== 6 || ringA.length !== 6) errors.push(`hex rim count coast ${coastA.length} ring ${ringA.length}`);
       else {
         for (const a of coastA) {
@@ -2106,15 +2211,15 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           }
           if (best > 0.05) errors.push(`selection hex is rotated ${(best * 180 / Math.PI).toFixed(1)}° off the island`);
         }
-        for (const a of coastA) {
-          let best = Infinity;
-          for (const b of shadeA) {
-            const d = Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-            if (d < best) best = d;
-          }
-          if (best > 0.05) errors.push(`shade hex is rotated ${(best * 180 / Math.PI).toFixed(1)}° off the island`);
-        }
       }
+      sample.shade.updateWorldMatrix(true, false);
+      const shadeAt = new THREE.Vector3();
+      const isleAt = new THREE.Vector3();
+      sample.shade.getWorldPosition(shadeAt);
+      sample.group.getWorldPosition(isleAt);
+      if (Math.hypot(shadeAt.x - isleAt.x, shadeAt.z - isleAt.z) > 0.05) errors.push("contact shade left the island");
+      const shadeW = sample.shade.geometry.parameters && sample.shade.geometry.parameters.width;
+      if (!(shadeW >= MESH_R * 3)) errors.push("contact shade is not the wide plane");
       return errors;
     },
   };
@@ -2143,52 +2248,52 @@ function addKit(group, island, lamps, kit) {
     return rec;
   };
   if (island.kit === "port") {
-    put("box", "#8d6244", 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
-    put("cyl", "#f7f4ee", 0.02, 0.7, -MESH_R - 0.15, 0.22, 0.72, 0.22);
-    put("sphere", "#ffe1a8", 0.02, 1.12, -MESH_R - 0.15, 0.15, 0.15, 0.15, null, true);
-    put("box", "#c4473a", 0.42, 0.66, -0.2, 0.28, 0.22, 0.22);
-    put("box", "#2f6f9e", -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
+    put("box", P.c8d6244, 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
+    put("cyl", P.cf7f4ee, 0.02, 0.7, -MESH_R - 0.15, 0.22, 0.72, 0.22);
+    put("sphere", P.cffe1a8, 0.02, 1.12, -MESH_R - 0.15, 0.15, 0.15, 0.15, null, true);
+    put("box", P.cc4473a, 0.42, 0.66, -0.2, 0.28, 0.22, 0.22);
+    put("box", P.c2f6f9e, -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
   } else if (island.kit === "tower") {
-    put("box", "#f7f4ee", 0, 0.95, -0.2, 0.26, 0.9, 0.26);
-    put("torus", "#d9e2e4", 0, 1.5, -0.2, 0.32, 0.32, 0.32, { x: Math.PI / 2.4 });
+    put("box", P.cf7f4ee, 0, 0.95, -0.2, 0.26, 0.9, 0.26);
+    put("torus", P.cd9e2e4, 0, 1.5, -0.2, 0.32, 0.32, 0.32, { x: Math.PI / 2.4 });
   } else if (island.kit === "lab") {
-    put("box", "#f7f4ee", 0, 0.78, -0.25, 0.72, 0.5, 0.42);
-    put("box", "#b7e0e4", 0, 0.86, -0.02, 0.5, 0.22, 0.04, null, true);
+    put("box", P.cf7f4ee, 0, 0.78, -0.25, 0.72, 0.5, 0.42);
+    put("box", P.cb7e0e4, 0, 0.86, -0.02, 0.5, 0.22, 0.04, null, true);
   } else if (island.kit === "clinic" || island.kit === "hospital") {
     const tall = island.kit === "hospital" ? 0.72 : 0.48;
-    put("box", "#f7f4ee", 0, 0.52 + tall / 2, -0.28, 0.55, tall, 0.4);
-    put("box", "#d4544a", 0, 0.52 + tall * 0.72, -0.06, 0.06, 0.22, 0.04);
-    put("box", "#d4544a", 0, 0.52 + tall * 0.72, -0.06, 0.2, 0.06, 0.04);
+    put("box", P.cf7f4ee, 0, 0.52 + tall / 2, -0.28, 0.55, tall, 0.4);
+    put("box", P.cd4544a, 0, 0.52 + tall * 0.72, -0.06, 0.06, 0.22, 0.04);
+    put("box", P.cd4544a, 0, 0.52 + tall * 0.72, -0.06, 0.2, 0.06, 0.04);
   } else if (island.kit === "warehouse") {
-    put("box", "#d7c7a2", 0, 0.74, -0.2, 0.9, 0.4, 0.46);
-    put("box", "#b98348", 0.55, 0.64, 0.15, 0.2, 0.16, 0.2);
-    put("box", "#8d6244", 0.32, 0.66, 0.18, 0.18, 0.2, 0.18);
+    put("box", P.cd7c7a2, 0, 0.74, -0.2, 0.9, 0.4, 0.46);
+    put("box", P.cb98348, 0.55, 0.64, 0.15, 0.2, 0.16, 0.2);
+    put("box", P.c8d6244, 0.32, 0.66, 0.18, 0.18, 0.2, 0.18);
   } else if (island.kit === "school") {
-    put("box", "#f3efe2", 0, 0.7, -0.3, 0.8, 0.36, 0.4);
-    put("cyl", "#5c6670", 0.55, 0.8, 0.15, 0.04, 0.55, 0.04);
-    put("box", "#d4544a", 0.66, 0.98, 0.15, 0.18, 0.1, 0.02);
+    put("box", P.cf3efe2, 0, 0.7, -0.3, 0.8, 0.36, 0.4);
+    put("cyl", P.c5c6670, 0.55, 0.8, 0.15, 0.04, 0.55, 0.04);
+    put("box", P.cd4544a, 0.66, 0.98, 0.15, 0.18, 0.1, 0.02);
   } else if (island.kit === "rings") {
-    ["#2a9a90", "#e0a04a", "#6a8f4e"].forEach((color, index) => {
+    [P.c2a9a90, P.ce0a04a, P.c6a8f4e].forEach((color, index) => {
       const scale = (0.16 + index * 0.05) / 0.5;
       put("torus", color, 0, 0.85 + index * 0.08, -0.15, scale, scale, scale, { x: Math.PI / 2.2, y: index * 0.6 });
     });
   } else if (island.kit === "dots") {
-    for (let i = 0; i < 5; i += 1) put("sphere", "#f4efe4", -0.28 + i * 0.14, 0.58, -0.35, 0.1, 0.1, 0.1);
+    for (let i = 0; i < 5; i += 1) put("sphere", P.cf4efe4, -0.28 + i * 0.14, 0.58, -0.35, 0.1, 0.1, 0.1);
   } else if (island.kit === "ribbon") {
-    put("torus", "#c4546a", 0, 0.9, -0.2, 0.36, 0.36, 0.36, { x: Math.PI / 2.5 });
+    put("torus", P.cc4546a, 0, 0.9, -0.2, 0.36, 0.36, 0.36, { x: Math.PI / 2.5 });
   } else if (island.kit === "tent") {
-    for (const x of [-0.22, 0.22]) put("cone", "#f7f4ee", x, 0.72, -0.25, 0.44, 0.38, 0.44);
+    for (const x of [-0.22, 0.22]) put("cone", P.cf7f4ee, x, 0.72, -0.25, 0.44, 0.38, 0.44);
   } else if (island.kit === "yard") {
     for (let i = 0; i < 4; i += 1) {
       const x = -0.24 + (i % 2) * 0.28;
       const z = -0.4 + Math.floor(i / 2) * 0.24;
-      put("cyl", "#c47a4a", x, 0.6, z, 0.16, 0.14, 0.16);
-      if (i !== 1) put("box", "#6e8f62", x, 0.69, z, 0.12, 0.03, 0.12);
+      put("cyl", P.cc47a4a, x, 0.6, z, 0.16, 0.14, 0.16);
+      if (i !== 1) put("box", P.c6e8f62, x, 0.69, z, 0.12, 0.03, 0.12);
     }
   } else if (island.kit === "antenna") {
-    put("cyl", "#d5dbde", 0, 1.0, -0.2, 0.065, 0.9, 0.065);
-    put("sphere", "#f2f6ff", 0, 1.5, -0.2, 0.12, 0.12, 0.12, null, true);
+    put("cyl", P.cd5dbde, 0, 1.0, -0.2, 0.065, 0.9, 0.065);
+    put("sphere", P.cf2f6ff, 0, 1.5, -0.2, 0.12, 0.12, 0.12, null, true);
   } else if (island.kit === "houses") {
-    put("box", "#efe6d4", 0, 0.66, -0.32, 0.7, 0.28, 0.34);
+    put("box", P.cefe6d4, 0, 0.66, -0.32, 0.7, 0.28, 0.34);
   }
 }
