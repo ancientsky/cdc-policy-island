@@ -91,7 +91,7 @@ export const crate = "#c4a484";
 export const cloth = "#e7d3c4";
 export const cross = "#c98980";
 export const bamboo = "#c4b07a";
-export const glowLamp = "#e6c7a4";
+export const glowLamp = "#ffc27a";
 
 function mixHex(a, b, t) {
   const pa = Number.parseInt(a.slice(1), 16);

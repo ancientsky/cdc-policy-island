@@ -8,12 +8,15 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { createKit } from "./kit.js";
 import * as P from "./palette.js";
 import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, resetDecor } from "./decor.js";
+import { createEnvironment } from "./environment.js";
+import { Line2 } from "three/addons/lines/Line2.js";
+import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
 // Meeple front is local -z: the nose sits at z < 0, the pack sits at z > 0.
 // rotation.y = atan2(-dir.x, -dir.z) turns that -z axis onto dir.
 // Check: dir (1, 0, 0) => rotation.y = -π/2 => local -z lands on world +x.
 
-const _tangent = new THREE.Vector3();
 const _threatDir = new THREE.Vector3();
 const _crewDir = new THREE.Vector3();
 const _crewFace = new THREE.Vector3();
@@ -35,6 +38,7 @@ const lookDeep = new THREE.Color();
 const lookShallow = new THREE.Color();
 const lookFoam = new THREE.Color();
 const lookHaze = new THREE.Color();
+const lookSunPos = new THREE.Vector3();
 
 function layerGeo(base, bottomHex, topHex) {
   const geo = base.clone();
@@ -100,17 +104,50 @@ function groundMap(island) {
   return tex;
 }
 
-// deep / shallow / foam / haze feed the sea. Numbers, not #rrggbb strings.
-// Night exposure 1.05 and hemiI 0.85 stay until the time-of-day pass.
+// Time-of-day anchors. Colors are 0x numbers so this file stays free of #rrggbb.
+// h:24 matches h:0. Knots at 05:45 and 16:00 are inserted below.
 const LOOKS = [
-  { h: 0, top: P.c070b12, hor: P.c121a24, bot: P.c070b12, water: P.c07141c, sun: P.cb7c6ea, hemi: P.c4a6280, ground: P.c1c2834, fill: P.cc5d4ee, exposure: 1.05, hemiI: 0.85, stars: 1, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, haze: 0x0f1c2e },
-  { h: 5, top: P.c1a1424, hor: P.c4a3040, bot: P.c121a24, water: P.c0c1e28, sun: P.ce7b090, hemi: P.c4a3848, ground: P.c241810, fill: P.cc49880, exposure: 0.74, hemiI: 0.32, stars: 0.55, deep: 0x1a2f45, shallow: 0x4a6a80, foam: 0xb8a0b0, haze: 0x6a5a78 },
-  { h: 8.33, top: P.cf3c7a0, hor: P.cf7e6cf, bot: P.c7eaea8, water: P.c3eb0b4, sun: P.cfff1d4, hemi: P.cf4dcc0, ground: P.c8d7348, fill: P.cf0c4a0, exposure: 1.12, hemiI: 0.78, stars: 0, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, haze: 0xf6e2c8 },
-  { h: 12.5, top: P.c7ec4dc, hor: P.ce7f7f6, bot: P.cb7ddd6, water: P.c49c8d2, sun: P.cfffaf2, hemi: P.ce9f7f5, ground: P.ca09068, fill: P.cc5e6ee, exposure: 1.22, hemiI: 0.88, stars: 0, deep: 0x2a86a0, shallow: 0x86e3d4, foam: 0xffffff, haze: 0xd8eef0 },
-  { h: 18.67, top: P.c3a1844, hor: P.ce07a48, bot: P.c1a2030, water: P.c1a3c48, sun: P.cffb089, hemi: P.ce8a888, ground: P.c4a2c1c, fill: P.ce09070, exposure: 0.92, hemiI: 0.5, stars: 0.2, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, haze: 0xe9a07e },
-  { h: 22, top: P.c070b12, hor: P.c162230, bot: P.c070b12, water: P.c07141c, sun: P.c9eb0dc, hemi: P.c4a6280, ground: P.c1c2834, fill: P.cc5d4ee, exposure: 1.05, hemiI: 0.85, stars: 0.95, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, haze: 0x0f1c2e },
-  { h: 24, top: P.c070b12, hor: P.c121a24, bot: P.c070b12, water: P.c07141c, sun: P.cb7c6ea, hemi: P.c4a6280, ground: P.c1c2834, fill: P.cc5d4ee, exposure: 1.05, hemiI: 0.85, stars: 1, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, haze: 0x0f1c2e },
+  { h: 0, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.80, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
+  { h: 5, top: 0x2a2440, hor: 0xc98a8a, bot: 0x1a2232, haze: 0x6a5a78, deep: 0x1a2f45, shallow: 0x4a6a80, foam: 0xb8a0b0, sun: 0xffb59a, hemi: 0x6a5a7a, ground: 0x2a2026, fill: 0x7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.40, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
+  { h: 8.33, top: 0x9fc8e6, hor: 0xfbe3c8, bot: 0xa9d3cf, haze: 0xf6e2c8, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, sun: 0xffd7a8, hemi: 0xfde8d0, ground: 0x8a7a5c, fill: 0x9cc4e8, key: 2.40, fillI: 0.35, hemiI: 0.65, exposure: 1.00, sunPos: new THREE.Vector3(22, 10, 14), stars: 0, night: 0 },
+  { h: 12.5, top: 0x5fb0e0, hor: 0xdff3f6, bot: 0xbfe6e2, haze: 0xd8eef0, deep: 0x2a86a0, shallow: 0x86e3d4, foam: 0xffffff, sun: 0xffffff, hemi: 0xe6f4ff, ground: 0xb0a07c, fill: 0xcfe8f5, key: 2.80, fillI: 0.25, hemiI: 1.00, exposure: 0.95, sunPos: new THREE.Vector3(6, 30, 8), stars: 0, night: 0 },
+  { h: 18.67, top: 0x3b2a5c, hor: 0xf39a6b, bot: 0x2a2f4a, haze: 0xe9a07e, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, sun: 0xff9a5c, hemi: 0xd8c8e4, ground: 0x3a2a3a, fill: 0x7a68c0, key: 1.15, fillI: 0.70, hemiI: 0.90, exposure: 1.00, sunPos: new THREE.Vector3(-24, 6, 6), stars: 0.2, night: 0.3 },
+  { h: 22, top: 0x2a3f70, hor: 0x1e3050, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.80, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 0.95, night: 1 },
+  { h: 24, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.80, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
 ];
+
+function spliceLookKnot(hour) {
+  let i = 0;
+  while (i < LOOKS.length - 1 && hour >= LOOKS[i + 1].h) i += 1;
+  const a = LOOKS[i];
+  const b = LOOKS[i + 1];
+  const t = (hour - a.h) / (b.h - a.h);
+  const colorOf = (key) => mixA.set(a[key]).lerp(mixB.set(b[key]), t).getHex();
+  const num = (key) => a[key] + (b[key] - a[key]) * t;
+  LOOKS.splice(i + 1, 0, {
+    h: hour,
+    top: colorOf("top"),
+    hor: colorOf("hor"),
+    bot: colorOf("bot"),
+    haze: colorOf("haze"),
+    deep: colorOf("deep"),
+    shallow: colorOf("shallow"),
+    foam: colorOf("foam"),
+    sun: colorOf("sun"),
+    hemi: colorOf("hemi"),
+    ground: colorOf("ground"),
+    fill: colorOf("fill"),
+    key: num("key"),
+    fillI: num("fillI"),
+    hemiI: num("hemiI"),
+    exposure: num("exposure"),
+    sunPos: new THREE.Vector3().lerpVectors(a.sunPos, b.sunPos, t),
+    stars: num("stars"),
+    night: num("night"),
+  });
+}
+spliceLookKnot(5.75);
+spliceLookKnot(16);
 
 function norm(s) {
   return String(s ?? "").toLowerCase().replace(/\s+/g, "");
@@ -124,13 +161,6 @@ function wrapAngle(d) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   return d;
-}
-
-function nightAmount(hour) {
-  if (hour >= 7.5 && hour < 16.5) return 0;
-  if (hour >= 16.5 && hour < 19.5) return (hour - 16.5) / 3;
-  if (hour >= 5 && hour < 7.5) return 1 - (hour - 5) / 2.5;
-  return 1;
 }
 
 function mixHex(a, b, t, target) {
@@ -158,7 +188,11 @@ function lookAtHour(hour) {
     fill: mixHex(a.fill, b.fill, t, lookFill),
     exposure: a.exposure + (b.exposure - a.exposure) * t,
     hemiI: a.hemiI + (b.hemiI - a.hemiI) * t,
+    key: a.key + (b.key - a.key) * t,
+    fillI: a.fillI + (b.fillI - a.fillI) * t,
+    night: a.night + (b.night - a.night) * t,
     stars: a.stars + (b.stars - a.stars) * t,
+    sunPos: lookSunPos.lerpVectors(a.sunPos, b.sunPos, t),
   };
 }
 
@@ -246,6 +280,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   sun.shadow.camera.top = 20;
   sun.shadow.camera.bottom = -20;
   sun.shadow.bias = -0.00035;
+  sun.shadow.normalBias = 0.02;
   scene.add(sun);
   const fill = new THREE.DirectionalLight(0x9ec9cf, 0.28);
   fill.position.set(-14, 8, -10);
@@ -429,7 +464,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   roofGeo.rotateY(Math.PI / 4);
   const trunkGeo = new THREE.CylinderGeometry(0.035, 0.05, 0.16, 5);
   const crownGeo = new THREE.ConeGeometry(0.16, 0.34, 6);
-  const glowGeo = new THREE.CircleGeometry(MESH_R * 1.05, 6);
+  const glowGeo = new THREE.CircleGeometry(MESH_R * 1.72, 6);
   glowGeo.rotateX(-Math.PI / 2);
   // Outer rim stays short of the next island's coast. Centers are √3 * HEX_SIZE apart.
   const ringGeo = new THREE.RingGeometry(MESH_R * 0.985, MESH_R * 1.058, 6);
@@ -583,9 +618,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       transparent: true,
       opacity: 0,
       depthWrite: false,
+      blending: THREE.AdditiveBlending,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.position.y = 0.02;
+    glow.position.y = 0.03;
+    glow.renderOrder = 2;
     group.add(glow);
 
     const ring = new THREE.Mesh(
@@ -655,7 +692,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     });
   }
 
-  const flowViews = data.flows.map((flow) => {
+  const FLOW_SPLIT = 63;
+  const flowPaper = new THREE.Color("#fff7ea");
+  let flowBright = 1;
+  const flowViews = data.flows.map((flow, index) => {
     const a = views.get(flow.a).base;
     const b = views.get(flow.b).base;
     const start = new THREE.Vector3(a.x, 0.78, a.z);
@@ -667,40 +707,86 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     start.addScaledVector(dir, 1.05);
     end.addScaledVector(dir, -1.05);
     const mid = start.clone().lerp(end, 0.5);
-    const bend = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar((data.flows.indexOf(flow) % 2 === 0 ? 1 : -1) * Math.min(0.7, len * 0.12));
+    const bend = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar((index % 2 === 0 ? 1 : -1) * Math.min(0.7, len * 0.12));
     mid.add(bend);
-    mid.y += 1.05 + len * 0.2;
-    const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-    const accent = new THREE.Color(views.get(flow.a).island.accent);
-    const ribbonMat = new THREE.MeshStandardMaterial({
-      color: accent,
-      roughness: 0.45,
+    mid.y += Math.min(1.3, 0.5 + len * 0.06);
+    if (mid.y > 2.2) mid.y = 2.2;
+    const softA = new THREE.Color(views.get(flow.a).island.accent).lerp(flowPaper, 0.25);
+    const softB = new THREE.Color(views.get(flow.b).island.accent).lerp(flowPaper, 0.25);
+    const tip = new THREE.Color(views.get(flow.b).island.accent);
+    const geo = new LineGeometry();
+    const mat = new LineMaterial({
+      vertexColors: true,
+      linewidth: 3,
+      worldUnits: false,
+      dashed: true,
+      dashSize: 0.18,
+      gapSize: 0.12,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
     });
-    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 0.055, 8, false), ribbonMat);
-    const halo = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 36, 0.12, 8, false),
-      new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.34, depthWrite: false }),
-    );
-    const arrow = new THREE.Group();
-    const endTangent = new THREE.Vector3();
-    curve.getTangent(1, endTangent);
-    endTangent.y = 0;
-    arrow.position.copy(end);
-    if (endTangent.lengthSq() > 1e-8) arrow.rotation.y = Math.atan2(-endTangent.x, -endTangent.z);
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 6), ribbonMat);
-    tip.rotation.x = -Math.PI / 2;
-    arrow.add(tip);
-    tube.add(halo, arrow);
-    tube.visible = false;
-    tube.userData.kind = "flow-tube";
-    scene.add(tube);
+    const line = new Line2(geo, mat);
+    line.visible = false;
+    line.userData.kind = "flow";
+    line.raycast = () => {};
+    line.renderOrder = 3;
+    scene.add(line);
     flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
-    return { flow, curve, tube, len };
+    return {
+      flow,
+      start,
+      mid,
+      end,
+      len,
+      softA,
+      softB,
+      tip,
+      geo,
+      mat,
+      line,
+      curve: new THREE.QuadraticBezierCurve3(start, mid.clone(), end),
+      arch: 1,
+      phase: "hidden",
+      growT: 0,
+      fadeT: 0,
+      fadeFrom: 0,
+      targetOpacity: 0,
+      targetWidth: 1.5,
+    };
   });
+
+  function layoutRoute(route) {
+    const mid = route.mid.clone();
+    mid.y *= route.arch;
+    const curve = new THREE.QuadraticBezierCurve3(route.start, mid, route.end);
+    const pts = curve.getPoints(FLOW_SPLIT);
+    const positions = new Float32Array(pts.length * 3);
+    const colors = new Float32Array(pts.length * 3);
+    for (let i = 0; i < pts.length; i += 1) {
+      positions[i * 3] = pts[i].x;
+      positions[i * 3 + 1] = pts[i].y;
+      positions[i * 3 + 2] = pts[i].z;
+      const t = i / FLOW_SPLIT;
+      const color = t >= 0.92 ? route.tip : route.softA.clone().lerp(route.softB, t);
+      colors[i * 3] = Math.min(1, color.r * flowBright);
+      colors[i * 3 + 1] = Math.min(1, color.g * flowBright);
+      colors[i * 3 + 2] = Math.min(1, color.b * flowBright);
+    }
+    const drawn = Number.isFinite(route.geo.instanceCount) ? route.geo.instanceCount : 0;
+    route.geo.setPositions(positions);
+    route.geo.setColors(colors);
+    route.line.computeLineDistances();
+    route.geo.instanceCount = drawn;
+    route.curve = curve;
+  }
+  for (const route of flowViews) layoutRoute(route);
 
   const skinHex = [P.cf0c7a4, P.cd9a57a, P.cc48a6a, P.c8d5a3c];
   let cargoOn = true;
   const TOOL_KEY = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
+  const dotGeo = new THREE.BufferGeometry();
+  dotGeo.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0], 3));
 
   function anchorFront(mesh, yHead, nosePos) {
     const head = new THREE.Object3D();
@@ -712,38 +798,24 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   const walkers = flowViews.map((route, index) => {
-    const mesh = new THREE.Group();
-    const skin = skinHex[index % skinHex.length];
-    const alive = () => mesh.visible;
-    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: P.c14756f, alive });
-    kit.part({ kind: "sphere", parent: mesh, y: 0.44, sx: 0.2, sy: 0.2, sz: 0.2, color: skin, alive });
-    kit.part({ kind: "sphere", parent: mesh, y: 0.43, z: -0.085, sx: 0.056, sy: 0.056, sz: 0.056, color: skin, alive });
-    kit.part({ kind: "box", parent: mesh, y: 0.28, z: 0.09, sx: 0.1, sy: 0.09, sz: 0.045, color: P.cf3efe4, alive });
-    kit.part({
-      kind: "box",
-      parent: mesh,
-      x: 0.11,
-      y: 0.32,
-      z: -0.02,
-      sx: 0.11,
-      sy: 0.09,
-      sz: 0.09,
-      color: P.ce39a3a,
-      alive: () => mesh.visible && cargoOn,
-    });
-    const { head, nose } = anchorFront(mesh, 0.44, new THREE.Vector3(0, 0.43, -0.085));
+    const mesh = new THREE.Points(dotGeo, new THREE.PointsMaterial({
+      color: route.tip,
+      size: 6,
+      sizeAttenuation: false,
+      transparent: true,
+      depthWrite: false,
+    }));
+    mesh.userData.kind = "flow-dot";
+    mesh.raycast = () => {};
     mesh.visible = false;
     scene.add(mesh);
     return {
       mesh,
-      nose,
-      head,
       route,
       flow: route.flow,
       t: (index * 0.37) % 1,
       sign: index % 2 === 0 ? 1 : -1,
       duration: 14 + route.len * 1.6,
-      phase: index,
     };
   });
 
@@ -1451,20 +1523,54 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     paintGlow();
     kit.sync();
+    const starsOn = flowBright > 1;
+    let wave = 0;
     for (const route of flowViews) {
       const forced = Boolean(query) && norm(route.flow._hay).includes(query);
-      const touched = [...selected].some((id) => id === route.flow.a || id === route.flow.b);
+      const related = hoverId === route.flow.a || hoverId === route.flow.b
+        || [...selected].some((id) => id === route.flow.a || id === route.flow.b);
       const ends = Boolean(views.get(route.flow.a).lit && views.get(route.flow.b).lit);
-      route.tube.visible = Boolean(ends && (showAllFlows || touched || forced));
+      const focusing = selected.size > 0;
+      const want = Boolean(ends && (showAllFlows || related || forced) && !(focusing && !related && !forced));
+      const arch = focusing && (related || forced) ? 0.6 : 1;
+      if (arch !== route.arch) {
+        route.arch = arch;
+        layoutRoute(route);
+      }
+      let opacity = 0;
+      let width = 1.5;
+      if (want) {
+        if (hoverId || focusing) {
+          opacity = related || forced ? 1 : 0.06;
+          width = related || forced ? 3 : 1.5;
+        } else {
+          opacity = 0.18;
+          width = 1.5;
+        }
+        if (starsOn && opacity >= 0.18) opacity = 1;
+      }
+      route.targetOpacity = opacity;
+      route.targetWidth = width;
+      if (want && route.phase === "hidden") {
+        route.phase = "grow";
+        route.growT = -wave * 0.06;
+        wave += 1;
+        route.line.visible = true;
+        route.geo.instanceCount = 0;
+      } else if (want && route.phase === "fade") {
+        route.phase = "shown";
+        route.line.visible = true;
+        route.geo.instanceCount = FLOW_SPLIT;
+      } else if (!want && (route.phase === "grow" || route.phase === "shown")) {
+        route.phase = "fade";
+        route.fadeT = 0;
+        route.fadeFrom = route.mat.opacity;
+      }
     }
   }
 
   function poseWalker(walker) {
     walker.route.curve.getPoint(walker.t, walker.mesh.position);
-    walker.route.curve.getTangent(walker.t, _tangent);
-    _tangent.multiplyScalar(walker.sign);
-    if (_tangent.lengthSq() > 1e-8) walker.mesh.rotation.y = Math.atan2(-_tangent.x, -_tangent.z);
-    walker.mesh.updateWorldMatrix(true, true);
   }
 
   function applyClock() {
@@ -1480,43 +1586,57 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     hemi.groundColor.copy(look.ground);
     hemi.intensity = look.hemiI;
     fill.color.copy(look.fill);
-    fill.intensity = 0.18 + look.stars * 0.22;
+    fill.intensity = look.fillI;
     waterMat.uniforms.deepColor.value.copy(look.deep);
     waterMat.uniforms.shallowColor.value.copy(look.shallow);
     waterMat.uniforms.foamColor.value.copy(look.foam);
     waterMat.uniforms.stars.value = look.stars;
-    const ang = ((hour - 6) / 12) * Math.PI;
-    const elev = Math.sin(ang);
-    const nightSky = look.stars > 0.5;
-    skySunDir.set(
-      (nightSky ? -1 : 1) * Math.cos(ang),
-      nightSky ? 0.62 : Math.max(elev, 0.06),
-      nightSky ? -0.45 : 0.32,
-    ).normalize();
-    skyMat.uniforms.sunColor.value.set(nightSky ? P.cd5e4ff : P.cffe6bf);
-    skyMat.uniforms.sunAmt.value = nightSky ? 0.9 : THREE.MathUtils.clamp(elev + 0.55, 0.35, 1);
+    environment.setTime(look);
+    sun.intensity = look.key;
+    sun.color.copy(look.sun);
+    skyMat.uniforms.sunColor.value.copy(look.sun);
+    const liveX = look.sunPos.x;
+    const liveY = look.sunPos.y;
+    const liveZ = look.sunPos.z;
+    const night = look.night;
+    fill.position.set(-liveX, 8, -liveZ);
+    const qHour = THREE.MathUtils.clamp(Math.round(hour * 6) / 6, 0, 24);
+    const qPos = lookAtHour(qHour).sunPos;
+    const az = Math.atan2(qPos.x, qPos.z);
+    const horiz = Math.hypot(liveX, liveZ);
+    sun.position.set(Math.sin(az) * horiz, liveY, Math.cos(az) * horiz);
+    skySunDir.copy(sun.position).normalize();
+    const elev = skySunDir.y;
+    skyMat.uniforms.sunAmt.value = night > 0.5 ? 0.9 : THREE.MathUtils.clamp(elev + 0.45, 0.35, 1);
     waterMat.uniforms.sunColor.value.copy(skyMat.uniforms.sunColor.value);
     waterMat.uniforms.sunAmt.value = skyMat.uniforms.sunAmt.value;
-    sun.position.set(Math.cos(ang) * 26, Math.max(elev, 0.08) * 24 + 2, 9);
-    const dayLit = 1 - look.stars;
-    sun.intensity = 0.05 + dayLit * (0.45 + Math.max(elev, 0) * 1.15);
-    sun.color.copy(look.sun);
-    stars.material.opacity = look.stars * 0.9;
+    stars.material.opacity = night * 0.9;
+    const nextBright = look.stars > 0.5 ? 1.15 : 1;
+    if (nextBright !== flowBright) {
+      flowBright = nextBright;
+      for (const route of flowViews) layoutRoute(route);
+      refresh();
+    }
     paintGlow();
     renderer.shadowMap.needsUpdate = true;
   }
 
   function paintGlow() {
     const hour = minutes / 60;
-    const night = nightAmount(hour);
-    kit.glowMat.emissiveIntensity = night * 1.1;
-    for (const lamp of lamps) lamp.glowAmount = 0.35 + night * 0.85;
+    const night = lookAtHour(hour).night;
+    kit.glowMat.emissiveIntensity = 1;
+    for (const lamp of lamps) {
+      lamp.glowAmount = lamp.role === "lighthouse" ? night * 4 : night * 1.4;
+    }
     for (const view of views.values()) {
       const active = view.buildings.some((building) => building.group.visible && hourCovers(building.item.hours, hour));
-      view.glow.material.opacity = active ? 0.28 + (1 - night) * 0.12 : 0;
-      view.glow.visible = view.glow.material.opacity > 0.02;
+      const disc = view.glow.material;
+      disc.color.set(night > 0.5 ? 0xffcf8a : view.island.accent);
+      disc.opacity = active ? 0.12 + night * 0.28 : 0;
+      view.glow.visible = disc.opacity > 0.02;
       for (const building of view.buildings) {
-        const amount = building.group.visible && hourCovers(building.item.hours, hour) ? 1 : 0.18;
+        const awake = building.group.visible && hourCovers(building.item.hours, hour);
+        const amount = awake ? 0.1 + night * 3.2 : night * 0.25;
         for (const win of building.windows) win.glowAmount = amount;
       }
     }
@@ -1536,6 +1656,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     renderer.setSize(W, H, false);
     labels.setSize(W, H);
+    for (const route of flowViews) route.mat.resolution.set(W, H);
     applyFit();
   }
 
@@ -1564,6 +1685,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       riseI += 1;
     }
     if (!frozen && !reduced) waterMat.uniforms.uTime.value = elapsed;
+    if (!frozen) environment.update(step);
     if (!frozen && !reduced) {
       for (const threat of threats) {
         if (threat.fading && !threat.gone) {
@@ -1617,8 +1739,35 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     placeCamera();
     scene.fog.density = 0.32 / cam.radius;
     const routesOn = elapsed > 1.15 || reduced;
+    if (!frozen) {
+      for (const route of flowViews) {
+        if (!reduced && route.line.visible) route.mat.uniforms.dashOffset.value -= step * 0.6;
+        if (route.phase === "grow") {
+          route.growT += step;
+          const u = Math.min(1, Math.max(0, route.growT / 0.55));
+          const eased = 1 - (1 - u) ** 3;
+          route.geo.instanceCount = Math.round(eased * FLOW_SPLIT);
+          route.mat.opacity = route.targetOpacity;
+          route.mat.linewidth = route.targetWidth;
+          if (u >= 1) route.phase = "shown";
+        } else if (route.phase === "fade") {
+          route.fadeT += step;
+          const u = Math.min(1, route.fadeT / 0.2);
+          route.mat.opacity = route.fadeFrom * (1 - u);
+          if (u >= 1) {
+            route.phase = "hidden";
+            route.line.visible = false;
+            route.geo.instanceCount = 0;
+            route.mat.opacity = 0;
+          }
+        } else if (route.phase === "shown") {
+          route.mat.opacity = route.targetOpacity;
+          route.mat.linewidth = route.targetWidth;
+        }
+      }
+    }
     for (const walker of walkers) {
-      const show = Boolean(routesOn && walker.route.tube.visible === true);
+      const show = Boolean(routesOn && walker.route.line.visible === true);
       walker.mesh.visible = show;
       if (!show || frozen || reduced) continue;
       walker.t += (step / walker.duration) * walker.sign;
@@ -1634,7 +1783,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         arriveCb({ flow: walker.flow, from: walker.flow.b, to: walker.flow.a, carried: walker.flow.carried });
       }
       poseWalker(walker);
-      walker.mesh.position.y += Math.sin(elapsed * 7 + walker.phase) * 0.02;
     }
     stepHandoffs(frozen ? 0 : step);
     hoverTick = (hoverTick + 1) % 2;
@@ -1968,7 +2116,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     applyFit();
   }
 
-  addSeaDecor(scene, kit, placed);
+  addSeaDecor(scene, kit, placed, lamps);
+  const environment = createEnvironment(THREE, scene, {
+    quality: narrowScreen() ? "mid" : "high",
+    camera,
+  });
   kit.build(scene);
   scene.traverse((obj) => {
     const mat = obj.material;
@@ -1988,6 +2140,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         const decor = decorReport();
         const shapes = {};
         for (const [id, view] of views) shapes[id] = view.buildings.map((building) => building.recipe);
+        const hour = minutes / 60;
+        const look = lookAtHour(hour);
+        const horiz = Math.hypot(sun.position.x, sun.position.z);
         return {
           draws: renderer.info.render.calls,
           drawCalls: renderer.info.render.calls,
@@ -1997,6 +2152,22 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           decorByIsland: decor.decorByIsland,
           decor,
           shapes,
+          environment: environment.info(),
+          hour,
+          night: look.night,
+          exposure: renderer.toneMappingExposure,
+          hemiI: hemi.intensity,
+          sun: [sun.position.x, sun.position.y, sun.position.z],
+          shadowRatio: horiz / Math.max(0.001, sun.position.y),
+          looks: LOOKS.length,
+          flows: flowViews.filter((route) => route.line.visible === true).length,
+          flowDash: flowViews[0]?.mat.uniforms.dashOffset.value ?? 0,
+          flowCount: flowViews[0]?.geo.instanceCount ?? -1,
+          flowOpacity: flowViews[0]?.mat.opacity ?? -1,
+          flowWidth: flowViews[0]?.mat.linewidth ?? -1,
+          flowRes: flowViews[0]?.mat.resolution.toArray() ?? [],
+          flowPeak: flowViews.reduce((peak, route) => Math.max(peak, route.curve.getPoint(0.5).y), 0),
+          lit: [...views.values()].filter((view) => view.lit).map((view) => view.island.id),
         };
       },
     });
@@ -2046,19 +2217,32 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     onArrive(fn) { arriveCb = fn; },
     getTheta() { return cam.theta; },
     debugState() {
+      const hour = minutes / 60;
+      const look = lookAtHour(hour);
+      const horiz = Math.hypot(sun.position.x, sun.position.z);
       return {
-        flows: flowViews.filter((route) => route.tube.visible === true).length,
+        flows: flowViews.filter((route) => route.line.visible === true).length,
         lit: [...views.values()].filter((view) => view.lit).map((view) => view.island.id),
         draws: renderer.info.render.calls,
         instances: kit.instanceCount(),
+        hour,
+        night: look.night,
+        exposure: renderer.toneMappingExposure,
+        hemiI: hemi.intensity,
+        sun: [sun.position.x, sun.position.y, sun.position.z],
+        shadowRatio: horiz / Math.max(0.001, sun.position.y),
+        looks: LOOKS.length,
       };
     },
     selfTest() {
       const errors = [];
-      const strictFlows = flowViews.filter((route) => route.tube.visible === true).length;
-      let drawnTubes = 0;
-      for (const route of flowViews) if (route.tube.visible !== false) drawnTubes += 1;
-      if (strictFlows !== drawnTubes) errors.push(`flows ${strictFlows} disagree with drawn tubes ${drawnTubes}`);
+      const strictFlows = flowViews.filter((route) => route.line.visible === true).length;
+      let drawnLines = 0;
+      for (const route of flowViews) {
+        if (route.line.visible !== false) drawnLines += 1;
+        if (route.curve.getPoint(0.5).y > 2.2) errors.push(`flow ${route.flow.id} peaks above 2.2`);
+      }
+      if (strictFlows !== drawnLines) errors.push(`flows ${strictFlows} disagree with drawn lines ${drawnLines}`);
       const banned = new Set(["hepa", "amr", "global"]);
       for (const threat of threats) {
         if (banned.has(threat.islandId)) errors.push(`threat still targets ${threat.islandId}`);
@@ -2108,6 +2292,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (!sea.intersectObject(water, false).length) errors.push("water is not visible from above");
 
       const walker = walkers[0];
+      if (!walker.mesh.isPoints) errors.push("walker is not a point");
       const savedT = walker.t;
       const savedSign = walker.sign;
       walker.sign = 1;
@@ -2119,17 +2304,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const move = walker.mesh.position.clone().sub(p0);
       move.y = 0;
       if (move.length() < 0.02) errors.push("walker did not move along the route");
-      else {
-        const nose = new THREE.Vector3();
-        const head = new THREE.Vector3();
-        walker.nose.getWorldPosition(nose);
-        walker.head.getWorldPosition(head);
-        const front = nose.sub(head);
-        front.y = 0;
-        front.normalize();
-        const cos = front.dot(move.normalize());
-        if (cos < 0.9) errors.push(`walker faces away from travel (cos ${cos.toFixed(2)})`);
-      }
       walker.t = savedT;
       walker.sign = savedSign;
       poseWalker(walker);
@@ -2270,6 +2444,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         seenMat.add(mat);
         if (mat.flatShading !== true) errors.push("a standard material is still smooth");
       });
+      if (LOOKS.length < 9) errors.push(`LOOKS has ${LOOKS.length} rows`);
+      if (LOOKS.some((row) => typeof row.night !== "number")) errors.push("LOOKS row missing night");
+      if (!LOOKS.some((row) => Math.abs(row.h - 5.75) < 1e-6)) errors.push("LOOKS missing 05:45");
+      if (!LOOKS.some((row) => Math.abs(row.h - 16) < 1e-6)) errors.push("LOOKS missing 16:00");
+      const dawn = LOOKS[0];
+      const wrap = LOOKS[LOOKS.length - 1];
+      const same = ["top", "hor", "bot", "haze", "deep", "shallow", "foam", "sun", "hemi", "ground", "fill", "key", "fillI", "hemiI", "exposure", "stars", "night"];
+      for (const key of same) {
+        if (dawn[key] !== wrap[key]) errors.push(`h:24 ${key} differs from h:0`);
+      }
+      if (dawn.sunPos.distanceTo(wrap.sunPos) > 1e-6) errors.push("h:24 sunPos differs from h:0");
+      const envInfo = environment.info();
+      if (envInfo.draws > 12) errors.push(`environment draws ${envInfo.draws}`);
+      if (envInfo.trees < 3000) errors.push(`environment trees ${envInfo.trees}`);
       return errors;
     },
   };
@@ -2300,7 +2488,8 @@ function addKit(group, island, lamps, kit) {
   if (island.kit === "port") {
     put("box", P.c8d6244, 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
     put("cyl", P.cf7f4ee, 0.02, 0.7, -MESH_R - 0.15, 0.22, 0.72, 0.22);
-    put("sphere", P.cffe1a8, 0.02, 1.12, -MESH_R - 0.15, 0.15, 0.15, 0.15, null, true);
+    const beacon = put("sphere", P.cffe1a8, 0.02, 1.12, -MESH_R - 0.15, 0.15, 0.15, 0.15, null, true);
+    beacon.role = "lighthouse";
     put("box", P.cc4473a, 0.42, 0.66, -0.2, 0.28, 0.22, 0.22);
     put("box", P.c2f6f9e, -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
   } else if (island.kit === "tower") {

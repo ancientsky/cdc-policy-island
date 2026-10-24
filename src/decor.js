@@ -914,12 +914,16 @@ function seaPut(kit, group, spec) {
   });
 }
 
-function addIslet(scene, kit, spot, theme) {
+function addIslet(scene, kit, spot, theme, lamps) {
   const group = new Group();
   group.position.set(spot.x, 0, spot.z);
   group.userData.kind = "islet";
   scene.add(group);
-  const put = (spec) => seaPut(kit, group, spec);
+  const put = (spec) => {
+    const rec = seaPut(kit, group, spec);
+    if (spec.glow) lamps.push(rec);
+    return rec;
+  };
   put({ kind: "sphere", color: SAND, y: 0.06, sx: 0.72, sy: 0.26, sz: 0.6, cast: true });
   if (theme === "light") {
     put({ kind: "cyl", color: CREAM, y: 0.42, sx: 0.1, sy: 0.5, sz: 0.1, cast: true });
@@ -975,7 +979,7 @@ function addBoat(scene, kit, spot, rng) {
   return group;
 }
 
-export function addSeaDecor(scene, kit, placed) {
+export function addSeaDecor(scene, kit, placed, lamps = []) {
   const rng = mulberry(0x5eedc0de);
   const islets = sampleRing(rng, placed, MESH_R + 1.7, MESH_R + 3.5, [], 2.1, 9);
   const boats = sampleRing(rng, placed, MESH_R + 1.2, MESH_R + 2.9, islets, 1.35, 13);
@@ -983,7 +987,7 @@ export function addSeaDecor(scene, kit, placed) {
   sea.boats = boats;
   sea.isletClear = islets.reduce((min, spot) => Math.min(min, spot.near), Infinity);
   sea.boatClear = boats.reduce((min, spot) => Math.min(min, spot.near), Infinity);
-  islets.forEach((spot, index) => addIslet(scene, kit, spot, ISLET[index % ISLET.length]));
+  islets.forEach((spot, index) => addIslet(scene, kit, spot, ISLET[index % ISLET.length], lamps));
   for (const spot of boats) addBoat(scene, kit, spot, rng);
 }
 

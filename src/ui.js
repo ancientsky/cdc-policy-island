@@ -174,7 +174,7 @@ export function mount({ scene, islands, flows }) {
     scene.setMinutes(state.minutes);
     const theme = themeFromMinutes(state.minutes);
     document.documentElement.dataset.theme = theme;
-    const themeColor = { morning: "#f6e3c8", noon: "#d5eee8", evening: "#3a1844", night: "#070b12" };
+    const themeColor = { morning: "#fbe3c8", noon: "#dff3f6", evening: "#3b2a5c", night: "#0b1426" };
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = themeColor[theme];
     pokeCaption();
