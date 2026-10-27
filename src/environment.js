@@ -6,9 +6,9 @@ import { bindSway } from "./kit.js";
 // Basin, far ridges, forest and clouds around the 14 islands.
 // World +x is east, +z is south. The default camera sits on +z (theta 0.18,
 // phi 1.02, radius about 22 on a 1440×900 overview) and looks toward -z,
-// so north is the top of the frame. A ring of radius 22 already lies on
-// that top pixel row, and radius 50 is above the frame. The north hills
-// therefore start just past the northern islets, not on that ring.
+// so north is the top of the frame. The northern quarantine island sits
+// near z -7. Its shore stays open water: Taiwan meets no other country
+// by land. Hills and ridge ribbons begin only after that strait.
 
 const BANDS = [
   { t: 0, color: 0xb7a888 },
@@ -65,10 +65,9 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     const shaped = fbm(x, z) * 0.5 + 0.5;
     // North hills (top of the default view), a west dune, a low east
     // headland, and side reefs south of the chain. The island basin stays
-    // at the seabed: policy islands sit near z 0..16 and x -2..8.
-    // Climb just north of the islets, then drop back so the far side
-    // leaves a band of sky for the three ridge ribbons and the clouds.
-    const north = smoothstep(-4.6, -8.8, z) * (1 - smoothstep(-9.4, -15.5, z));
+    // at the seabed, including the quarantine island near z -7.
+    // Climb only after the strait, then drop back for the ridge ribbons.
+    const north = smoothstep(-21.5, -25.5, z) * (1 - smoothstep(-26.5, -33.0, z));
     const westGate = 1 - smoothstep(11, 18, Math.abs(z - 5));
     const west = smoothstep(-7.8, -15, x) * westGate;
     const eastGate = 1 - smoothstep(9, 16, Math.abs(z - 7));
@@ -157,7 +156,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
 
   const spots = [];
   for (let x = -26; x <= 36; x += 0.52) {
-    for (const z of [-7.55, -8.15]) {
+    for (const z of [-24.6, -25.2]) {
       if (inClearing(x, z)) continue;
       const y = heightAt(x, z);
       if (y < 0.32) continue;
@@ -172,7 +171,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     const roll = rng();
     if (roll < 0.78) {
       x = -26 + rng() * 58;
-      z = -6.8 - rng() * 1.8;
+      z = -24.0 - rng() * 1.6;
     } else if (roll < 0.92) {
       x = -8.5 - rng() * 12;
       z = -2 + rng() * 16;
@@ -221,12 +220,12 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   const ridgeMats = [];
   const haze = new THREE.Color();
   const nightTint = new THREE.Color(0x24344c);
-  // Three north-coast ribbons. A circle at radius 50/66/86 sits above this
-  // camera, so each ribbon is an arc just beyond the hills that do show.
+  // Three ribbons on the far side of the strait, not against the
+  // quarantine shore. A circle at radius 50 sits above this camera.
   const ridgeLayers = [
-    { z0: -10.2, bow: 0.15, base: 0.25, crest: 2.9 },
-    { z0: -11.5, bow: 0.15, base: 0.25, crest: 3.15 },
-    { z0: -12.8, bow: 0.15, base: 0.25, crest: 3.35 },
+    { z0: -26.2, bow: 0.2, base: 0.35, crest: 2.8 },
+    { z0: -28.0, bow: 0.2, base: 0.3, crest: 3.15 },
+    { z0: -29.8, bow: 0.2, base: 0.25, crest: 3.4 },
   ];
   ridgeLayers.forEach((layer, index) => {
     const steps = 48;
@@ -356,7 +355,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   while (lampSpots.length < 36 && lampGuard < 200) {
     lampGuard += 1;
     const x = -18 + rng() * 42;
-    const z = -7.3 - rng() * 1.5;
+    const z = -24.4 - rng() * 1.3;
     if (inClearing(x, z)) continue;
     const y = heightAt(x, z);
     if (y < 0.35) continue;

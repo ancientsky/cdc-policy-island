@@ -580,7 +580,7 @@ const body = {
     },
     border: {
       name: "Border quarantine", pin: "Border",
-      blurb: "A pathogen from abroad reaches the airport and the port before it reaches a neighborhood. Quarantine sits on the northernmost cell, as the door of this net, not as a wall by itself.",
+      blurb: "A pathogen from abroad reaches the airport and the port before it reaches a neighborhood. Taiwan has sea on every side, and this island meets no other country by land. Quarantine sits on the northernmost cell, as the door for flights and ships, not as a wall by itself.",
       source: "Preparedness and border quarantine for emerging infections and an influenza pandemic (2022–2027)",
       hrefLabel: "Taiwan CDC home (search border quarantine)",
       items: {
@@ -752,7 +752,7 @@ const body = {
     },
     border: {
       name: "水際検疫", pin: "水際",
-      blurb: "外から来た病原体は、地域に入る前に空港と港に着く。検疫を輪郭の最北に置き、この網の扉にした。単独の壁ではない。",
+      blurb: "外から来た病原体は、地域に入る前に空港と港に着く。台湾は海に囲まれ、陸で他の国と接しない。検疫は輪郭の最北に置き、この網の扉にした。見るのは飛行機と船で、単独の壁ではない。",
       source: "新興感染症・インフルエンザ大流行の応変整備および水際検疫計画（2022–2027）",
       hrefLabel: "疾病管制署トップ（水際検疫を検索）",
       items: {

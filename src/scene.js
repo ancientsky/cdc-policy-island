@@ -3734,6 +3734,53 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const envInfo = environment.info();
       if (envInfo.draws > 12) errors.push(`environment draws ${envInfo.draws}`);
       if (envInfo.trees < 3000) errors.push(`environment trees ${envInfo.trees}`);
+
+      // Sample offsets around the quarantine island, not a heading frame.
+      const shore = border.base;
+      const around = [
+        [2.1, 0], [-2.1, 0], [0, 2.1], [0, -2.1],
+        [3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4],
+        [4.6, 1.2], [4.6, -1.2], [-4.6, 1.2], [-4.6, -1.2],
+        [1.2, 4.6], [-1.2, 4.6], [1.2, -4.6], [-1.2, -4.6],
+        [0, -8], [2, -10], [-2, -10],
+      ];
+      let dry = 0;
+      for (const [dx, dz] of around) {
+        if (environment.heightAt(shore.x + dx, shore.z + dz) > 0.02) dry += 1;
+      }
+      if (dry) errors.push(`border shore meets land at ${dry} samples`);
+
+      const portClock = life.probe().port;
+      if (!portClock) errors.push("quarantine port has no plane or ship");
+      else {
+        life.scrubPort(0);
+        const parked = life.probe().port;
+        const planeHome = Math.hypot(parked.plane.x - shore.x, parked.plane.z - shore.z);
+        const shipHome = Math.hypot(parked.ship.x - shore.x, parked.ship.z - shore.z);
+        if (planeHome > 1.3) errors.push("parked plane left the island");
+        if (shipHome < planeHome * 2.2) errors.push("ship sits on the island");
+        if (!(parked.ship.z < shore.z - 1.4)) errors.push("ship is not off the north shore");
+        if (environment.heightAt(parked.ship.x, parked.ship.z) > 0.02) errors.push("ship berth is on land");
+        const face = (t0, t1, craft) => {
+          life.scrubPort(t0);
+          const a = life.probe().port[craft];
+          life.scrubPort(t1);
+          const b = life.probe().port[craft];
+          const mx = b.x - a.x;
+          const mz = b.z - a.z;
+          const travel = Math.hypot(mx, mz);
+          const front = Math.hypot(b.fx, b.fz) || 1;
+          const cos = (b.fx * mx + b.fz * mz) / (front * (travel || 1));
+          return { travel, cos };
+        };
+        const flown = face(5, 5.35, "plane");
+        if (flown.travel < 0.08) errors.push("plane did not move");
+        else if (flown.cos < 0.85) errors.push(`plane faces away from travel (cos ${flown.cos.toFixed(2)})`);
+        const sailed = face(8, 8.35, "ship");
+        if (sailed.travel < 0.08) errors.push("ship did not move");
+        else if (sailed.cos < 0.85) errors.push(`ship faces away from travel (cos ${sailed.cos.toFixed(2)})`);
+        life.scrubPort(portClock.portTime);
+      }
       return errors;
     },
   };
@@ -3782,6 +3829,11 @@ function addKit(group, island, lamps, kit, life) {
     put("box", P.c2f6f9e, -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
     put("cyl", P.board, 0.72, 0.58, -0.55, 0.025, 0.64, 0.025);
     putFlag(0.72, 0.92, -0.55);
+    // East-west strip on the island. It does not leave the shore.
+    put("box", P.c5c6670, -0.05, 0.405, 0.42, 1.55, 0.02, 0.22);
+    put("box", P.cf4f0e6, 0.2, 0.42, 0.42, 0.08, 0.012, 0.1);
+    put("box", P.cf4f0e6, -0.28, 0.42, 0.42, 0.08, 0.012, 0.1);
+    life.addPort(group);
   } else if (island.kit === "tower") {
     put("box", P.cf7f4ee, 0, 0.95, -0.2, 0.26, 0.9, 0.26);
     put("torus", P.cd9e2e4, 0, 1.5, -0.2, 0.32, 0.32, 0.32, { x: Math.PI / 2.4 });
