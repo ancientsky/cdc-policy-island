@@ -36,12 +36,63 @@ export function mount({ scene, islands, flows }) {
     freeze: false,
     bird: false,
     log: [],
+    person: null,
+    germ: null,
   };
 
   const $ = (id) => document.getElementById(id);
   const stats = $("stats");
   const tree = $("tree");
   const sheet = $("sheet");
+  const germ = document.createElement("aside");
+  germ.id = "germ";
+  germ.className = "germ";
+  germ.hidden = true;
+  document.querySelector(".hud").append(germ);
+  const GAME_KEY = "cdc-island-game-v1";
+  const toolKey = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
+  const germSuffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb" };
+  function readGame() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(GAME_KEY) || "");
+      if (!raw || raw.v !== 1 || typeof raw.repelled !== "object" || raw.repelled === null) throw new Error("bad");
+      return { v: 1, repelled: { ...raw.repelled }, total: Number(raw.total) || 0 };
+    } catch {
+      return { v: 1, repelled: {}, total: 0 };
+    }
+  }
+  function writeGame(next) {
+    try { localStorage.setItem(GAME_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+  }
+  let game = readGame();
+  const counter = document.createElement("p");
+  counter.id = "repel-count";
+  counter.className = "repel-count";
+  counter.innerHTML = "<span></span>";
+  const toast = document.createElement("div");
+  toast.id = "repel-toast";
+  toast.className = "repel-toast";
+  toast.hidden = true;
+  document.querySelector(".hud").append(counter, toast);
+  let toastTimer = 0;
+  let toastInfo = null;
+  function paintScore() {
+    const chip = counter.querySelector("span");
+    if (chip) chip.textContent = t("repelCount", { n: game.total });
+  }
+  function showToast(info) {
+    toastInfo = info;
+    const island = byId.get(info.islandId);
+    const suffix = germSuffix[info.islandId];
+    const action = t(toolKey[info.tool] || "toolClean");
+    toast.innerHTML = `<b>${esc(t("repelToast", { action, name: island?.pin || "" }))}</b><span>${esc(suffix ? t(`germDo${suffix}`) : "")}</span>`;
+    toast.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.hidden = true;
+      toastTimer = 0;
+    }, 2400);
+  }
   const clock = $("clock");
   const day = $("day");
   const dayNoteEl = $("day-note");
@@ -139,6 +190,8 @@ export function mount({ scene, islands, flows }) {
     document.querySelector(".tools")?.setAttribute("aria-label", t("mapLabel"));
     const veilText = $("veil-text");
     if (veilText) veilText.textContent = t("veil");
+    paintScore();
+    if (toastInfo && !toast.hidden) showToast(toastInfo);
     $("c")?.setAttribute("aria-label", t("canvas"));
     paintLangButton();
     for (const button of document.querySelectorAll("[data-toggle]")) button.textContent = t(toggleKey[button.dataset.toggle]);
@@ -211,7 +264,95 @@ export function mount({ scene, islands, flows }) {
     }).join("") : `<p class="empty">${esc(t("emptyIsland"))}</p>`;
   }
 
+  let personTimer = 0;
+
+  function personStatus(info) {
+    if (info.ambient) return t("personStay", { name: info.placeName });
+    if (info.handing) return t("personHandoff", { name: info.placeName });
+    return t("personGoing", { name: info.placeName });
+  }
+
+  function dismissPerson() {
+    state.person = null;
+    if (personTimer) {
+      clearInterval(personTimer);
+      personTimer = 0;
+    }
+    scene.clearPersonFocus?.();
+  }
+
+  function closePerson() {
+    dismissPerson();
+    renderSheet();
+  }
+
+  function closeGerm() {
+    state.germ = null;
+    germ.hidden = true;
+    germ.innerHTML = "";
+  }
+
+  function renderGerm() {
+    const info = state.germ;
+    if (!info) return;
+    const live = scene.threatInfo(info.index) || info;
+    const suffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb" }[live.islandId];
+    if (!suffix) return;
+    germ.hidden = false;
+    germ.innerHTML = `<button type="button" class="btn x" data-germ-close aria-label="${esc(t("close"))}">×</button><p class="k">${esc(t("germWhatLabel"))}</p><p>${esc(t(`germWhat${suffix}`))}</p><p class="k">${esc(t("germHowLabel"))}</p><p>${esc(t(`germHow${suffix}`))}</p><p class="k">${esc(t("germDoLabel"))}</p><p class="do">${esc(t(`germDo${suffix}`))}</p>`;
+  }
+
+  function openGerm(index) {
+    const info = scene.threatInfo(index);
+    if (!info) return;
+    dismissPerson();
+    state.germ = info;
+    renderGerm();
+  }
+
+  function paintPersonLive() {
+    if (!state.person) return;
+    const info = scene.personInfo(state.person.index);
+    if (!info) return;
+    state.person = info;
+    const bar = sheet.querySelector(".person-bar span");
+    const pct = sheet.querySelector(".person-pct");
+    const status = sheet.querySelector(".person-status span");
+    const n = Math.round(info.progress * 100);
+    if (bar) bar.style.width = `${n}%`;
+    if (pct) pct.textContent = t("personProgress", { n });
+    if (status) status.textContent = personStatus(info);
+  }
+
+  function renderPerson(info) {
+    document.body.classList.add("detail");
+    sheet.hidden = false;
+    const carried = info.carried || t(info.carryKey || "carrySit");
+    const n = Math.round(info.progress * 100);
+    const photo = scene.personPortrait(info.index) || "";
+    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><img class="person-photo" width="160" height="160" alt="${esc(t(info.roleKey))}" ${photo ? `src="${photo}"` : ""}><p class="eyebrow">${esc(info.flowTitle || "")}</p><h2>${esc(t(info.roleKey))}</h2><p class="person-line">${esc(t(info.lineKey))}</p><div class="person-cells"><div style="--c:${esc(info.toAccent)}">${esc(t("personSending", { what: carried }))}</div><div style="--c:${esc(info.fromAccent)}">${esc(t("personFrom", { name: info.fromName }))}</div><div style="--c:${esc(info.toAccent)}">${esc(t("personTo", { name: info.toName }))}</div></div><p class="person-status"><i class="breathe"></i><span>${esc(personStatus(info))}</span></p><div class="person-bar"><span style="width:${n}%"></span></div><p class="person-pct">${esc(t("personProgress", { n }))}</p>`;
+    measureSafe();
+  }
+
+  function openPerson(index) {
+    const info = scene.personInfo(index);
+    if (!info) return;
+    closeGerm();
+    state.person = info;
+    scene.focusPerson(index);
+    if (info.flowId) scene.markFlow(info.flowId);
+    renderPerson(info);
+    if (personTimer) clearInterval(personTimer);
+    personTimer = setInterval(paintPersonLive, 250);
+  }
+
   function renderSheet() {
+    if (state.person) {
+      const info = scene.personInfo(state.person.index) || state.person;
+      state.person = info;
+      renderPerson(info);
+      return;
+    }
     const selected = state.selected;
     if (!selected) {
       sheet.hidden = true;
@@ -241,6 +382,8 @@ export function mount({ scene, islands, flows }) {
 
   function selectIsland(id) {
     if (!byId.has(id)) return;
+    dismissPerson();
+    closeGerm();
     state.selected = { type: "island", id };
     scene.focusIslands([id]);
     scene.setHotItem(null);
@@ -253,6 +396,8 @@ export function mount({ scene, islands, flows }) {
   function selectItem(islandId, itemId) {
     const island = byId.get(islandId);
     if (!island?.items.some((item) => item.id === itemId)) return;
+    dismissPerson();
+    closeGerm();
     state.selected = { type: "item", islandId, itemId };
     scene.focusIslands([islandId]);
     scene.setHotItem(itemId);
@@ -265,6 +410,8 @@ export function mount({ scene, islands, flows }) {
   function selectFlow(id) {
     const flow = flows.find((item) => item.id === id);
     if (!flow) return;
+    dismissPerson();
+    closeGerm();
     state.selected = { type: "flow", id, flow };
     scene.focusIslands([flow.a, flow.b]);
     scene.setHotItem(null);
@@ -275,6 +422,8 @@ export function mount({ scene, islands, flows }) {
   }
 
   function clearSelection() {
+    dismissPerson();
+    closeGerm();
     state.selected = null;
     scene.overview();
     scene.setHotItem(null);
@@ -397,9 +546,32 @@ export function mount({ scene, islands, flows }) {
     showIntro(introIndex);
   }
 
+  const cardAt = new Map();
+  scene.onStrike((info) => {
+    if (!info) return;
+    const prev = cardAt.get(info.islandId);
+    if (prev != null && performance.now() - prev < 20000) return;
+    cardAt.set(info.islandId, performance.now());
+    openGerm(info.index);
+  });
+  scene.onRepel((info) => {
+    if (!info) return;
+    game.repelled[info.islandId] = (Number(game.repelled[info.islandId]) || 0) + 1;
+    game.total += 1;
+    writeGame(game);
+    paintScore();
+    counter.classList.remove("pop");
+    void counter.offsetWidth;
+    counter.classList.add("pop");
+    showToast(info);
+  });
   scene.onPick((hit) => {
     if (!hit) {
       clearSelection();
+      return;
+    }
+    if (hit.kind === "person") {
+      openPerson(hit.index);
       return;
     }
     if (hit.kind === "item") selectItem(hit.islandId, hit.itemId);
@@ -429,7 +601,8 @@ export function mount({ scene, islands, flows }) {
   });
   sheet.addEventListener("click", (event) => {
     if (event.target.closest("[data-close]")) {
-      clearSelection();
+      if (state.person) closePerson();
+      else clearSelection();
       return;
     }
     const item = event.target.closest("[data-item]");
@@ -439,6 +612,9 @@ export function mount({ scene, islands, flows }) {
     }
     const flow = event.target.closest("[data-flow]");
     if (flow) selectFlow(flow.dataset.flow);
+  });
+  germ.addEventListener("click", (event) => {
+    if (event.target.closest("[data-germ-close]")) closeGerm();
   });
 
   for (const button of document.querySelectorAll(".tabs button")) {
@@ -587,6 +763,8 @@ export function mount({ scene, islands, flows }) {
         $("filter").setAttribute("aria-expanded", "false");
         setPane(state.tab);
       } else if (!modal.hidden) closeModal();
+      else if (state.germ) closeGerm();
+      else if (state.person) closePerson();
       else if (state.selected) clearSelection();
     }
   });
@@ -602,6 +780,7 @@ export function mount({ scene, islands, flows }) {
     paintClock();
     renderList();
     renderSheet();
+    renderGerm();
     refreshModal();
   });
 

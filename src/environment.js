@@ -40,7 +40,7 @@ function qualityPlan(quality) {
   return { seg: 200, trees: 6000 };
 }
 
-export function createEnvironment(THREE, scene, { quality = "high", camera = null } = {}) {
+export function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [] } = {}) {
   const plan = qualityPlan(quality);
   const rng = mulberry(0x22e170);
   const noise = new SimplexNoise({ random: rng });
@@ -143,9 +143,21 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   const trunkGeo = new THREE.CylinderGeometry(0.07, 0.12, 0.7, 5);
   trunkGeo.translate(0, 0.35, 0);
 
+  // Backdrop pines share a latitude with the northern islands. Skip a disc
+  // around each island so a close camera is not standing inside a trunk.
+  function inClearing(x, z) {
+    for (const disc of clearings) {
+      const dx = x - disc.x;
+      const dz = z - disc.z;
+      if (dx * dx + dz * dz < disc.r * disc.r) return true;
+    }
+    return false;
+  }
+
   const spots = [];
   for (let x = -26; x <= 36; x += 0.52) {
     for (const z of [-7.55, -8.15]) {
+      if (inClearing(x, z)) continue;
       const y = heightAt(x, z);
       if (y < 0.32) continue;
       spots.push({ x, y, z, scale: 0.78, pine: ((x * 10) & 1) === 0 });
@@ -168,6 +180,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
       z = 1 + rng() * 12;
     }
     if (z > 16) continue;
+    if (inClearing(x, z)) continue;
     const y = heightAt(x, z);
     if (y < 0.5 || y > 12) continue;
     if (noise.noise3d(x * 0.28, z * 0.28, 2.4) > 0.42) continue;
@@ -298,6 +311,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     lampGuard += 1;
     const x = -18 + rng() * 42;
     const z = -7.3 - rng() * 1.5;
+    if (inClearing(x, z)) continue;
     const y = heightAt(x, z);
     if (y < 0.35) continue;
     const n = 4 + Math.floor(rng() * 3);

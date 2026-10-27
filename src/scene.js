@@ -9,6 +9,7 @@ import { createKit } from "./kit.js";
 import * as P from "./palette.js";
 import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, resetDecor } from "./decor.js";
 import { createEnvironment } from "./environment.js";
+import { createPeople } from "./people.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
@@ -511,6 +512,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   hitGeo.rotateY(Math.PI / 6);
   const hitMat = new THREE.MeshBasicMaterial({ color: P.cffffff });
   const hitboxes = [];
+  const itemHits = [];
+  const itemHitGeo = new THREE.BoxGeometry(0.3, 0.78, 0.3);
+  const itemHitMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
 
   function tag(mesh, islandId, cast = true) {
     mesh.userData = { kind: "island", islandId };
@@ -570,6 +574,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     for (const part of buildingParts(recipe, island.accent)) {
       add(part.kind, part.color, part.x, part.y, part.z, part.sx, part.sy, part.sz, part.rot, part.glow);
     }
+    const itemHit = new THREE.Mesh(itemHitGeo, itemHitMat);
+    itemHit.position.y = 0.36;
+    itemHit.visible = false;
+    itemHit.castShadow = false;
+    itemHit.receiveShadow = false;
+    itemHit.userData = { kind: "item", islandId: island.id, itemId: item.id };
+    group.add(itemHit);
+    itemHits.push(itemHit);
     parent.add(group);
     return { group, item, windows, recipe };
   }
@@ -642,8 +654,36 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
     const pinEl = document.createElement("div");
     pinEl.className = "pin";
-    pinEl.innerHTML = `<b>${island.no}</b><em></em>`;
-    pinEl.querySelector("b").style.setProperty("--c", island.accent);
+    pinEl.innerHTML = `<button type="button"><b>${island.no}</b></button><em></em>`;
+    const pinButton = pinEl.querySelector("button");
+    pinButton.querySelector("b").style.setProperty("--c", island.accent);
+    pinButton.setAttribute("aria-label", island.name);
+    pinButton.addEventListener("pointerenter", () => {
+      pinHover = island.id;
+      hoverItem = null;
+      people.setHover(-1);
+      if (hotIndex >= 0) {
+        hotIndex = -1;
+        for (const threat of threats) threat.hot = false;
+      }
+      if (hoverId !== island.id) {
+        hoverId = island.id;
+        refresh();
+      }
+      holdRender = Math.max(holdRender, 0.3);
+    });
+    pinButton.addEventListener("pointerleave", () => {
+      if (pinHover === island.id) pinHover = null;
+      if (hoverId === island.id) {
+        hoverId = null;
+        refresh();
+        holdRender = Math.max(holdRender, 0.3);
+      }
+    });
+    pinButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      pickCb({ kind: "island", islandId: island.id });
+    });
     pinEl.querySelector("em").textContent = island.pin;
     const pin = new CSS2DObject(pinEl);
     pin.position.set(0, 1.25, 0);
@@ -687,6 +727,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       buildings,
       lit: true,
       hover: 0,
+      accent: new THREE.Color(island.accent),
+      springY: 0,
+      springV: 0,
+      pulseT: null,
+      pulseRing: null,
       base: new THREE.Vector3(x, 0.4, z),
       hay,
     });
@@ -785,8 +830,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const skinHex = [P.cf0c7a4, P.cd9a57a, P.cc48a6a, P.c8d5a3c];
   let cargoOn = true;
   const TOOL_KEY = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
-  const dotGeo = new THREE.BufferGeometry();
-  dotGeo.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0], 3));
 
   function anchorFront(mesh, yHead, nosePos) {
     const head = new THREE.Object3D();
@@ -797,28 +840,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     return { head, nose };
   }
 
-  const walkers = flowViews.map((route, index) => {
-    const mesh = new THREE.Points(dotGeo, new THREE.PointsMaterial({
-      color: route.tip,
-      size: 6,
-      sizeAttenuation: false,
-      transparent: true,
-      depthWrite: false,
-    }));
-    mesh.userData.kind = "flow-dot";
-    mesh.raycast = () => {};
-    mesh.visible = false;
-    scene.add(mesh);
-    return {
-      mesh,
-      route,
-      flow: route.flow,
-      t: (index * 0.37) % 1,
-      sign: index % 2 === 0 ? 1 : -1,
-      duration: 14 + route.len * 1.6,
-    };
-  });
-
   let minutes = 8 * 60 + 20;
   let phase = "all";
   let pillarSet = new Set();
@@ -828,10 +849,13 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let frozen = false;
   let bird = false;
   let hoverId = null;
+  let pinHover = null;
+  let hoverItem = null;
   let hotItem = null;
   let selected = new Set();
   let elapsed = 0;
   const threats = [];
+  const threatHits = [];
   const crews = [];
   const crewMarks = [];
   const handoffPops = [];
@@ -897,6 +921,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (crew.t > 0.25 && threat.dir > 0) {
         threat.dir = -1;
         threat.slow = 0.35;
+        if (!crew.applied) noteDefense(crew);
       }
       if (crew.t >= 0.9) crew.actDone = true;
       return;
@@ -909,7 +934,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (drops) writeDrops(drops, 20, k, 0.42, -0.15);
       if (crew.t >= 0.6) {
         if (!crew.applied) {
-          crew.applied = true;
+          noteDefense(crew);
           threat.rate *= 0.6;
           threat.cleans += 1;
           if (threat.cleans >= 3) threat.fading = true;
@@ -924,7 +949,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (bubbles) writeDrops(bubbles, 12, k, 0.5, 0.95);
       if (crew.t >= 0.8) {
         if (!crew.applied) {
-          crew.applied = true;
+          noteDefense(crew);
           if (threat.dir > 0) threat.dir = -1;
         }
         crew.actDone = true;
@@ -938,7 +963,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
       if (crew.t >= 1.05) {
         if (!crew.applied) {
-          crew.applied = true;
+          noteDefense(crew);
           threat.fading = true;
         }
         crew.actDone = true;
@@ -948,7 +973,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (tool === "check") {
       if (crew.gate) crew.gate.visible = true;
       threat.hold = true;
-      if (crew.t >= 0.4) crew.actDone = true;
+      if (crew.t >= 0.4) {
+        if (!crew.applied) noteDefense(crew);
+        crew.actDone = true;
+      }
     }
   }
 
@@ -1028,21 +1056,17 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       _crewDir.z * 1.28 + sideZ * spread,
     );
     const mesh = new THREE.Group();
-    mesh.scale.setScalar(1.4);
+    mesh.scale.setScalar(1.15);
     mesh.visible = false;
     mesh.userData = { kind: "crew" };
     const skin = skinHex[crews.length % skinHex.length];
-    const alive = () => mesh.visible;
-    kit.part({ kind: "cone", parent: mesh, y: 0.2, sx: 0.3, sy: 0.38, sz: 0.3, color: P.c14756f, alive });
-    kit.part({ kind: "sphere", parent: mesh, y: 0.44, sx: 0.2, sy: 0.2, sz: 0.2, color: skin, alive });
-    kit.part({ kind: "sphere", parent: mesh, y: 0.43, z: -0.085, sx: 0.056, sy: 0.056, sz: 0.056, color: skin, alive });
     const { head, nose } = anchorFront(mesh, 0.44, new THREE.Vector3(0, 0.43, -0.085));
     const fx = new THREE.Group();
     fx.visible = false;
     if (threat.tool === "shield") {
       const bubble = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.5, 1),
-        new THREE.MeshBasicMaterial({ color: P.ce1992d, transparent: true, opacity: 0.35, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: 0xe1992d, transparent: true, opacity: 0.35, depthWrite: false }),
       );
       bubble.position.y = 0.35;
       fx.add(bubble);
@@ -1085,7 +1109,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (threat.tool === "check") {
       gate = new THREE.Mesh(
         new THREE.PlaneGeometry(1.4, 0.9),
-        new THREE.MeshBasicMaterial({ color: P.c0e8a80, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: 0x0e8a80, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
       );
       gate.position.set(threat.halt.x, 0.7, threat.halt.z);
       const towardHome = new THREE.Vector3(threat.home.x - threat.halt.x, 0, threat.home.z - threat.halt.z);
@@ -1109,6 +1133,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       t: 0,
       actDone: false,
       applied: false,
+      skin,
     };
   }
 
@@ -1139,12 +1164,24 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function addThreat(mesh, head, nose, home, halt, rate, scale, tool, islandId) {
-    mesh.userData = { kind: "threat" };
+    const threatIndex = threats.length;
+    mesh.userData = { kind: "threat", threatIndex };
     mesh.scale.setScalar(scale);
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5 / scale, 12, 10),
+      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+    );
+    hit.visible = false;
+    hit.castShadow = false;
+    hit.receiveShadow = false;
+    mesh.add(hit);
+    threatHits.push(hit);
     mesh.traverse((child) => {
       if (!child.isMesh) return;
       child.castShadow = false;
       child.receiveShadow = false;
+      child.userData.kind = "threat";
+      child.userData.threatIndex = threatIndex;
     });
     scene.add(mesh);
     const threat = {
@@ -1177,6 +1214,24 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     threat.fadeT = 0;
     threat.gone = false;
     threat.cleans = 0;
+    threat.rate0 = rate;
+    threat.hit = hit;
+    threat.hoverK = 1;
+    threat.hot = false;
+    threat.freeze = 0;
+    threat.squashT = -1;
+    threat.wobble = 0;
+    threat.flash = 0;
+    threat.coolUntil = 0;
+    threat.hits = [];
+    threat.sinking = false;
+    threat.sinkT = 0;
+    threat.rising = false;
+    threat.riseT = 0;
+    threat.away = 0;
+    threat.playerPush = false;
+    threat.taps = 0;
+    threat.baseColors = mats.map((mat) => mat.color.clone());
     threats.push(threat);
     poseThreat(threat);
   }
@@ -1199,7 +1254,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     });
     group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 1), bodyMat));
     const spikeGeo = new THREE.ConeGeometry(0.035, 0.09, 5);
-    const spikeMat = new THREE.MeshStandardMaterial({ color: P.cffd0a8, roughness: 0.6 });
+    const spikeMat = new THREE.MeshStandardMaterial({ color: 0xffd0a8, roughness: 0.6, flatShading: true });
     const spikes = new THREE.InstancedMesh(spikeGeo, spikeMat, 12);
     const dummy = new THREE.Object3D();
     const up = new THREE.Vector3(0, 1, 0);
@@ -1237,8 +1292,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function makeMosquito() {
     const group = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: P.c2a2630, roughness: 0.62 });
-    const pale = new THREE.MeshStandardMaterial({ color: P.cf2ede2, roughness: 0.55 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2630, roughness: 0.62, flatShading: true });
+    const pale = new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.55, flatShading: true });
     for (let i = 0; i < 5; i += 1) {
       const seg = new THREE.Mesh(new THREE.SphereGeometry(0.05 - i * 0.005, 8, 6), i % 2 ? pale : dark);
       seg.scale.set(1, 0.7, 1.2);
@@ -1253,10 +1308,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     beak.rotation.x = Math.PI / 2;
     beak.position.set(0, -0.012, -0.28);
     const wingMat = new THREE.MeshStandardMaterial({
-      color: P.cdff3ff,
+      color: 0xdff3ff,
       transparent: true,
       opacity: 0.35,
       roughness: 0.12,
+      flatShading: true,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
@@ -1306,17 +1362,69 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const roster = [
       { make: () => makeMosquito(), id: "dengue", tool: "clean", rate: 0.046 },
       { make: () => makeMosquito(), id: "border", tool: "check", rate: 0.04 },
-      { make: () => makeVirus(P.cd2694a), id: "flu", tool: "shield", rate: 0.038 },
-      { make: () => makeVirus(P.c5aa86a), id: "entero", tool: "wash", rate: 0.04 },
+      { make: () => makeVirus(0xd2694a), id: "flu", tool: "shield", rate: 0.038 },
+      { make: () => makeVirus(0x5aa86a), id: "entero", tool: "wash", rate: 0.04 },
       { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034 },
     ];
     roster.forEach((spec, index) => {
       const built = spec.make();
       const raid = approach(index, views.get(spec.id).base);
-      addThreat(built.group, built.head, built.nose, raid.home, raid.halt, spec.rate, 1.2, spec.tool, spec.id);
+      addThreat(built.group, built.head, built.nose, raid.home, raid.halt, spec.rate, 1.1, spec.tool, spec.id);
     });
     placeCrews();
   }
+
+  const liftWhite = new THREE.Color(0xffffff);
+  const toolKey = {
+    clean: "toolClean",
+    check: "toolCheck",
+    shield: "toolShield",
+    wash: "toolWash",
+    finish: "toolFinish",
+  };
+  const sparkColor = {
+    clean: 0x7ec8e0,
+    wash: 0xffffff,
+    shield: 0xe1992d,
+    finish: 0x91bb70,
+    check: 0x0e8a80,
+  };
+  const sparkGeo = new THREE.SphereGeometry(0.035, 8, 6);
+  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+  const sparks = new THREE.InstancedMesh(sparkGeo, sparkMat, 16);
+  sparks.frustumCulled = false;
+  sparks.visible = false;
+  sparks.castShadow = false;
+  sparks.receiveShadow = false;
+  scene.add(sparks);
+  const sparkDummy = new THREE.Object3D();
+  const sparkP = Array.from({ length: 16 }, () => new THREE.Vector3());
+  const sparkV = Array.from({ length: 16 }, () => new THREE.Vector3());
+  let sparkLife = 0;
+  let shakeLeft = 0;
+  const tipEl = document.createElement("div");
+  tipEl.className = "threat-tip";
+  const tipObj = new CSS2DObject(tipEl);
+  tipObj.visible = false;
+  scene.add(tipObj);
+  let hotIndex = -1;
+  const isleGeo = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+  const isleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+  const isleBits = new THREE.InstancedMesh(isleGeo, isleMat, 10);
+  isleBits.frustumCulled = false;
+  isleBits.visible = false;
+  isleBits.castShadow = false;
+  isleBits.receiveShadow = false;
+  scene.add(isleBits);
+  const isleDummy = new THREE.Object3D();
+  const isleP = Array.from({ length: 10 }, () => new THREE.Vector3());
+  const isleV = Array.from({ length: 10 }, () => new THREE.Vector3());
+  let isleLife = 0;
+  const itemTipEl = document.createElement("div");
+  itemTipEl.className = "item-tip";
+  const itemTip = new CSS2DObject(itemTipEl);
+  itemTip.visible = false;
+  scene.add(itemTip);
 
   const blobGeo = new THREE.CircleGeometry(0.28, 10);
   blobGeo.rotateX(-Math.PI / 2);
@@ -1347,6 +1455,21 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   let pickCb = () => {};
   let arriveCb = () => {};
+  let markCb = () => {};
+  let strikeCb = () => {};
+  let repelCb = () => {};
+  const people = createPeople({
+    scene,
+    renderer,
+    camera,
+    views,
+    flows: data.flows,
+    crews,
+    onArrive: (event) => {
+      flashHandoff(event.to, event.carried);
+      arriveCb(event);
+    },
+  });
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -1379,6 +1502,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let safeT = 1;
   let focusHalf = null;
   let zoomed = false;
+  let personFocus = -1;
+  let rush = 0;
   let overviewRadius = 28;
   let maxR = Math.max(48, overviewRadius * 1.25);
   const cam = { theta: 0.18, phi: 1.02, radius: overviewRadius, target: overviewTarget.clone() };
@@ -1421,6 +1546,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   function frameWide() {
     focusHalf = null;
     zoomed = false;
+    personFocus = -1;
     goalTarget.copy(overviewTarget);
     applyFit();
   }
@@ -1465,17 +1591,29 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function placeCamera() {
     const sp = Math.sin(cam.phi);
-    const x = cam.target.x + cam.radius * sp * Math.sin(cam.theta);
-    const y = cam.target.y + cam.radius * Math.cos(cam.phi);
-    const z = cam.target.z + cam.radius * sp * Math.cos(cam.theta);
+    let x = cam.target.x + cam.radius * sp * Math.sin(cam.theta);
+    let y = cam.target.y + cam.radius * Math.cos(cam.phi);
+    let z = cam.target.z + cam.radius * sp * Math.cos(cam.theta);
+    let lx = cam.target.x;
+    let ly = cam.target.y;
+    let lz = cam.target.z;
+    if (shakeLeft > 0) {
+      const amp = 0.08 * (shakeLeft / 0.25);
+      x += (Math.random() - 0.5) * 2 * amp;
+      y += (Math.random() - 0.5) * 2 * amp;
+      z += (Math.random() - 0.5) * 2 * amp;
+      lx += (Math.random() - 0.5) * 2 * amp;
+      ly += (Math.random() - 0.5) * 2 * amp;
+      lz += (Math.random() - 0.5) * 2 * amp;
+    }
     const look = camera.userData;
-    if (camera.position.x === x && camera.position.y === y && camera.position.z === z
-      && look._lx === cam.target.x && look._ly === cam.target.y && look._lz === cam.target.z) return;
-    look._lx = cam.target.x;
-    look._ly = cam.target.y;
-    look._lz = cam.target.z;
+    if (shakeLeft <= 0 && camera.position.x === x && camera.position.y === y && camera.position.z === z
+      && look._lx === lx && look._ly === ly && look._lz === lz) return;
+    look._lx = lx;
+    look._ly = ly;
+    look._lz = lz;
     camera.position.set(x, y, z);
-    camera.lookAt(cam.target);
+    camera.lookAt(lx, ly, lz);
     camera.updateMatrixWorld();
   }
 
@@ -1496,6 +1634,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     return null;
   }
 
+  function poseRing(view) {
+    if (view.flashT != null) return;
+    const picked = selected.has(view.island.id);
+    view.ring.visible = picked || view.hover > 0.04;
+    view.ring.material.opacity = picked ? 0.96 : view.hover * 0.55;
+    view.ring.scale.setScalar(1);
+  }
+
   function refresh() {
     for (const view of views.values()) {
       const kind = queryKind(view);
@@ -1511,7 +1657,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         const itemHit = !query || kind !== "item" || norm(building.item._hay).includes(query);
         building.group.visible = Boolean(on && phaseOk(building.item.phase) && itemHit);
       }
-      view.ring.visible = Boolean(selected.has(view.island.id));
+      poseRing(view);
       view.group.traverse((child) => {
         if (!child.isMesh || child.userData.kind !== "island") return;
         if (child === view.top || child === view.coast || child === view.glow || child === view.ring) return;
@@ -1567,10 +1713,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         route.fadeFrom = route.mat.opacity;
       }
     }
-  }
-
-  function poseWalker(walker) {
-    walker.route.curve.getPoint(walker.t, walker.mesh.position);
   }
 
   function applyClock() {
@@ -1660,41 +1802,169 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     applyFit();
   }
 
-  function tick(dt) {
-    const step = Math.min(dt, 0.05);
-    easeSafe(step);
-    if (!frozen) elapsed += step;
-    const hoverK = 1 - Math.exp(-step * 8);
-    for (const view of views.values()) {
-      const delay = view.island.row * 0.055;
-      const risen = reduced ? 1 : THREE.MathUtils.clamp((elapsed - delay) / 0.75, 0, 1);
-      const ease = 1 - (1 - risen) ** 3;
-      const want = hoverId === view.island.id || selected.has(view.island.id) ? 1 : 0;
-      view.hover += (want - view.hover) * hoverK;
-      const lift = -1.25 * (1 - ease) + view.hover * 0.1;
-      if (view.group.position.y !== lift) view.group.position.y = lift;
-      for (const building of view.buildings) {
-        const hot = building.item.id === hotItem ? 1.12 : 1;
-        if (building.group.scale.x !== hot) building.group.scale.setScalar(hot);
+  function easeOutElastic(amount) {
+    if (amount <= 0) return 0;
+    if (amount >= 1) return 1;
+    const c4 = (2 * Math.PI) / 3;
+    return 2 ** (-10 * amount) * Math.sin((amount * 10 - 0.75) * c4) + 1;
+  }
+
+  function noteDefense(crew) {
+    crew.applied = true;
+    const threat = crew.threat;
+    if (threat.playerPush) {
+      threat.playerPush = false;
+      return;
+    }
+    threat.u = Math.max(threat.floor, threat.u - 0.16);
+  }
+
+  function parkThreat(threat) {
+    threat.sinking = false;
+    threat.fading = false;
+    threat.gone = true;
+    threat.away = 20;
+    threat.hot = false;
+    if (hotIndex === threats.indexOf(threat)) hotIndex = -1;
+    threat.mesh.visible = false;
+    setThreatOpacity(threat, 0);
+  }
+
+  function startRise(threat) {
+    threat.gone = false;
+    threat.rising = true;
+    threat.riseT = 0;
+    threat.u = threat.floor;
+    threat.dir = 1;
+    threat.slow = 1;
+    threat.hold = false;
+    threat.cleans = 0;
+    threat.rate = threat.rate0;
+    threat.fadeT = 0;
+    threat.hits = [];
+    threat.playerPush = false;
+    setThreatOpacity(threat, 0);
+    threat.mesh.visible = true;
+  }
+
+  function beginSink(threat) {
+    threat.dir = 0;
+    threat.hot = false;
+    if (reduced) {
+      parkThreat(threat);
+      return;
+    }
+    threat.sinking = true;
+    threat.sinkT = 0;
+  }
+
+  function burstAt(threat) {
+    sparkMat.color.setHex(sparkColor[threat.tool] || 0xffffff);
+    sparkMat.opacity = 1;
+    sparkLife = 0.6;
+    sparks.visible = true;
+    const origin = threat.mesh.position;
+    for (let i = 0; i < 16; i += 1) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const speed = 1.5 + Math.random() * 1.5;
+      sparkV[i].set(
+        Math.sin(phi) * Math.cos(theta),
+        Math.abs(Math.cos(phi)) * 0.35,
+        Math.sin(phi) * Math.sin(theta),
+      ).multiplyScalar(speed);
+      sparkP[i].copy(origin);
+    }
+  }
+
+  function kickShake() {
+    if (reduced) return;
+    shakeLeft = 0.25;
+  }
+
+  function placeTip() {
+    const threat = threats[hotIndex];
+    if (!threat || threat.gone || !threat.mesh.visible) {
+      tipObj.visible = false;
+      return;
+    }
+    tipEl.textContent = t("threatTip", { action: t(toolKey[threat.tool] || "toolClean") });
+    threat.mesh.getWorldPosition(tipObj.position);
+    tipObj.position.y += 0.62;
+    tipObj.visible = true;
+  }
+
+  function applyLook(threat, step) {
+    const hoverTarget = threat.hot ? 1.12 : 1;
+    threat.hoverK = THREE.MathUtils.damp(threat.hoverK, hoverTarget, 12, step);
+    let xz = 1;
+    let y = 1;
+    if (!reduced && threat.squashT >= 0) {
+      const k = easeOutElastic(Math.min(1, threat.squashT / 0.32));
+      xz = 1.3 + (1 - 1.3) * k;
+      y = 0.7 + (1 - 0.7) * k;
+      threat.squashT += step;
+      if (threat.squashT >= 0.32) threat.squashT = -1;
+    }
+    const fitted = threat.scale0 * threat.hoverK;
+    threat.mesh.scale.set(fitted * xz, fitted * y, fitted * xz);
+    if (threat.flash > 0) threat.flash = Math.max(0, threat.flash - step);
+    const lift = threat.hot ? 0.2 : (threat.flash > 0 ? 0.2 * (threat.flash / 0.3) : 0);
+    threat.mats.forEach((mat, index) => {
+      const base = threat.baseColors[index];
+      if (!base || !mat.color) return;
+      mat.color.copy(base);
+      if (lift > 0) mat.color.lerp(liftWhite, lift);
+    });
+    if (threat.wobble > 0) {
+      threat.mesh.position.x += Math.sin(threat.wobble * 84) * 0.06;
+      threat.wobble = Math.max(0, threat.wobble - step);
+    }
+  }
+
+  function stepThreats(step) {
+    if (shakeLeft > 0) shakeLeft = Math.max(0, shakeLeft - step);
+    if (sparkLife > 0) {
+      sparkLife = Math.max(0, sparkLife - step);
+      const fade = sparkLife / 0.6;
+      sparkMat.opacity = fade;
+      for (let i = 0; i < 16; i += 1) {
+        sparkV[i].y -= 6 * step;
+        sparkP[i].addScaledVector(sparkV[i], step);
+        sparkDummy.position.copy(sparkP[i]);
+        sparkDummy.scale.setScalar(fade > 0 ? 1 : 0);
+        sparkDummy.updateMatrix();
+        sparks.setMatrixAt(i, sparkDummy.matrix);
       }
+      sparks.instanceMatrix.needsUpdate = true;
+      sparks.visible = sparkLife > 0;
     }
-    const riseU = waterMat.uniforms.isleRise.value;
-    let riseI = 0;
-    for (const view of views.values()) {
-      riseU[riseI] = view.group.position.y < -0.2 ? 0 : 1;
-      riseI += 1;
-    }
-    if (!frozen && !reduced) waterMat.uniforms.uTime.value = elapsed;
-    if (!frozen) environment.update(step);
-    if (!frozen && !reduced) {
-      for (const threat of threats) {
-        if (threat.fading && !threat.gone) {
-          threat.fadeT += step;
-          const k = Math.min(1, threat.fadeT / 0.8);
-          setThreatOpacity(threat, (1 - k) ** 3);
-          if (k >= 1) threat.gone = true;
+    for (const threat of threats) {
+      if (threat.away > 0) {
+        threat.away = Math.max(0, threat.away - step);
+        if (threat.away <= 0) startRise(threat);
+        else continue;
+      }
+      if (threat.sinking) {
+        threat.sinkT += step;
+        const k = Math.min(1, threat.sinkT / 0.7);
+        setThreatOpacity(threat, 1 - k);
+        if (k >= 1) {
+          parkThreat(threat);
+          continue;
         }
-        if (!threat.gone) {
+      } else if (threat.fading && !threat.gone) {
+        threat.fadeT += step;
+        const k = Math.min(1, threat.fadeT / 0.8);
+        setThreatOpacity(threat, (1 - k) ** 3);
+        if (k >= 1) {
+          parkThreat(threat);
+          continue;
+        }
+      }
+      if (!threat.gone && !threat.sinking && !reduced) {
+        if (threat.freeze > 0) threat.freeze = Math.max(0, threat.freeze - step);
+        else {
           const speed = threat.rate * threat.slow;
           if (threat.hold && threat.dir >= 0 && threat.u >= threat.holdAt) {
             threat.u = threat.holdAt;
@@ -1710,12 +1980,143 @@ export function createScene(canvas, data, { reduced = false } = {}) {
             }
           }
         }
-        poseThreat(threat);
       }
+      if (threat.rising) {
+        threat.riseT += step;
+        const k = Math.min(1, threat.riseT / 0.9);
+        setThreatOpacity(threat, k);
+        if (k >= 1) threat.rising = false;
+      }
+      if (threat.gone) continue;
+      poseThreat(threat);
+      if (threat.sinking) {
+        const k = Math.min(1, threat.sinkT / 0.7);
+        threat.mesh.position.y = THREE.MathUtils.lerp(threat.hover, -1.2, k);
+      } else if (threat.rising) {
+        const k = Math.min(1, threat.riseT / 0.9);
+        threat.mesh.position.y = THREE.MathUtils.lerp(-1.2, threat.hover, k);
+      }
+      applyLook(threat, step);
+    }
+    if (!reduced) {
       for (const crew of crews) stepCrew(crew, step);
     }
+    placeTip();
+  }
+
+  function strike(threat) {
+    if (!threat || threat.gone || threat.sinking || threat.away > 0) return;
+    threat.taps += 1;
+    const now = performance.now();
+    if (now < threat.coolUntil) {
+      threat.wobble = 0.15;
+      holdRender = Math.max(holdRender, 0.2);
+      return;
+    }
+    threat.coolUntil = now + 600;
+    threat.freeze = 0.08;
+    threat.playerPush = true;
+    threat.hold = false;
+    threat.dir = -1;
+    threat.u = Math.max(threat.floor, threat.u - 0.26);
+    const crew = crews.find((item) => item.threat === threat);
+    if (crew && crew.phase === "wait") {
+      crew.phase = "run";
+      crew.t = 0;
+      crew.applied = false;
+      crew.actDone = false;
+      crew.mesh.visible = true;
+      crew.labelAnchor.visible = true;
+    }
+    if (reduced) threat.flash = 0.3;
+    else {
+      threat.squashT = 0;
+      burstAt(threat);
+      kickShake();
+    }
+    threat.hits.push(now);
+    threat.hits = threat.hits.filter((stamp) => now - stamp <= 8000);
+    const routed = threat.hits.length >= 3;
+    if (routed) {
+      threat.hits = [];
+      beginSink(threat);
+    }
+    const info = {
+      index: threats.indexOf(threat),
+      islandId: threat.islandId,
+      tool: threat.tool,
+      routed,
+    };
+    strikeCb(info);
+    if (routed) repelCb({ islandId: threat.islandId, tool: threat.tool, routed: true });
+    holdRender = Math.max(holdRender, 0.45);
+  }
+
+  function tick(dt) {
+    const step = Math.min(dt, 0.05);
+    easeSafe(step);
+    if (!frozen) elapsed += step;
+    const hoverK = 1 - Math.exp(-step * 14);
+    let islandBusy = false;
+    for (const view of views.values()) {
+      const delay = view.island.row * 0.055;
+      const risen = reduced ? 1 : THREE.MathUtils.clamp((elapsed - delay) / 0.75, 0, 1);
+      const ease = 1 - (1 - risen) ** 3;
+      const want = hoverId === view.island.id || selected.has(view.island.id) ? 1 : 0;
+      view.hover += (want - view.hover) * hoverK;
+      view.springY += view.springV * step;
+      view.springV += (-220 * view.springY - 14 * view.springV) * step;
+      if (Math.abs(view.springY) < 0.0004 && Math.abs(view.springV) < 0.008) {
+        view.springY = 0;
+        view.springV = 0;
+      } else islandBusy = true;
+      const lift = -1.25 * (1 - ease) + view.hover * 0.28 + view.springY;
+      if (view.group.position.y !== lift) view.group.position.y = lift;
+      const grown = 1 + view.hover * 0.035;
+      if (view.group.scale.x !== grown) view.group.scale.setScalar(grown);
+      view.landMat.color.setRGB(1, 1, 1).lerp(view.accent, view.hover * 0.12);
+      poseRing(view);
+      if (view.pulseT != null && view.pulseRing) {
+        islandBusy = true;
+        view.pulseT += step;
+        const k = Math.min(1, view.pulseT / 0.45);
+        const e = 1 - (1 - k) ** 3;
+        view.pulseRing.scale.setScalar(reduced ? 1 : 1 + 0.45 * e);
+        view.pulseRing.material.opacity = 0.9 * (1 - (reduced ? k : e));
+        if (k >= 1) {
+          view.pulseRing.material.dispose();
+          view.pulseRing.removeFromParent();
+          view.pulseRing = null;
+          view.pulseT = null;
+        }
+      }
+      for (const building of view.buildings) {
+        const target = building.item.id === hoverItem ? 1.14 : (building.item.id === hotItem ? 1.12 : 1);
+        const next = THREE.MathUtils.damp(building.group.scale.x, target, 16, step);
+        if (Math.abs(next - building.group.scale.x) > 0.0001) {
+          building.group.scale.setScalar(next);
+          islandBusy = true;
+        }
+      }
+    }
+    const riseU = waterMat.uniforms.isleRise.value;
+    let riseI = 0;
+    for (const view of views.values()) {
+      riseU[riseI] = view.group.position.y < -0.2 ? 0 : 1;
+      riseI += 1;
+    }
+    if (!frozen && !reduced) waterMat.uniforms.uTime.value = elapsed;
+    if (!frozen) environment.update(step);
+    if (!frozen) stepThreats(step);
+    if (!frozen && !reduced) stepIsleBits(step);
+    if (personFocus >= 0) {
+      const at = people.spot(personFocus);
+      if (at) goalTarget.set(at.x, at.y + 0.35, at.z);
+    }
     const phiGoal = bird ? 0.58 : userPhi;
-    const k = 1 - Math.exp(-step * (reduced ? 28 : 3.4));
+    const easeSpeed = rush > 0 ? 8 : (reduced ? 28 : 3.4);
+    if (rush > 0) rush = Math.max(0, rush - step);
+    const k = 1 - Math.exp(-step * easeSpeed);
     const dTheta = wrapAngle(goal.theta - cam.theta);
     const dPhi = phiGoal - cam.phi;
     const dRadius = goal.radius - cam.radius;
@@ -1738,7 +2139,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     placeCamera();
     scene.fog.density = 0.32 / cam.radius;
-    const routesOn = elapsed > 1.15 || reduced;
+    people.update(step, { frozen, reduced, cargoOn, camera });
+    const bubbleSize = viewSize();
+    people.placeBubbles(camera, bubbleSize.W, bubbleSize.H);
     if (!frozen) {
       for (const route of flowViews) {
         if (!reduced && route.line.visible) route.mat.uniforms.dashOffset.value -= step * 0.6;
@@ -1766,41 +2169,83 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         }
       }
     }
-    for (const walker of walkers) {
-      const show = Boolean(routesOn && walker.route.line.visible === true);
-      walker.mesh.visible = show;
-      if (!show || frozen || reduced) continue;
-      walker.t += (step / walker.duration) * walker.sign;
-      if (walker.t >= 1) {
-        walker.t = 1;
-        walker.sign = -1;
-        flashHandoff(walker.flow.b, walker.flow.carried);
-        arriveCb({ flow: walker.flow, from: walker.flow.a, to: walker.flow.b, carried: walker.flow.carried });
-      } else if (walker.t <= 0) {
-        walker.t = 0;
-        walker.sign = 1;
-        flashHandoff(walker.flow.a, walker.flow.carried);
-        arriveCb({ flow: walker.flow, from: walker.flow.b, to: walker.flow.a, carried: walker.flow.carried });
-      }
-      poseWalker(walker);
-    }
     stepHandoffs(frozen ? 0 : step);
     hoverTick = (hoverTick + 1) % 2;
     if (hoverSample && hoverTick === 0 && pointers.size === 0) {
-      const hit = hitAt(hoverSample);
-      const id = hit?.islandId ?? null;
-      if (id !== hoverId) {
-        hoverId = id;
-        refresh();
-        holdRender = 0.3;
+      const picked = pickHit(hoverSample);
+      if (pinHover) {
+        people.setHover(-1);
+        hoverItem = null;
+        if (hotIndex >= 0) {
+          hotIndex = -1;
+          for (const threat of threats) threat.hot = false;
+        }
+        if (hoverId !== pinHover) {
+          hoverId = pinHover;
+          refresh();
+          holdRender = Math.max(holdRender, 0.3);
+        }
+        canvas.style.cursor = "pointer";
+      } else if (picked?.kind === "threat") {
+        people.setHover(-1);
+        hoverItem = null;
+        if (hoverId !== null) {
+          hoverId = null;
+          refresh();
+        }
+        if (hotIndex !== picked.index) holdRender = 0.3;
+        hotIndex = picked.index;
+        for (const threat of threats) threat.hot = threats[hotIndex] === threat;
+        canvas.style.cursor = "crosshair";
+      } else if (picked?.kind === "person") {
+        people.setHover(picked.index);
+        hoverItem = null;
+        if (hotIndex >= 0) holdRender = 0.3;
+        hotIndex = -1;
+        for (const threat of threats) threat.hot = false;
+        if (hoverId !== null) {
+          hoverId = null;
+          refresh();
+          holdRender = 0.3;
+        }
+        canvas.style.cursor = "pointer";
+      } else if (picked?.kind === "item") {
+        people.setHover(-1);
+        if (hotIndex >= 0) holdRender = 0.3;
+        hotIndex = -1;
+        for (const threat of threats) threat.hot = false;
+        if (hoverItem !== picked.itemId || hoverId !== picked.islandId) {
+          hoverItem = picked.itemId;
+          hoverId = picked.islandId;
+          refresh();
+          holdRender = Math.max(holdRender, 0.3);
+        }
+        canvas.style.cursor = "pointer";
+      } else {
+        people.setHover(-1);
+        if (hotIndex >= 0) holdRender = 0.3;
+        hotIndex = -1;
+        for (const threat of threats) threat.hot = false;
+        const id = picked?.kind === "island" ? picked.islandId : null;
+        if (id !== hoverId || hoverItem) {
+          hoverItem = null;
+          hoverId = id;
+          refresh();
+          holdRender = 0.3;
+        }
+        canvas.style.cursor = id ? "pointer" : "grab";
       }
-      canvas.style.cursor = id ? "pointer" : "grab";
     }
+    placeItemTip();
     const moving = Math.abs(wrapAngle(goal.theta - cam.theta)) > 0.002
       || Math.abs((bird ? 0.58 : userPhi) - cam.phi) > 0.002
       || Math.abs(goal.radius - cam.radius) > 0.03
       || cam.target.distanceTo(goalTarget) > 0.03
-      || safeT < 1;
+      || safeT < 1
+      || shakeLeft > 0
+      || sparkLife > 0
+      || isleLife > 0
+      || islandBusy;
     if (moving) holdRender = 0.3;
     if (minutes !== paintedMinutes) {
       applyClock();
@@ -1846,7 +2291,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let labelForce = false;
 
   function labelsStill() {
-    if (handoffPops.length) {
+    if (tipObj.visible || itemTip.visible || hotIndex >= 0) return false;
+    if (people.bubblesOn() || handoffPops.length) {
       labelForce = true;
       return false;
     }
@@ -1986,9 +2432,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       view.ring.material.opacity = 0.9 * (1 - e);
       if (k >= 1) {
         view.flashT = null;
-        view.ring.scale.setScalar(1);
-        view.ring.material.opacity = 0.96;
-        view.ring.visible = Boolean(selected.has(view.island.id));
+        poseRing(view);
       }
     }
     for (let i = handoffPops.length - 1; i >= 0; i -= 1) {
@@ -2017,13 +2461,61 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   const raycaster = new THREE.Raycaster();
 
-  function hitAt(event) {
+  function personNear(personHit, islandHit) {
+    if (!personHit) return false;
+    if (!islandHit?.point) return true;
+    const at = people.spot(personHit.index);
+    if (!at) return false;
+    const dx = islandHit.point.x - at.x;
+    const dy = islandHit.point.y - at.y;
+    const dz = islandHit.point.z - at.z;
+    return dx * dx + dy * dy + dz * dz < 4.84;
+  }
+
+  function pickThreat() {
+    const roots = [];
+    for (const threat of threats) {
+      if (threat.gone || threat.sinking || !threat.mesh.visible || !threat.hit) continue;
+      roots.push(threat.hit);
+    }
+    const hits = raycaster.intersectObjects(roots, false);
+    for (const hit of hits) {
+      let node = hit.object;
+      while (node) {
+        if (node.userData && node.userData.kind === "threat" && node.userData.threatIndex != null) {
+          return node.userData.threatIndex;
+        }
+        node = node.parent;
+      }
+    }
+    return -1;
+  }
+
+  function pickHit(event) {
     const point = ndc(event);
     raycaster.far = Infinity;
     raycaster.setFromCamera(point, camera);
-    const hit = raycaster.intersectObjects(hitboxes, false)[0];
-    const islandId = hit?.object.userData.islandId;
+    const threatIndex = pickThreat();
+    if (threatIndex >= 0) return { kind: "threat", index: threatIndex };
+    const personHit = people.pick(raycaster);
+    const islandHit = raycaster.intersectObjects(hitboxes, false)[0];
+    if (personNear(personHit, islandHit)) return { kind: "person", index: personHit.index };
+    const itemHit = pickItem();
+    if (itemHit) return itemHit;
+    const islandId = islandHit?.object.userData.islandId;
     return islandId ? { kind: "island", islandId } : null;
+  }
+
+  function pickItem() {
+    const hits = raycaster.intersectObjects(itemHits, false);
+    for (const hit of hits) {
+      const host = hit.object.parent;
+      if (host && host.visible === false) continue;
+      const data = hit.object.userData;
+      if (data?.kind !== "item") continue;
+      return { kind: "item", islandId: data.islandId, itemId: data.itemId };
+    }
+    return null;
   }
 
   canvas.addEventListener("pointerdown", (event) => {
@@ -2062,15 +2554,23 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const prev = pointers.get(event.pointerId);
     pointers.delete(event.pointerId);
     if (!prev || pointers.size) return;
-    canvas.style.cursor = hoverId ? "pointer" : "grab";
-    if (dragged > 6) return;
-    let hit = hitAt(event);
-    if (event.pointerType === "touch") {
+    if (dragged > 6) {
+      canvas.style.cursor = hoverId ? "pointer" : "grab";
+      return;
+    }
+    let hit = pickHit(event);
+    if (event.pointerType === "touch" && hit?.kind !== "person" && hit?.kind !== "threat") {
       // The number sits above the mesh, so a ray through the badge often
       // hits the island in front. A badge within 28px is the one that was tapped.
       const pin = nearestPin(event);
       if (pin) hit = pin;
     }
+    if (hit?.kind === "threat") {
+      strike(threats[hit.index]);
+      canvas.style.cursor = "crosshair";
+      return;
+    }
+    canvas.style.cursor = hoverId ? "pointer" : "grab";
     pickCb(hit);
   }
   canvas.addEventListener("pointerup", endPointer);
@@ -2081,8 +2581,34 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     zoomed = true;
   }, { passive: false });
 
+  // Orbit theta places the camera at (sin θ, cos θ). θ = yaw sits directly behind
+  // a −z-fronted person. The extra 0.58 rad is the oblique rear seat. Of the two
+  // shoulders, pick the one with the larger cos so a walker facing east or west
+  // on the north rim is seen from the south, not from inside the north trees.
+  function personTheta(yaw) {
+    const bias = 0.58;
+    const right = yaw + bias;
+    const left = yaw - bias;
+    return Math.cos(right) >= Math.cos(left) ? right : left;
+  }
+
+  function focusPerson(index) {
+    const at = people.spot(index);
+    if (!at) return;
+    personFocus = index;
+    people.setSelected(index);
+    zoomed = true;
+    bird = false;
+    rush = 1.2;
+    goalTarget.set(at.x, at.y + 0.35, at.z);
+    goal.theta = personTheta(at.yaw);
+    goal.radius = 4;
+    userPhi = 0.9;
+  }
+
   function focusIslands(ids) {
     selected = new Set(ids);
+    personFocus = -1;
     refresh();
     zoomed = false;
     if (!ids.length) {
@@ -2114,12 +2640,106 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     goalTarget.copy(center);
     applyFit();
+    if (ids.length === 1) pulse(ids[0]);
+  }
+
+  function trimTip(text) {
+    const chars = Array.from(text || "");
+    if (chars.length <= 12) return text || "";
+    return `${chars.slice(0, 12).join("")}…`;
+  }
+
+  function placeItemTip() {
+    if (!hoverItem) {
+      itemTip.visible = false;
+      return;
+    }
+    let found = null;
+    for (const view of views.values()) {
+      found = view.buildings.find((building) => building.item.id === hoverItem);
+      if (found) break;
+    }
+    if (!found || !found.group.visible) {
+      itemTip.visible = false;
+      return;
+    }
+    found.group.getWorldPosition(itemTip.position);
+    itemTip.position.y += 0.6;
+    itemTipEl.textContent = trimTip(found.item.name);
+    itemTip.visible = true;
+  }
+
+  function burstIsle(view) {
+    isleMat.color.set(view.island.accent);
+    isleMat.opacity = 1;
+    isleLife = 0.7;
+    isleBits.visible = true;
+    const origin = view.group.position;
+    for (let i = 0; i < 10; i += 1) {
+      const ang = Math.random() * Math.PI * 2;
+      const speed = 1.2 + Math.random() * 0.8;
+      isleV[i].set(Math.cos(ang) * 0.28, speed, Math.sin(ang) * 0.28);
+      isleP[i].set(origin.x, origin.y + 0.55, origin.z);
+    }
+  }
+
+  function stepIsleBits(step) {
+    if (isleLife <= 0) return;
+    isleLife = Math.max(0, isleLife - step);
+    const fade = isleLife / 0.7;
+    isleMat.opacity = fade;
+    for (let i = 0; i < 10; i += 1) {
+      isleV[i].y -= 5 * step;
+      isleP[i].addScaledVector(isleV[i], step);
+      isleDummy.position.copy(isleP[i]);
+      isleDummy.scale.setScalar(fade > 0 ? 1 : 0);
+      isleDummy.updateMatrix();
+      isleBits.setMatrixAt(i, isleDummy.matrix);
+    }
+    isleBits.instanceMatrix.needsUpdate = true;
+    isleBits.visible = isleLife > 0;
+  }
+
+  function startPulseRing(view) {
+    if (view.pulseRing) {
+      view.pulseRing.material.dispose();
+      view.pulseRing.removeFromParent();
+    }
+    const mesh = new THREE.Mesh(
+      ringGeo,
+      new THREE.MeshBasicMaterial({
+        color: view.island.accent,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.5;
+    mesh.raycast = () => {};
+    mesh.userData = { kind: "pulse" };
+    view.group.add(mesh);
+    view.pulseRing = mesh;
+    view.pulseT = 0;
+  }
+
+  function pulse(id) {
+    const view = views.get(id);
+    if (!view) return;
+    if (!reduced) {
+      view.springV = 2.2;
+      burstIsle(view);
+    }
+    startPulseRing(view);
+    holdRender = Math.max(holdRender, 0.85);
   }
 
   addSeaDecor(scene, kit, placed, lamps);
   const environment = createEnvironment(THREE, scene, {
     quality: narrowScreen() ? "mid" : "high",
     camera,
+    clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
   });
   kit.build(scene);
   scene.traverse((obj) => {
@@ -2168,6 +2788,124 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           flowRes: flowViews[0]?.mat.resolution.toArray() ?? [],
           flowPeak: flowViews.reduce((peak, route) => Math.max(peak, route.curve.getPoint(0.5).y), 0),
           lit: [...views.values()].filter((view) => view.lit).map((view) => view.island.id),
+          walkers: people.counts().walkers,
+          ambient: people.counts().ambient,
+          peopleDraws: people.counts().draws,
+        };
+      },
+      personProbe: (index) => {
+        const at = people.spot(index);
+        const card = people.info(index);
+        if (!at || !card) return null;
+        _proj.set(at.x, at.y + 0.35, at.z).project(camera);
+        const size = viewSize();
+        return {
+          x: (_proj.x * 0.5 + 0.5) * size.W,
+          y: (-_proj.y * 0.5 + 0.5) * size.H,
+          progress: card.progress,
+          roleKey: card.roleKey,
+          flowId: card.flowId,
+          yaw: at.yaw,
+        };
+      },
+      threatProbe: (index) => {
+        const threat = threats[index];
+        if (!threat) return null;
+        const box = new THREE.Box3().setFromObject(threat.mesh);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const { W, H } = viewSize();
+        const px = (v) => {
+          const p = v.clone().project(camera);
+          return { x: (p.x * 0.5 + 0.5) * W, y: (-p.y * 0.5 + 0.5) * H };
+        };
+        const c = px(center);
+        const reach = px(center.clone().add(new THREE.Vector3(size.x, size.y, size.z)));
+        const island = views.get(threat.islandId).base;
+        const left = px(new THREE.Vector3(island.x - MESH_R, 0.4, island.z));
+        const right = px(new THREE.Vector3(island.x + MESH_R, 0.4, island.z));
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        for (const x of [box.min.x, box.max.x]) {
+          for (const y of [box.min.y, box.max.y]) {
+            for (const z of [box.min.z, box.max.z]) {
+              const p = px(new THREE.Vector3(x, y, z));
+              minX = Math.min(minX, p.x);
+              maxX = Math.max(maxX, p.x);
+              minY = Math.min(minY, p.y);
+              maxY = Math.max(maxY, p.y);
+            }
+          }
+        }
+        return {
+          islandId: threat.islandId,
+          tool: threat.tool,
+          x: c.x,
+          y: c.y,
+          world: Math.max(size.x, size.y, size.z),
+          worldH: size.y,
+          screen: Math.hypot(reach.x - c.x, reach.y - c.y),
+          screenW: maxX - minX,
+          screenH: maxY - minY,
+          islandScreen: Math.hypot(right.x - left.x, right.y - left.y),
+          glow: threat.mats.some((mat) => mat.emissive && mat.emissiveIntensity > 0 && (mat.emissive.r + mat.emissive.g + mat.emissive.b) > 0),
+        };
+      },
+      gameProbe: () => ({
+        cursor: canvas.style.cursor,
+        tip: tipEl.textContent,
+        tipOn: tipObj.visible,
+        spark: sparkLife,
+        shake: shakeLeft,
+        radius: cam.radius,
+        rows: threats.map((threat) => ({
+          id: threat.islandId,
+          hot: threat.hot,
+          scale: threat.mesh.scale.x,
+          scaleY: threat.mesh.scale.y,
+          crew: crews.find((crew) => crew.threat === threat)?.phase || "",
+          taps: threat.taps,
+          y: threat.mesh.position.y,
+          gone: threat.gone,
+          away: threat.away,
+          sinking: threat.sinking,
+          u: threat.u,
+          opacity: threat.mats[0]?.opacity ?? 1,
+        })),
+      }),
+      islandProbe: (id) => {
+        const view = views.get(id);
+        if (!view) return null;
+        const { W, H } = viewSize();
+        const projected = view.base.clone().project(camera);
+        return {
+          id,
+          x: (projected.x * 0.5 + 0.5) * W,
+          y: (-projected.y * 0.5 + 0.5) * H,
+          lift: view.group.position.y,
+          scale: view.group.scale.x,
+          ring: view.ring.visible,
+          ringOpacity: view.ring.material.opacity,
+          top: view.landMat.color.getHexString(),
+          springY: view.springY,
+          springV: view.springV,
+          pulse: view.pulseT,
+          pulseScale: view.pulseRing ? view.pulseRing.scale.x : 0,
+          bits: isleLife,
+          buildings: view.buildings.map((building) => {
+            const at = new THREE.Vector3();
+            building.group.getWorldPosition(at);
+            const p = at.project(camera);
+            return {
+              id: building.item.id,
+              name: building.item.name,
+              scale: building.group.scale.x,
+              x: (p.x * 0.5 + 0.5) * W,
+              y: (-p.y * 0.5 + 0.5) * H,
+            };
+          }),
         };
       },
     });
@@ -2183,6 +2921,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         const island = view.island;
         const nameEl = view.pinEl.querySelector("em");
         if (nameEl) nameEl.textContent = island.pin;
+        const badge = view.pinEl.querySelector("button");
+        if (badge) badge.setAttribute("aria-label", island.name);
         view.hay = [island.name, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ");
         for (const item of island.items) item._hay = [item.name, item.text, ...(item.keywords ?? [])].join(" ");
       }
@@ -2191,12 +2931,28 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
       }
       for (const mark of crewMarks) mark.el.textContent = t(mark.key);
+      people.relabel();
+      placeTip();
       refresh();
     },
     setPhase(value) { phase = value; refresh(); },
     setPillars(value) { pillarSet = value; refresh(); },
     setQuery(value) { query = norm(value); refresh(); },
     focusIslands,
+    focusPerson,
+    clearPersonFocus() {
+      personFocus = -1;
+      people.setSelected(-1);
+    },
+    personInfo: (index) => people.info(index),
+    threatInfo(index) {
+      const threat = threats[index];
+      if (!threat || threat.gone) return null;
+      return { index, islandId: threat.islandId, tool: threat.tool };
+    },
+    personPortrait: (index) => people.portrait(index),
+    markFlow(id) { if (id) markCb(id); },
+    onMarkFlow(fn) { markCb = fn; },
     overview() { focusIslands([]); },
     setShowAllFlows(value) { showAllFlows = value; refresh(); },
     setFreeze(value) { frozen = value; },
@@ -2215,6 +2971,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     setHotItem(id) { hotItem = id; },
     onPick(fn) { pickCb = fn; },
     onArrive(fn) { arriveCb = fn; },
+    onStrike(fn) { strikeCb = fn; },
+    onRepel(fn) { repelCb = fn; },
     getTheta() { return cam.theta; },
     debugState() {
       const hour = minutes / 60;
@@ -2246,8 +3004,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const banned = new Set(["hepa", "amr", "global"]);
       for (const threat of threats) {
         if (banned.has(threat.islandId)) errors.push(`threat still targets ${threat.islandId}`);
+        for (const mat of threat.mats) {
+          const glow = mat.emissive;
+          if (glow && mat.emissiveIntensity > 0 && glow.r + glow.g + glow.b > 0) errors.push(`threat on ${threat.islandId} glows`);
+        }
       }
       if (threats.length !== 5) errors.push(`expected 5 threats, saw ${threats.length}`);
+      for (const threat of threats) {
+        const radius = threat.hit?.geometry?.parameters?.radius ?? 0;
+        if (radius * threat.scale0 < 0.499) errors.push(`hit sphere on ${threat.islandId} is under 0.5`);
+      }
       const border = views.get("border");
       const dengue = views.get("dengue");
       if (!(border.base.z < dengue.base.z)) errors.push("border island is not north (-z) of dengue");
@@ -2291,22 +3057,13 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const sea = new THREE.Raycaster(new THREE.Vector3(0, 20, 0), new THREE.Vector3(0, -1, 0));
       if (!sea.intersectObject(water, false).length) errors.push("water is not visible from above");
 
-      const walker = walkers[0];
-      if (!walker.mesh.isPoints) errors.push("walker is not a point");
-      const savedT = walker.t;
-      const savedSign = walker.sign;
-      walker.sign = 1;
-      walker.t = 0.22;
-      poseWalker(walker);
-      const p0 = walker.mesh.position.clone();
-      walker.t = 0.31;
-      poseWalker(walker);
-      const move = walker.mesh.position.clone().sub(p0);
-      move.y = 0;
-      if (move.length() < 0.02) errors.push("walker did not move along the route");
-      walker.t = savedT;
-      walker.sign = savedSign;
-      poseWalker(walker);
+      const walked = people.proveMotion();
+      if (walked.walkers < 50) errors.push(`walkers ${walked.walkers} < 50`);
+      if (walked.ambient < 10) errors.push(`ambient ${walked.ambient} < 10`);
+      if (walked.moved < 0.02) errors.push("walker did not move along the route");
+      if (!walked.feetOk) errors.push("walker feet left the island surface");
+      if (walked.facing < 0.9) errors.push(`walker faces away from travel (cos ${walked.facing.toFixed(2)})`);
+      if (walked.draws > 25) errors.push(`people draws ${walked.draws} > 25`);
 
       const threat = threats[0];
       if (!threat) errors.push("no threat to face");

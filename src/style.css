@@ -383,6 +383,137 @@ body.intro .title-card { opacity: 0; }
 .detail-item small { color: var(--muted); }
 .detail-item em { font-style: normal; color: var(--muted); }
 .sheet h3 { margin: 8px 0; font-size: var(--fs-sm); font-weight: 700; }
+.person-photo {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: var(--field);
+  display: block;
+  margin-bottom: 8px;
+}
+.germ {
+  position: absolute;
+  top: 88px;
+  right: 16px;
+  width: 280px;
+  max-height: min(420px, calc(100vh - 120px));
+  overflow: auto;
+  padding: 14px 14px 16px;
+  border-radius: 20px;
+  z-index: 4;
+}
+.germ[hidden] { display: none; }
+.germ .x { float: right; width: 36px; height: 36px; border-radius: 50%; background: var(--field); }
+.germ .k { margin: 8px 0 2px; font-size: 13px; font-weight: 700; }
+.germ p { margin: 0 0 6px; font-size: 14px; line-height: 1.6; }
+.germ .do { border-left: 4px solid var(--teal); padding-left: 8px; }
+.threat-tip {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #fff;
+  background: #1f2d33;
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.item-tip {
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: #fff;
+  background: #1f2d33;
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.repel-count {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
+  pointer-events: none;
+}
+.repel-count span {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #1f2d33;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.repel-count.pop span { animation: repel-pop 280ms cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes repel-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.repel-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #1f2d33;
+  color: #fff;
+  pointer-events: none;
+}
+.repel-toast b { display: block; font-size: 15px; line-height: 1.45; }
+.repel-toast span { display: block; margin-top: 4px; font-size: 13px; line-height: 1.5; opacity: 0.92; }
+.repel-toast[hidden] { display: none; }
+.person-line { margin: 0 0 8px; }
+.person-cells { display: grid; gap: 6px; margin: 8px 0; }
+.person-cells div {
+  border-left: 4px solid var(--c, var(--teal));
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--hover);
+  font-size: var(--fs-sm);
+}
+.person-status { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.breathe {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1f9d6b;
+  display: inline-block;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.72); }
+}
+.person-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.person-bar span {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+  width: 0%;
+}
+.person-pct { margin: 6px 0 0; color: var(--muted); font-size: var(--fs-xs); }
+.person-bubble {
+  font: 700 var(--fs-xs)/1.2 var(--sans);
+  background: var(--paper-solid);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 3px 8px;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .related { display: flex; flex-wrap: wrap; gap: 6px; }
 .related button { width: auto; background: var(--hover); }
 
@@ -512,13 +643,33 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   font-family: var(--sans); font-size: var(--fs-xl);
 }
 .pin { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pin button {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.pin.crowded button,
+.pin.occluded button { pointer-events: none; }
 .pin b {
   min-width: 28px; height: 28px; padding: 0 6px;
   display: grid; place-items: center;
   border-radius: 999px; background: var(--paper-solid); color: var(--c, var(--deep));
   border: 2px solid var(--c, var(--deep));
   font-size: var(--fs-xs); font-weight: 700;
+  pointer-events: none;
+  transition: transform 160ms cubic-bezier(.2, 1.6, .4, 1), background-color 160ms;
 }
+.pin button:hover b,
+.pin button:focus-visible b,
+.pin b:hover { transform: scale(1.18); }
 .pin em {
   display: none; font-style: normal;
   background: var(--paper-solid); color: var(--ink);
@@ -556,7 +707,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   background: #fff8f6; color: #8d1d1d; border-radius: 20px;
 }
 
-.brand, .rail, .dial, .toggles, .ledger, .sheet, .modal-card, .compass, #lang-pop, .filter-pop {
+.brand, .rail, .dial, .toggles, .ledger, .sheet, .germ, .modal-card, .compass, #lang-pop, .filter-pop {
   background: var(--paper);
   -webkit-backdrop-filter: blur(20px) saturate(1.7);
   backdrop-filter: blur(20px) saturate(1.7);
@@ -567,7 +718,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   box-shadow: inset 0 1px 0 var(--gloss), 0 6px 18px -8px rgba(6, 48, 50, 0.35);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .brand, .rail, .dial, .toggles, .ledger, .sheet, .modal-card, .compass, #lang-pop, .filter-pop {
+  .brand, .rail, .dial, .toggles, .ledger, .sheet, .germ, .modal-card, .compass, #lang-pop, .filter-pop {
     background: var(--paper-solid);
   }
 }
@@ -756,5 +907,5 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .veil, .title-card, .ledger, .modal-card, .caption { transition: none; animation: none; }
+  .veil, .title-card, .ledger, .modal-card, .caption, .breathe { transition: none; animation: none; }
 }

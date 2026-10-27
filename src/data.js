@@ -80,6 +80,9 @@ export const islands = [
     source: "新興傳染病暨流感大流行應變整備及邊境檢疫計畫（2022–2027）",
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢邊境檢疫）",
+    actions: [
+      { icon: "check", label: "出國回來如果發燒或拉肚子，入境時主動告訴機場檢疫人員。", detail: "發燒或拉肚子時，主動告訴檢疫人員。", href: null },
+    ],
     items: [
       { id: "border-port", name: "航空港口檢疫", phase: "now", hours: [[5, 23]], keywords: ["機場", "港口", "檢疫", "體溫"], text: "對入境旅客、機組與船舶做檢疫詢問和症狀評估。異常就分流、採檢，不讓隊伍本身變成風險。" },
       { id: "border-travel", name: "旅遊史與症狀", phase: "now", hours: [[5, 23]], keywords: ["旅遊史", "入境", "發燒"], text: "發熱、呼吸道症狀和蚊媒疫區旅遊史，當天要變成疫情中心看得到的名單。" },
@@ -147,6 +150,9 @@ export const islands = [
     source: "常設業務，與新興傳染病暨流感大流行應變整備及邊境檢疫計畫（2022–2027）、急性監測第四期（2025–2028）交界",
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢流感）",
+    actions: [
+      { icon: "check", label: "咳嗽、打噴嚏時用手肘遮住口鼻；生病了就在家休息。", detail: "生病了就在家休息。", href: null },
+    ],
     items: [
       { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別"], text: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
       { id: "flu-drug", name: "抗病毒藥物", phase: "now", hours: [[9, 17]], keywords: ["抗病毒", "合約醫院", "庫存"], text: "合約醫院的藥劑存量和效期要在流行期調得動。藥和疫苗是兩條補給線，不能互相替代。" },
@@ -169,6 +175,9 @@ export const islands = [
     source: "急性傳染病流行風險監控與管理第四期計畫（2025–2028）裡的腸病毒與腸道傳染病章節。開學季仍和教托育機構一起做。",
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢腸病毒）",
+    actions: [
+      { icon: "check", label: "家裡有弟弟妹妹，如果他一直想睡、手腳突然抽動或一直吐，要馬上告訴大人帶去看醫生。", detail: "嗜睡、手腳突然抽動或一直吐，要馬上告訴大人。", href: null },
+    ],
     items: [
       { id: "entero-sign", name: "重症前兆衛教", phase: "now", hours: [[7, 20]], keywords: ["嗜睡", "肌躍", "嘔吐", "家長"], text: "提醒家長辨識嗜睡、肌躍型抽搐、持續嘔吐等重症前兆，儘速就醫。衛教要在流行上升前就在，而不是上新聞以後。" },
       { id: "entero-school", name: "教托育監視", phase: "now", hours: [[7, 16]], keywords: ["幼兒園", "停課", "缺勤"], text: "幼兒園與國小的缺勤、停課和群聚回報衛生單位。這是監測的前段，不是學校自己的內部統計。" },
@@ -191,6 +200,9 @@ export const islands = [
     source: "急性傳染病流行風險監控與管理第四期計畫（2025–2028）裡的病媒監測與孳生源清除。社區清積水仍是常設業務。",
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢登革熱）",
+    actions: [
+      { icon: "check", label: "下雨後幫忙「巡、倒、清、刷」：花盆底盤、瓶罐、廢輪胎的積水都倒掉。", detail: "花盆底盤、瓶罐、廢輪胎的積水都倒掉。", href: null },
+    ],
     items: [
       { id: "dengue-source", name: "孳生源清除", phase: "now", hours: [[6, 10], [15, 18]], keywords: ["積水", "容器", "花盆"], text: "容器、花盆和積水處要巡、要清。雨後的空窗比藥劑的庫存更常決定下一週的指數。" },
       { id: "dengue-index", name: "病媒蚊密度", phase: "now", hours: [[7, 17]], keywords: ["誘卵", "指數", "成蚊"], text: "用密度看這一區的風險。指數上升而還沒有本土病例時，就該先清，不等確診。" },
@@ -213,6 +225,9 @@ export const islands = [
     source: "我國加入 WHO 2035 消除結核第三期計畫（2026–2030）。名稱裡的 2035 是目標年，不是會員資格，消除也還沒有達成。",
     href: "https://www.cdc.gov.tw/Category/ListPage/2fbGet7KwqEwnjGAy-Zbyg",
     hrefLabel: "看結核病防治專區",
+    actions: [
+      { icon: "check", label: "咳嗽超過兩週，要請大人帶你去看醫生。", detail: "咳嗽超過兩週就去看醫生。", href: null },
+    ],
     items: [
       { id: "tb-find", name: "主動發現", phase: "now", hours: [[9, 17]], keywords: ["接觸者", "篩檢", "高風險"], text: "在接觸者和高風險族群裡找出發病的人，不等症狀自己走到門診。" },
       { id: "tb-dots", name: "都治與完成治療", phase: "now", hours: [[9, 17]], keywords: ["都治", "DOTS", "完成率"], text: "直接觀察治療和關懷，是為了完成率，不是為了打卡。沒吃完的療程會把抗藥性留在社區。" },
