@@ -158,6 +158,18 @@ function damp(current, goal, dt, speed) {
   return current + (goal - current) * (1 - Math.exp(-speed * dt));
 }
 
+function easeInOutCubic(t) {
+  const x = t < 0 ? 0 : t > 1 ? 1 : t;
+  return x < 0.5 ? 4 * x * x * x : 1 - ((-2 * x + 2) ** 3) / 2;
+}
+
+function easeOutBack(t, s = 1.70158) {
+  const x = t < 0 ? 0 : t > 1 ? 1 : t;
+  const c1 = s;
+  const c3 = c1 + 1;
+  return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2;
+}
+
 function wrapAngle(d) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
@@ -198,6 +210,7 @@ function lookAtHour(hour) {
 }
 
 export function createScene(canvas, data, { reduced = false } = {}) {
+  let introAt = 0;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   const narrowScreen = () => (canvas.clientWidth || window.innerWidth || 1200) < 980;
   let pixelCap = Math.min(window.devicePixelRatio || 1, narrowScreen() ? 1.5 : 2);
@@ -582,8 +595,21 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     itemHit.userData = { kind: "item", islandId: island.id, itemId: item.id };
     group.add(itemHit);
     itemHits.push(itemHit);
+    if (!reduced) {
+      group.scale.setScalar(0);
+      group.visible = false;
+    }
     parent.add(group);
-    return { group, item, windows, recipe };
+    return {
+      group,
+      item,
+      windows,
+      recipe,
+      show: 1,
+      shown: reduced ? 1 : 0,
+      spring: 1,
+      sv: 0,
+    };
   }
 
   const placed = raw.map((point) => ({
@@ -599,7 +625,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const z = point.z - cz;
     const group = new THREE.Group();
     group.userData.islandId = island.id;
-    group.position.set(x, reduced ? 0 : -1.25, z);
+    group.userData.treeRecs = [];
+    group.position.set(x, reduced ? 0 : -1.6, z);
+    group.scale.setScalar(reduced ? 1 : 0.7);
     scene.add(group);
 
     const skirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, vertexColors: true });
@@ -653,9 +681,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     group.add(ring);
 
     const pinEl = document.createElement("div");
-    pinEl.className = "pin";
+    pinEl.className = reduced ? "pin" : "pin hold";
     pinEl.innerHTML = `<button type="button"><b>${island.no}</b></button><em></em>`;
     const pinButton = pinEl.querySelector("button");
+    const pinBadge = pinButton.querySelector("b");
+    pinBadge.addEventListener("animationend", () => pinBadge.classList.remove("pop"));
     pinButton.querySelector("b").style.setProperty("--c", island.accent);
     pinButton.setAttribute("aria-label", island.name);
     pinButton.addEventListener("pointerenter", () => {
@@ -732,10 +762,25 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       springV: 0,
       pulseT: null,
       pulseRing: null,
+      fade: 1,
+      fadeTarget: 1,
+      pinShown: Boolean(reduced),
+      treeRecs: group.userData.treeRecs,
+      introIndex: 0,
       base: new THREE.Vector3(x, 0.4, z),
       hay,
     });
   }
+
+  const introOrder = [...views.values()].sort((a, b) => {
+    const da = a.base.x * a.base.x + a.base.z * a.base.z;
+    const db = b.base.x * b.base.x + b.base.z * b.base.z;
+    if (Math.abs(da - db) > 1e-6) return da - db;
+    return String(a.island.no).localeCompare(String(b.island.no));
+  });
+  introOrder.forEach((view, index) => {
+    view.introIndex = index;
+  });
 
   const FLOW_SPLIT = 63;
   const flowPaper = new THREE.Color("#fff7ea");
@@ -863,7 +908,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function poseThreat(threat) {
     threat.mesh.position.lerpVectors(threat.home, threat.halt, threat.u);
-    threat.mesh.position.y = threat.hover + Math.sin(elapsed * 1.15 + threat.phase) * 0.06;
+    const bob = actorsLive() ? Math.sin(elapsed * 1.15 + threat.phase) * 0.06 : 0;
+    threat.mesh.position.y = threat.hover + bob;
     _threatDir.subVectors(threat.halt, threat.home);
     _threatDir.y = 0;
     if (_threatDir.lengthSq() > 1e-8) threat.mesh.rotation.y = Math.atan2(-_threatDir.x, -_threatDir.z);
@@ -992,7 +1038,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       crew.mesh.visible = false;
       crew.labelAnchor.visible = false;
       crew.fx.visible = false;
-      if (elapsed > 0.7 && threat.dir > 0 && threat.u > 0.5) {
+      if (actorsLive() && elapsed > 0.7 && threat.dir > 0 && threat.u > 0.5) {
         crew.phase = "run";
         crew.t = 0;
         crew.mesh.visible = true;
@@ -1510,6 +1556,22 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const goal = { theta: cam.theta, radius: overviewRadius };
   let userPhi = cam.phi;
   const goalTarget = overviewTarget.clone();
+  let flight = null;
+  let coasting = false;
+  let pinchGesture = false;
+  const orbitVel = { theta: 0, phi: 0 };
+
+  function actorsLive(now = performance.now()) {
+    if (reduced) return true;
+    if (!introAt) return false;
+    return now - introAt >= 2400;
+  }
+
+  function introClock(now = performance.now()) {
+    if (reduced) return 10000;
+    if (!introAt) return 0;
+    return now - introAt;
+  }
 
   // Positive setViewOffset y lifts the frame: offsetY = H/2 - safeCenterY.
   // A safe rect in the upper half (UI along the bottom) therefore uses a positive y.
@@ -1535,7 +1597,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   function applyFit() {
     overviewRadius = fitDistance(overviewHalf.x, overviewHalf.z);
     maxR = Math.max(48, overviewRadius * 1.25);
-    if (!zoomed) {
+    const parked = !reduced && !introAt && !flight && !focusHalf && !zoomed;
+    if (!zoomed && !parked) {
       if (bird) goal.radius = Math.min(maxR, overviewRadius + 8);
       else if (!focusHalf) goal.radius = overviewRadius;
       else goal.radius = Math.min(maxR, fitDistance(focusHalf.x, focusHalf.z));
@@ -1543,12 +1606,107 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     applyViewOffset();
   }
 
+  function stopCoast() {
+    coasting = false;
+    orbitVel.theta = 0;
+    orbitVel.phi = 0;
+  }
+
+  function beginFlight(to, opts) {
+    flight = {
+      t0: performance.now(),
+      dur: opts.duration,
+      arc: Boolean(opts.arc),
+      intro: Boolean(opts.intro),
+      trackFit: Boolean(opts.trackFit),
+      person: Boolean(opts.person),
+      distance: opts.distance || 0,
+      from: {
+        theta: cam.theta,
+        phi: cam.phi,
+        radius: cam.radius,
+        target: cam.target.clone(),
+      },
+      to: {
+        theta: to.theta,
+        phi: to.phi,
+        radius: to.radius,
+        target: to.target.clone(),
+      },
+    };
+  }
+
+  function cancelFlight() {
+    if (!flight) return;
+    flight = null;
+    goal.theta = cam.theta;
+    goal.radius = cam.radius;
+    userPhi = cam.phi;
+    goalTarget.copy(cam.target);
+  }
+
+  function stepFlight() {
+    if (!flight) return;
+    if (flight.person && personFocus >= 0) {
+      const at = people.spot(personFocus);
+      if (at) flight.to.target.set(at.x, at.y + 0.35, at.z);
+    } else if (flight.intro) {
+      flight.to.radius = overviewRadius;
+      flight.to.target.copy(overviewTarget);
+    } else if (flight.trackFit) {
+      flight.to.radius = goal.radius;
+      flight.to.target.copy(goalTarget);
+    }
+    const raw = (performance.now() - flight.t0) / Math.max(1, flight.dur);
+    const done = raw >= 1;
+    const e = done ? 1 : easeInOutCubic(raw);
+    const arc = !done && flight.arc ? Math.sin(Math.PI * e) * Math.min(6, flight.distance * 0.4) : 0;
+    cam.theta = flight.from.theta + wrapAngle(flight.to.theta - flight.from.theta) * e;
+    cam.phi = THREE.MathUtils.clamp(flight.from.phi + (flight.to.phi - flight.from.phi) * e, 0.32, 1.22);
+    cam.radius = flight.from.radius + (flight.to.radius - flight.from.radius) * e + arc;
+    cam.target.lerpVectors(flight.from.target, flight.to.target, e);
+    goal.theta = cam.theta;
+    userPhi = cam.phi;
+    if (!done) return;
+    cam.radius = flight.to.radius;
+    cam.phi = THREE.MathUtils.clamp(flight.to.phi, 0.32, 1.22);
+    cam.theta = flight.from.theta + wrapAngle(flight.to.theta - flight.from.theta);
+    cam.target.copy(flight.to.target);
+    goal.theta = cam.theta;
+    goal.radius = cam.radius;
+    userPhi = cam.phi;
+    goalTarget.copy(cam.target);
+    flight = null;
+  }
+
   function frameWide() {
     focusHalf = null;
     zoomed = false;
     personFocus = -1;
+    stopCoast();
     goalTarget.copy(overviewTarget);
     applyFit();
+    const endPhi = bird ? 0.58 : userPhi;
+    const dist = Math.hypot(
+      cam.target.x - goalTarget.x,
+      cam.target.y - goalTarget.y,
+      cam.target.z - goalTarget.z,
+      (goal.radius - cam.radius) * 0.5,
+    );
+    if (dist < 0.05 && Math.abs(endPhi - cam.phi) < 0.02 && !flight) {
+      cam.phi = endPhi;
+      userPhi = endPhi;
+      cam.radius = goal.radius;
+      cam.target.copy(goalTarget);
+      goal.theta = cam.theta;
+      return;
+    }
+    beginFlight({
+      theta: cam.theta,
+      phi: endPhi,
+      radius: goal.radius,
+      target: goalTarget.clone(),
+    }, { duration: 900, distance: dist, arc: true, trackFit: true });
   }
 
   function easeSafe(step) {
@@ -1648,14 +1806,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const on = Boolean(kind) && pillarOk(view.island) && (phase === "all" || view.island.items.some((item) => phaseOk(item.phase)));
       view.lit = on;
       view.group.userData.lit = on;
-      for (const mat of [view.coastMat, view.landMat, view.skirtMat]) {
-        mat.opacity = on ? 1 : 0.14;
-        mat.transparent = !on;
-        mat.depthWrite = on;
+      view.fadeTarget = on ? 1 : 0.14;
+      if (view.fadeTarget < 1 || view.fade < 0.999) {
+        for (const mat of [view.coastMat, view.landMat, view.skirtMat]) {
+          mat.transparent = true;
+          mat.depthWrite = false;
+        }
       }
       for (const building of view.buildings) {
         const itemHit = !query || kind !== "item" || norm(building.item._hay).includes(query);
-        building.group.visible = Boolean(on && phaseOk(building.item.phase) && itemHit);
+        building.show = on && phaseOk(building.item.phase) && itemHit ? 1 : 0;
       }
       poseRing(view);
       view.group.traverse((child) => {
@@ -1962,7 +2122,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           continue;
         }
       }
-      if (!threat.gone && !threat.sinking && !reduced) {
+      if (!threat.gone && !threat.sinking && !reduced && actorsLive()) {
         if (threat.freeze > 0) threat.freeze = Math.max(0, threat.freeze - step);
         else {
           const speed = threat.rate * threat.slow;
@@ -2052,16 +2212,39 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     holdRender = Math.max(holdRender, 0.45);
   }
 
+  function poseIslandTrees(view, clock) {
+    if (!view.treeRecs.length) return;
+    const landStart = 200 + view.introIndex * 70;
+    const groups = new Map();
+    for (const rec of view.treeRecs) {
+      const slot = rec.treeSlot ?? 0;
+      const list = groups.get(slot);
+      if (list) list.push(rec);
+      else groups.set(slot, [rec]);
+    }
+    let index = 0;
+    for (const slot of [...groups.keys()].sort((a, b) => a - b)) {
+      const start = landStart + 680 + index * 40;
+      index += 1;
+      let mul = 1;
+      if (!reduced && (!introAt || clock < start)) mul = 0;
+      else if (!reduced && clock < start + 380) mul = Math.max(0, easeOutBack((clock - start) / 380, 2));
+      for (const rec of groups.get(slot)) rec.scaleMul = mul;
+    }
+  }
+
   function tick(dt) {
     const step = Math.min(dt, 0.05);
     easeSafe(step);
     if (!frozen) elapsed += step;
     const hoverK = 1 - Math.exp(-step * 14);
+    const clock = introClock();
     let islandBusy = false;
     for (const view of views.values()) {
-      const delay = view.island.row * 0.055;
-      const risen = reduced ? 1 : THREE.MathUtils.clamp((elapsed - delay) / 0.75, 0, 1);
-      const ease = 1 - (1 - risen) ** 3;
+      const landStart = 200 + view.introIndex * 70;
+      let isleE = 1;
+      if (!reduced && (!introAt || clock < landStart)) isleE = 0;
+      else if (!reduced && clock < landStart + 600) isleE = easeOutBack((clock - landStart) / 600, 1.6);
       const want = hoverId === view.island.id || selected.has(view.island.id) ? 1 : 0;
       view.hover += (want - view.hover) * hoverK;
       view.springY += view.springV * step;
@@ -2070,10 +2253,33 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         view.springY = 0;
         view.springV = 0;
       } else islandBusy = true;
-      const lift = -1.25 * (1 - ease) + view.hover * 0.28 + view.springY;
+      const lift = -1.6 * (1 - isleE) + view.hover * 0.28 + view.springY;
       if (view.group.position.y !== lift) view.group.position.y = lift;
-      const grown = 1 + view.hover * 0.035;
+      const grown = (0.7 + 0.3 * isleE) * (1 + view.hover * 0.035);
       if (view.group.scale.x !== grown) view.group.scale.setScalar(grown);
+      if (!view.pinShown && (reduced || (introAt && clock >= landStart + 600))) {
+        view.pinShown = true;
+        view.pinEl.classList.remove("hold");
+        if (!reduced) view.pinEl.querySelector("b")?.classList.add("pop");
+      }
+      poseIslandTrees(view, clock);
+      const span = 0.86;
+      const fadeStep = span * (step / 0.25);
+      const fadeDelta = view.fadeTarget - view.fade;
+      if (Math.abs(fadeDelta) <= fadeStep) view.fade = view.fadeTarget;
+      else view.fade += Math.sign(fadeDelta) * fadeStep;
+      if (Math.abs(view.fade - view.fadeTarget) > 0.001) islandBusy = true;
+      for (const mat of [view.coastMat, view.landMat, view.skirtMat]) {
+        if (view.fade >= 0.999 && view.fadeTarget >= 1) {
+          mat.transparent = false;
+          mat.depthWrite = true;
+          mat.opacity = 1;
+        } else {
+          mat.transparent = true;
+          mat.depthWrite = false;
+          mat.opacity = view.fade;
+        }
+      }
       view.landMat.color.setRGB(1, 1, 1).lerp(view.accent, view.hover * 0.12);
       poseRing(view);
       if (view.pulseT != null && view.pulseRing) {
@@ -2090,14 +2296,36 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           view.pulseT = null;
         }
       }
-      for (const building of view.buildings) {
-        const target = building.item.id === hoverItem ? 1.14 : (building.item.id === hotItem ? 1.12 : 1);
-        const next = THREE.MathUtils.damp(building.group.scale.x, target, 16, step);
-        if (Math.abs(next - building.group.scale.x) > 0.0001) {
-          building.group.scale.setScalar(next);
+      view.buildings.forEach((building, index) => {
+        const bStart = landStart + 680 + index * 40;
+        let presence;
+        if (!reduced && (!introAt || clock < bStart)) {
+          building.shown = 0;
+          presence = 0;
+        } else if (!reduced && clock < bStart + 380) {
+          const u = (clock - bStart) / 380;
+          building.shown = building.show > 0 ? Math.min(1, u) : 0;
+          presence = building.show > 0 ? Math.max(0, easeOutBack(u, 2)) : 0;
+        } else {
+          building.shown = damp(building.shown, building.show, step, 14);
+          presence = building.shown <= 0.001 ? 0 : easeOutBack(Math.min(1, Math.max(0, building.shown)));
+        }
+        const springTarget = building.item.id === hoverItem || building.item.id === hotItem ? 1.15 : 1;
+        building.sv += (springTarget - building.spring) * 220 * step;
+        building.sv *= Math.exp(-18 * step);
+        building.spring += building.sv * step;
+        if (Math.abs(building.spring - springTarget) < 0.0004 && Math.abs(building.sv) < 0.0008) {
+          building.spring = springTarget;
+          building.sv = 0;
+        } else islandBusy = true;
+        const scale = Math.max(0, presence * building.spring);
+        if (Math.abs(building.group.scale.x - scale) > 0.0001) {
+          building.group.scale.setScalar(scale);
           islandBusy = true;
         }
-      }
+        const visible = scale >= 0.01;
+        if (building.group.visible !== visible) building.group.visible = visible;
+      });
     }
     const riseU = waterMat.uniforms.isleRise.value;
     let riseI = 0;
@@ -2109,37 +2337,56 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (!frozen) environment.update(step);
     if (!frozen) stepThreats(step);
     if (!frozen && !reduced) stepIsleBits(step);
-    if (personFocus >= 0) {
+    if (personFocus >= 0 && !flight) {
       const at = people.spot(personFocus);
       if (at) goalTarget.set(at.x, at.y + 0.35, at.z);
     }
-    const phiGoal = bird ? 0.58 : userPhi;
-    const easeSpeed = rush > 0 ? 8 : (reduced ? 28 : 3.4);
-    if (rush > 0) rush = Math.max(0, rush - step);
-    const k = 1 - Math.exp(-step * easeSpeed);
-    const dTheta = wrapAngle(goal.theta - cam.theta);
-    const dPhi = phiGoal - cam.phi;
-    const dRadius = goal.radius - cam.radius;
-    const dTarget = cam.target.distanceTo(goalTarget);
-    if (pointers.size) {
+    if (flight) stepFlight();
+    else if (coasting && pointers.size === 0) {
+      goal.theta += orbitVel.theta * step;
+      userPhi = THREE.MathUtils.clamp(userPhi + orbitVel.phi * step, 0.32, 1.22);
+      const decay = Math.exp(-step * 4.5);
+      orbitVel.theta *= decay;
+      orbitVel.phi *= decay;
+      if (Math.abs(orbitVel.theta) < 0.001 && Math.abs(orbitVel.phi) < 0.001) {
+        orbitVel.theta = 0;
+        orbitVel.phi = 0;
+        coasting = false;
+      }
       cam.theta = goal.theta;
-      cam.phi = phiGoal;
+      cam.phi = userPhi;
       cam.radius = goal.radius;
       cam.target.copy(goalTarget);
-    } else if (Math.abs(dTheta) < 1e-4 && Math.abs(dPhi) < 1e-4 && Math.abs(dRadius) < 1e-3 && dTarget < 1e-3) {
+    } else if (pointers.size || !zoomed) {
+      const phiGoal = bird ? 0.58 : userPhi;
       cam.theta = goal.theta;
       cam.phi = phiGoal;
       cam.radius = goal.radius;
       cam.target.copy(goalTarget);
     } else {
-      cam.theta += dTheta * k;
-      cam.phi += dPhi * k;
-      cam.radius += dRadius * k;
-      cam.target.lerp(goalTarget, k);
+      const phiGoal = bird ? 0.58 : userPhi;
+      const easeSpeed = rush > 0 ? 8 : (reduced ? 28 : 3.4);
+      if (rush > 0) rush = Math.max(0, rush - step);
+      const k = 1 - Math.exp(-step * easeSpeed);
+      const dTheta = wrapAngle(goal.theta - cam.theta);
+      const dPhi = phiGoal - cam.phi;
+      const dRadius = goal.radius - cam.radius;
+      const dTarget = cam.target.distanceTo(goalTarget);
+      if (Math.abs(dTheta) < 1e-4 && Math.abs(dPhi) < 1e-4 && Math.abs(dRadius) < 1e-3 && dTarget < 1e-3) {
+        cam.theta = goal.theta;
+        cam.phi = phiGoal;
+        cam.radius = goal.radius;
+        cam.target.copy(goalTarget);
+      } else {
+        cam.theta += dTheta * k;
+        cam.phi += dPhi * k;
+        cam.radius += dRadius * k;
+        cam.target.lerp(goalTarget, k);
+      }
     }
     placeCamera();
     scene.fog.density = 0.32 / cam.radius;
-    people.update(step, { frozen, reduced, cargoOn, camera });
+    people.update(step, { frozen: frozen || !actorsLive(), reduced, cargoOn, camera, present: actorsLive() });
     const bubbleSize = viewSize();
     people.placeBubbles(camera, bubbleSize.W, bubbleSize.H);
     if (!frozen) {
@@ -2237,6 +2484,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
     }
     placeItemTip();
+    const introLive = !reduced && (!introAt || performance.now() - introAt < 2700);
     const moving = Math.abs(wrapAngle(goal.theta - cam.theta)) > 0.002
       || Math.abs((bird ? 0.58 : userPhi) - cam.phi) > 0.002
       || Math.abs(goal.radius - cam.radius) > 0.03
@@ -2245,7 +2493,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       || shakeLeft > 0
       || sparkLife > 0
       || isleLife > 0
-      || islandBusy;
+      || islandBusy
+      || coasting
+      || Boolean(flight)
+      || introLive;
     if (moving) holdRender = 0.3;
     if (minutes !== paintedMinutes) {
       applyClock();
@@ -2519,8 +2770,15 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   canvas.addEventListener("pointerdown", (event) => {
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, d: 0 });
+    cancelFlight();
+    stopCoast();
+    goal.theta = cam.theta;
+    goal.radius = cam.radius;
+    userPhi = cam.phi;
+    goalTarget.copy(cam.target);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, d: 0, t: performance.now() });
     dragged = 0;
+    if (pointers.size >= 2) pinchGesture = true;
     canvas.setPointerCapture(event.pointerId);
     canvas.style.cursor = "grabbing";
   });
@@ -2530,6 +2788,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       hoverSample = { clientX: event.clientX, clientY: event.clientY };
       return;
     }
+    const now = performance.now();
+    const dt = Math.max(1 / 120, (now - (prev.t || now)) / 1000);
+    prev.t = now;
     const dx = event.clientX - prev.x;
     const dy = event.clientY - prev.y;
     prev.x = event.clientX;
@@ -2537,27 +2798,46 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     prev.d += Math.abs(dx) + Math.abs(dy);
     dragged += Math.abs(dx) + Math.abs(dy);
     if (pointers.size >= 2) {
+      pinchGesture = true;
+      orbitVel.theta = 0;
+      orbitVel.phi = 0;
       const pts = [...pointers.values()];
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       if (prev.pinch) {
-        goal.radius = THREE.MathUtils.clamp(goal.radius * (prev.pinch / dist), 8, maxR);
+        goal.radius = THREE.MathUtils.clamp(cam.radius * (prev.pinch / dist), 8, maxR);
+        cam.radius = goal.radius;
         zoomed = true;
       }
       for (const item of pointers.values()) item.pinch = dist;
       return;
     }
-    goal.theta -= dx * 0.0052;
-    userPhi = THREE.MathUtils.clamp(userPhi - dy * 0.0036, 0.32, 1.22);
+    const dTheta = -dx * 0.0052;
+    const dPhi = -dy * 0.0036;
+    goal.theta += dTheta;
+    userPhi = THREE.MathUtils.clamp(userPhi + dPhi, 0.32, 1.22);
+    orbitVel.theta = dTheta / dt;
+    orbitVel.phi = dPhi / dt;
     if (bird) bird = false;
   });
   function endPointer(event) {
     const prev = pointers.get(event.pointerId);
     pointers.delete(event.pointerId);
     if (!prev || pointers.size) return;
+    const pinching = pinchGesture;
+    pinchGesture = false;
     if (dragged > 6) {
+      coasting = !pinching;
+      if (pinching) {
+        orbitVel.theta = 0;
+        orbitVel.phi = 0;
+        coasting = false;
+      }
       canvas.style.cursor = hoverId ? "pointer" : "grab";
       return;
     }
+    orbitVel.theta = 0;
+    orbitVel.phi = 0;
+    coasting = false;
     let hit = pickHit(event);
     if (event.pointerType === "touch" && hit?.kind !== "person" && hit?.kind !== "threat") {
       // The number sits above the mesh, so a ray through the badge often
@@ -2577,8 +2857,13 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   canvas.addEventListener("pointercancel", endPointer);
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
-    goal.radius = THREE.MathUtils.clamp(goal.radius * Math.exp(event.deltaY * 0.0011), 8, maxR);
+    cancelFlight();
+    stopCoast();
     zoomed = true;
+    goal.theta = cam.theta;
+    userPhi = cam.phi;
+    goalTarget.copy(cam.target);
+    goal.radius = THREE.MathUtils.clamp(cam.radius * Math.exp(event.deltaY * 0.0011), 8, maxR);
   }, { passive: false });
 
   // Orbit theta places the camera at (sin θ, cos θ). θ = yaw sits directly behind
@@ -2599,16 +2884,33 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     people.setSelected(index);
     zoomed = true;
     bird = false;
-    rush = 1.2;
-    goalTarget.set(at.x, at.y + 0.35, at.z);
-    goal.theta = personTheta(at.yaw);
-    goal.radius = 4;
-    userPhi = 0.9;
+    stopCoast();
+    const target = new THREE.Vector3(at.x, at.y + 0.35, at.z);
+    const endTheta = personTheta(at.yaw);
+    const endPhi = 0.9;
+    const endRadius = 4;
+    const dist = cam.target.distanceTo(target) + Math.abs(cam.radius - endRadius) * 0.25;
+    goalTarget.copy(target);
+    goal.theta = endTheta;
+    goal.radius = endRadius;
+    userPhi = endPhi;
+    beginFlight({
+      theta: endTheta,
+      phi: endPhi,
+      radius: endRadius,
+      target,
+    }, {
+      duration: THREE.MathUtils.clamp(dist * 90, 700, 1400),
+      distance: dist,
+      arc: true,
+      person: true,
+    });
   }
 
   function focusIslands(ids) {
     selected = new Set(ids);
     personFocus = -1;
+    stopCoast();
     refresh();
     zoomed = false;
     if (!ids.length) {
@@ -2640,7 +2942,36 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     goalTarget.copy(center);
     applyFit();
+    const dist = cam.target.distanceTo(center);
+    beginFlight({
+      theta: cam.theta,
+      phi: bird ? 0.58 : 0.9,
+      radius: goal.radius,
+      target: center.clone(),
+    }, {
+      duration: THREE.MathUtils.clamp(dist * 90, 700, 1400),
+      distance: dist,
+      arc: true,
+      trackFit: true,
+    });
     if (ids.length === 1) pulse(ids[0]);
+  }
+
+  function playIntro() {
+    if (reduced || introAt) {
+      holdRender = Math.max(holdRender, 0.2);
+      return;
+    }
+    introAt = performance.now();
+    if (!flight) {
+      beginFlight({
+        theta: 0.18,
+        phi: 1.02,
+        radius: overviewRadius,
+        target: overviewTarget.clone(),
+      }, { duration: 2200, distance: 0, arc: false, intro: true });
+    }
+    holdRender = Math.max(holdRender, 2.8);
   }
 
   function trimTip(text) {
@@ -2741,6 +3072,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     camera,
     clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
   });
+  if (!reduced) {
+    for (const view of views.values()) {
+      for (const rec of view.treeRecs) rec.scaleMul = 0;
+    }
+  }
   kit.build(scene);
   scene.traverse((obj) => {
     const mat = obj.material;
@@ -2753,6 +3089,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   applyClock();
   paintedMinutes = minutes;
   resize();
+  if (!reduced) {
+    cam.theta = 0.18 + 0.7;
+    cam.phi = 0.62;
+    cam.radius = overviewRadius + 14;
+    goal.theta = cam.theta;
+    goal.radius = cam.radius;
+    userPhi = cam.phi;
+  }
   placeCamera();
   if (import.meta.env.DEV) {
     window.__island = Object.assign(window.__island ?? {}, {
@@ -2875,6 +3219,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           opacity: threat.mats[0]?.opacity ?? 1,
         })),
       }),
+      camProbe: () => ({
+        theta: cam.theta,
+        phi: cam.phi,
+        radius: cam.radius,
+        tx: cam.target.x,
+        ty: cam.target.y,
+        tz: cam.target.z,
+        flight: Boolean(flight),
+        intro: Boolean(flight?.intro),
+        coast: coasting,
+        vel: Math.hypot(orbitVel.theta, orbitVel.phi),
+        introMs: introAt ? performance.now() - introAt : -1,
+        zoomed,
+      }),
       islandProbe: (id) => {
         const view = views.get(id);
         if (!view) return null;
@@ -2886,6 +3244,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           y: (-projected.y * 0.5 + 0.5) * H,
           lift: view.group.position.y,
           scale: view.group.scale.x,
+          pinHold: view.pinEl.classList.contains("hold"),
+          pop: view.pinEl.querySelector("b")?.classList.contains("pop") || false,
+          fade: view.fade,
+          tree: view.treeRecs[0]?.scaleMul ?? 1,
+          introIndex: view.introIndex,
           ring: view.ring.visible,
           ringOpacity: view.ring.material.opacity,
           top: view.landMat.color.getHexString(),
@@ -2954,6 +3317,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     markFlow(id) { if (id) markCb(id); },
     onMarkFlow(fn) { markCb = fn; },
     overview() { focusIslands([]); },
+    playIntro,
     setShowAllFlows(value) { showAllFlows = value; refresh(); },
     setFreeze(value) { frozen = value; },
     setBird(value) {
@@ -3167,8 +3531,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         return angles;
       }
       const sample = views.get("amr");
-      const coastA = rimAngles(sample.coast, MESH_R * 0.97);
-      const ringA = rimAngles(sample.ring, MESH_R * 1.02);
+      const rimScale = Math.max(0.2, sample.group.scale.x);
+      const coastA = rimAngles(sample.coast, MESH_R * 0.97 * rimScale);
+      const ringA = rimAngles(sample.ring, MESH_R * 1.02 * rimScale);
       if (coastA.length !== 6 || ringA.length !== 6) errors.push(`hex rim count coast ${coastA.length} ring ${ringA.length}`);
       else {
         for (const a of coastA) {

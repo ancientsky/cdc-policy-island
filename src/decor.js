@@ -772,7 +772,9 @@ export function addIslandDecor(group, island, kit, lamps, placed, houseSpots) {
   const treeWant = 4 + Math.floor(treeRng() * 3);
   const palmIsland = island.id === "dengue" || island.id === "hepa";
   const forms = new Set();
+  const treeRecs = group.userData.treeRecs || (group.userData.treeRecs = []);
   let trees = 0;
+  let treeSlot = 0;
   let treeTries = 0;
   while (trees < treeWant && treeTries < 80) {
     treeTries += 1;
@@ -787,7 +789,15 @@ export function addIslandDecor(group, island, kit, lamps, placed, houseSpots) {
     let form = treeRng() < 0.5 ? "pine" : "round";
     if (palmIsland && (trees === 0 || treeRng() < 0.45)) form = "palm";
     occ.add(x, z, 0.22);
-    placeTree(put, form, x, z, scale, ry);
+    const slot = treeSlot;
+    treeSlot += 1;
+    const mark = (spec) => {
+      const rec = put(spec);
+      rec.treeSlot = slot;
+      treeRecs.push(rec);
+      return rec;
+    };
+    placeTree(mark, form, x, z, scale, ry);
     forms.add(form);
     trees += 1;
   }

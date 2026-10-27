@@ -132,6 +132,7 @@ export function createKit() {
       rz: opts.rz || 0,
       color: new Color(opts.color || trim),
       glowAmount: glow ? 1 : 0,
+      scaleMul: 1,
       alive: opts.alive || null,
       mesh: null,
       index: -1,
@@ -220,19 +221,30 @@ export function createKit() {
         cache.set(src);
         ud._kitGen += 1;
       }
-      if (!moved && !bucket.dirty) continue;
+      let mulDrift = false;
+      if (!moved && !bucket.dirty) {
+        for (const rec of bucket.records) {
+          if ((rec.scaleMul ?? 1) !== rec._mul) {
+            mulDrift = true;
+            break;
+          }
+        }
+        if (!mulDrift) continue;
+      }
       const stamp = ud._kitGen;
       for (const rec of bucket.records) {
         const show = rec.alive ? rec.alive() : true;
         const glowNow = show ? rec.glowAmount : 0;
-        if (rec._gen === stamp && rec._show === show && rec._glow === glowNow) continue;
-        const pose = rec._gen !== stamp || rec._wrote !== true;
+        const mul = rec.scaleMul ?? 1;
+        if (rec._gen === stamp && rec._show === show && rec._glow === glowNow && rec._mul === mul) continue;
+        const pose = rec._gen !== stamp || rec._wrote !== true || rec._mul !== mul;
         const showChanged = rec._show !== show;
         rec._gen = stamp;
         rec._show = show;
         rec._glow = glowNow;
+        rec._mul = mul;
         if (pose || showChanged) {
-          const s = show ? 1 : 0;
+          const s = show ? mul : 0;
           writeLocal(rec.x, rec.y, rec.z, rec.rx, rec.ry, rec.rz, rec.sx * s, rec.sy * s, rec.sz * s);
           writeWorld(rec.parent);
           rec.mesh.setMatrixAt(rec.index, world);

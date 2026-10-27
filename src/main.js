@@ -50,6 +50,7 @@ function fallbackScene() {
     threatInfo: () => null,
     markFlow: noop,
     onMarkFlow: noop,
+    playIntro: noop,
     getTheta: () => 0,
     setSafeRect: noop,
     relabel: noop,
@@ -156,6 +157,37 @@ function failWebgl(error) {
   writeDiag();
 }
 
+function revealVeil() {
+  const startIntro = () => {
+    if (veil?.isConnected) veil.remove();
+    impl.playIntro();
+  };
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!veil) {
+        impl.playIntro();
+        return;
+      }
+      if (reduced) {
+        startIntro();
+        return;
+      }
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        startIntro();
+      };
+      veil.addEventListener("transitionend", (event) => {
+        if (event.target !== veil || event.propertyName !== "opacity") return;
+        finish();
+      });
+      veil.classList.add("out");
+      setTimeout(finish, 900);
+    });
+  });
+}
+
 async function bootScene() {
   try {
     const { createScene } = await import("./scene.js");
@@ -165,7 +197,7 @@ async function bootScene() {
     for (const [name, args] of queued.splice(0)) impl[name](...args);
     ready = true;
     impl.resize();
-    setTimeout(() => veil?.remove(), reduced ? 0 : 900);
+    revealVeil();
     setTimeout(writeDiag, 1800);
   } catch (error) {
     failWebgl(error);

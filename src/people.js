@@ -678,14 +678,15 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
     ring.position.set(person._feetX, person._feetY + 0.04, person._feetZ);
   }
 
-  function update(step, { frozen, reduced, cargoOn, camera: cam }) {
+  function update(step, { frozen, reduced, cargoOn, camera: cam, present = true }) {
     const hold = Boolean(frozen || reduced);
     if (!hold) clock += step;
     for (const person of list) {
       if (person.kind === "flow") {
-        person.shown = Boolean(cargoOn);
+        person.shown = Boolean(present && cargoOn);
         if (person.shown && !hold) advance(person, step);
       } else if (person.kind === "crew") syncCrew(person);
+      else person.shown = Boolean(present);
       writePerson(person, cam, hold);
     }
     for (const mesh of Object.values(channels)) mesh.instanceMatrix.needsUpdate = true;
