@@ -43,6 +43,7 @@ function fallbackScene() {
     onArrive: noop,
     onStrike: noop,
     onRepel: noop,
+    celebrate: (_list, done) => { if (typeof done === "function") done(); },
     focusPerson: noop,
     clearPersonFocus: noop,
     personInfo: () => null,

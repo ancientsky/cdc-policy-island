@@ -7,7 +7,8 @@ import { t } from "./i18n.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createKit } from "./kit.js";
 import * as P from "./palette.js";
-import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, resetDecor } from "./decor.js";
+import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, resetDecor, seaState } from "./decor.js";
+import { createLife } from "./life.js";
 import { createEnvironment } from "./environment.js";
 import { createPeople } from "./people.js";
 import { Line2 } from "three/addons/lines/Line2.js";
@@ -491,7 +492,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const pickables = [];
   const views = new Map();
   const lamps = [];
-  const kit = createKit();
+  const motion = {
+    uTime: waterMat.uniforms.uTime,
+    uAmp: { value: reduced ? 0 : 1 },
+    crowned: false,
+    flagged: false,
+  };
+  const kit = createKit(motion);
+  const life = createLife(scene, { motion, reduced });
   kit.geo("box", box);
   kit.geo("cyl", unitCyl);
   kit.geo("cone", unitCone);
@@ -518,6 +526,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   kit.geo("pine", new THREE.ConeGeometry(0.5, 1, 6));
   kit.geo("round", new THREE.IcosahedronGeometry(0.17, 0));
   kit.geo("frond", new THREE.ConeGeometry(0.05, 0.28, 3));
+  kit.geo("flag", new THREE.PlaneGeometry(0.18, 0.1, 8, 1));
   const pathGeo = new THREE.PlaneGeometry(1, 1);
   pathGeo.rotateX(-Math.PI / 2);
   kit.geo("path", pathGeo);
@@ -682,6 +691,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
     const pinEl = document.createElement("div");
     pinEl.className = reduced ? "pin" : "pin hold";
+    pinEl.dataset.island = island.id;
     pinEl.innerHTML = `<button type="button"><b>${island.no}</b></button><em></em>`;
     const pinButton = pinEl.querySelector("button");
     const pinBadge = pinButton.querySelector("b");
@@ -731,7 +741,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       return house(group, item, sx, sz, index, island);
     });
 
-    addKit(group, island, lamps, kit);
+    addKit(group, island, lamps, kit, life);
     addIslandDecor(group, island, kit, lamps, placed, spots.slice(0, island.items.length));
     group.traverse((child) => {
       if (!child.isMesh) return;
@@ -1558,6 +1568,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const goalTarget = overviewTarget.clone();
   let flight = null;
   let coasting = false;
+  let lastInput = performance.now();
+  let celebrateCb = null;
+  let ribbon = null;
+  const ribbonDummy = new THREE.Object3D();
+  function noteInput() { lastInput = performance.now(); }
   let pinchGesture = false;
   const orbitVel = { theta: 0, phi: 0 };
 
@@ -1636,13 +1651,26 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     };
   }
 
+  function finishCelebrate() {
+    const cb = celebrateCb;
+    celebrateCb = null;
+    if (typeof cb === "function") cb();
+  }
+
   function cancelFlight() {
     if (!flight) return;
+    const celebrate = Boolean(flight.celebrate);
     flight = null;
     goal.theta = cam.theta;
     goal.radius = cam.radius;
     userPhi = cam.phi;
     goalTarget.copy(cam.target);
+    if (celebrate) finishCelebrate();
+  }
+
+  function easeInOutSine(t) {
+    const x = t < 0 ? 0 : t > 1 ? 1 : t;
+    return -(Math.cos(Math.PI * x) - 1) / 2;
   }
 
   function stepFlight() {
@@ -1659,24 +1687,27 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     const raw = (performance.now() - flight.t0) / Math.max(1, flight.dur);
     const done = raw >= 1;
-    const e = done ? 1 : easeInOutCubic(raw);
+    const e = done ? 1 : (flight.ease === "sine" ? easeInOutSine(raw) : easeInOutCubic(raw));
+    const delta = flight.spin ? flight.to.theta - flight.from.theta : wrapAngle(flight.to.theta - flight.from.theta);
     const arc = !done && flight.arc ? Math.sin(Math.PI * e) * Math.min(6, flight.distance * 0.4) : 0;
-    cam.theta = flight.from.theta + wrapAngle(flight.to.theta - flight.from.theta) * e;
+    cam.theta = flight.from.theta + delta * e;
     cam.phi = THREE.MathUtils.clamp(flight.from.phi + (flight.to.phi - flight.from.phi) * e, 0.32, 1.22);
     cam.radius = flight.from.radius + (flight.to.radius - flight.from.radius) * e + arc;
     cam.target.lerpVectors(flight.from.target, flight.to.target, e);
     goal.theta = cam.theta;
     userPhi = cam.phi;
     if (!done) return;
+    const celebrate = Boolean(flight.celebrate);
     cam.radius = flight.to.radius;
     cam.phi = THREE.MathUtils.clamp(flight.to.phi, 0.32, 1.22);
-    cam.theta = flight.from.theta + wrapAngle(flight.to.theta - flight.from.theta);
+    cam.theta = flight.from.theta + delta;
     cam.target.copy(flight.to.target);
     goal.theta = cam.theta;
     goal.radius = cam.radius;
     userPhi = cam.phi;
     goalTarget.copy(cam.target);
     flight = null;
+    if (celebrate) finishCelebrate();
   }
 
   function frameWide() {
@@ -2334,7 +2365,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       riseI += 1;
     }
     if (!frozen && !reduced) waterMat.uniforms.uTime.value = elapsed;
-    if (!frozen) environment.update(step);
+    if (!frozen) environment.update(step, { hold: reduced });
+    life.step(step, { live: !reduced && !frozen, night: lookAtHour(minutes / 60).night });
+    stepRibbons();
+    const idleFor = (performance.now() - lastInput) / 1000;
+    const orbitQuiet = pointers.size === 0 && selected.size === 0 && personFocus < 0 && !flight && !coasting;
+    if (!reduced && !frozen && orbitQuiet && idleFor >= 6) goal.theta += step * 0.025;
     if (!frozen) stepThreats(step);
     if (!frozen && !reduced) stepIsleBits(step);
     if (personFocus >= 0 && !flight) {
@@ -2496,6 +2532,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       || islandBusy
       || coasting
       || Boolean(flight)
+      || Boolean(ribbon)
       || introLive;
     if (moving) holdRender = 0.3;
     if (minutes !== paintedMinutes) {
@@ -2770,6 +2807,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   canvas.addEventListener("pointerdown", (event) => {
+    noteInput();
     cancelFlight();
     stopCoast();
     goal.theta = cam.theta;
@@ -2820,6 +2858,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (bird) bird = false;
   });
   function endPointer(event) {
+    noteInput();
     const prev = pointers.get(event.pointerId);
     pointers.delete(event.pointerId);
     if (!prev || pointers.size) return;
@@ -2857,6 +2896,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   canvas.addEventListener("pointercancel", endPointer);
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
+    noteInput();
     cancelFlight();
     stopCoast();
     zoomed = true;
@@ -2878,6 +2918,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function focusPerson(index) {
+    noteInput();
     const at = people.spot(index);
     if (!at) return;
     personFocus = index;
@@ -2908,6 +2949,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function focusIslands(ids) {
+    noteInput();
     selected = new Set(ids);
     personFocus = -1;
     stopCoast();
@@ -3067,10 +3109,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   addSeaDecor(scene, kit, placed, lamps);
+  const sea = seaState();
+  life.mount(sea.boatGroups, [
+    ...placed.map((point) => ({ x: point.x, z: point.z, r: MESH_R + 1.15 })),
+    ...sea.islets.map((spot) => ({ x: spot.x, z: spot.z, r: 1.35 })),
+  ]);
   const environment = createEnvironment(THREE, scene, {
     quality: narrowScreen() ? "mid" : "high",
     camera,
     clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
+    motion,
   });
   if (!reduced) {
     for (const view of views.values()) {
@@ -3228,11 +3276,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         tz: cam.target.z,
         flight: Boolean(flight),
         intro: Boolean(flight?.intro),
+        celebrate: Boolean(flight?.celebrate),
         coast: coasting,
         vel: Math.hypot(orbitVel.theta, orbitVel.phi),
         introMs: introAt ? performance.now() - introAt : -1,
         zoomed,
+        idle: (performance.now() - lastInput) / 1000,
       }),
+      lifeProbe: () => ({ ...life.probe(), clouds: environment.cloudSample() }),
       islandProbe: (id) => {
         const view = views.get(id);
         if (!view) return null;
@@ -3272,6 +3323,107 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         };
       },
     });
+  }
+
+  function clearRibbon() {
+    if (!ribbon) return;
+    ribbon.mesh.removeFromParent();
+    ribbon.mesh.geometry.dispose();
+    ribbon.mesh.material.dispose();
+    ribbon = null;
+  }
+
+  function armRibbons(list) {
+    clearRibbon();
+    if (!list?.length) return;
+    const count = list.length * 24;
+    const geo = new THREE.PlaneGeometry(0.06, 0.22);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const mesh = new THREE.InstancedMesh(geo, mat, count);
+    mesh.frustumCulled = false;
+    mesh.raycast = () => {};
+    mesh.count = count;
+    ribbonDummy.position.set(0, -20, 0);
+    ribbonDummy.scale.setScalar(0);
+    ribbonDummy.updateMatrix();
+    const plan = list.map((island, index) => {
+      const view = views.get(island.id);
+      const at = view ? view.base : new THREE.Vector3();
+      const color = new THREE.Color(island.accent);
+      for (let i = 0; i < 24; i++) mesh.setColorAt(index * 24 + i, color);
+      mesh.setMatrixAt(index * 24, ribbonDummy.matrix);
+      return { delay: index * 0.08, x: at.x, y: 0.55, z: at.z };
+    });
+    for (let i = 0; i < count; i++) mesh.setMatrixAt(i, ribbonDummy.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    scene.add(mesh);
+    ribbon = { mesh, t0: performance.now(), plan };
+  }
+
+  function stepRibbons() {
+    if (!ribbon) return;
+    const t = (performance.now() - ribbon.t0) / 1000;
+    const { mesh, plan } = ribbon;
+    let alive = 0;
+    for (let n = 0; n < plan.length; n++) {
+      const row = plan[n];
+      for (let i = 0; i < 24; i++) {
+        const age = t - row.delay - i * 0.012;
+        const idx = n * 24 + i;
+        if (age <= 0 || age > 1.6) {
+          ribbonDummy.position.set(0, -20, 0);
+          ribbonDummy.scale.setScalar(0);
+        } else {
+          alive += 1;
+          const ang = (i / 24) * Math.PI * 2 + n * 0.4;
+          const rad = 0.12 + age * (0.5 + (i % 4) * 0.06);
+          const y = row.y + age * 1.35 - age * age * 0.42;
+          ribbonDummy.position.set(row.x + Math.cos(ang) * rad, y, row.z + Math.sin(ang) * rad);
+          ribbonDummy.rotation.set(0.2, ang, age * 3);
+          const s = Math.max(0.05, 1 - age / 1.6);
+          ribbonDummy.scale.set(0.85, s, 0.85);
+        }
+        ribbonDummy.updateMatrix();
+        mesh.setMatrixAt(idx, ribbonDummy.matrix);
+      }
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (alive === 0 && t > plan.length * 0.08 + 1.7) clearRibbon();
+  }
+
+  function celebrate(list, done) {
+    celebrateCb = typeof done === "function" ? done : null;
+    if (reduced) {
+      finishCelebrate();
+      return;
+    }
+    noteInput();
+    bird = false;
+    selected.clear();
+    personFocus = -1;
+    people.setSelected(-1);
+    focusHalf = null;
+    zoomed = false;
+    stopCoast();
+    goalTarget.copy(overviewTarget);
+    applyFit();
+    beginFlight({
+      theta: cam.theta + Math.PI * 2,
+      phi: 1.02,
+      radius: overviewRadius,
+      target: overviewTarget.clone(),
+    }, { duration: 6000, distance: 0, arc: false });
+    flight.spin = true;
+    flight.ease = "sine";
+    flight.celebrate = true;
+    armRibbons(list);
   }
 
   return {
@@ -3321,6 +3473,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     setShowAllFlows(value) { showAllFlows = value; refresh(); },
     setFreeze(value) { frozen = value; },
     setBird(value) {
+      noteInput();
       bird = value;
       if (value) {
         frameWide();
@@ -3337,6 +3490,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     onArrive(fn) { arriveCb = fn; },
     onStrike(fn) { strikeCb = fn; },
     onRepel(fn) { repelCb = fn; },
+    celebrate,
     getTheta() { return cam.theta; },
     debugState() {
       const hour = minutes / 60;
@@ -3585,7 +3739,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   };
 }
 
-function addKit(group, island, lamps, kit) {
+function addKit(group, island, lamps, kit, life) {
   const alive = () => group.userData.lit !== false;
   const put = (kind, color, x, y, z, sx, sy, sz, rot = null, glow = false) => {
     const rec = kit.part({
@@ -3607,24 +3761,46 @@ function addKit(group, island, lamps, kit) {
     if (glow) lamps.push(rec);
     return rec;
   };
+  function putFlag(x, y, z) {
+    kit.part({
+      kind: "flag",
+      parent: group,
+      x: x + 0.09,
+      y,
+      z,
+      color: P.cloth,
+      alive,
+    });
+  }
   if (island.kit === "port") {
     put("box", P.c8d6244, 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
     put("cyl", P.cf7f4ee, 0.02, 0.7, -MESH_R - 0.15, 0.22, 0.72, 0.22);
     const beacon = put("sphere", P.cffe1a8, 0.02, 1.12, -MESH_R - 0.15, 0.15, 0.15, 0.15, null, true);
     beacon.role = "lighthouse";
+    life.addBeam(group, 0.02, 1.12, -MESH_R - 0.15);
     put("box", P.cc4473a, 0.42, 0.66, -0.2, 0.28, 0.22, 0.22);
     put("box", P.c2f6f9e, -0.4, 0.64, -0.05, 0.26, 0.2, 0.24);
+    put("cyl", P.board, 0.72, 0.58, -0.55, 0.025, 0.64, 0.025);
+    putFlag(0.72, 0.92, -0.55);
   } else if (island.kit === "tower") {
     put("box", P.cf7f4ee, 0, 0.95, -0.2, 0.26, 0.9, 0.26);
     put("torus", P.cd9e2e4, 0, 1.5, -0.2, 0.32, 0.32, 0.32, { x: Math.PI / 2.4 });
   } else if (island.kit === "lab") {
     put("box", P.cf7f4ee, 0, 0.78, -0.25, 0.72, 0.5, 0.42);
     put("box", P.cb7e0e4, 0, 0.86, -0.02, 0.5, 0.22, 0.04, null, true);
+    put("box", P.chimneyClay, 0.22, 1.12, -0.36, 0.05, 0.14, 0.05);
+    life.addChimney(group, 0.22, 1.2, -0.36);
+    put("cyl", P.board, -0.2, 1.2, -0.36, 0.02, 0.28, 0.02);
+    putFlag(-0.2, 1.36, -0.36);
   } else if (island.kit === "clinic" || island.kit === "hospital") {
     const tall = island.kit === "hospital" ? 0.72 : 0.48;
     put("box", P.cf7f4ee, 0, 0.52 + tall / 2, -0.28, 0.55, tall, 0.4);
     put("box", P.cd4544a, 0, 0.52 + tall * 0.72, -0.06, 0.06, 0.22, 0.04);
     put("box", P.cd4544a, 0, 0.52 + tall * 0.72, -0.06, 0.2, 0.06, 0.04);
+    if (island.kit === "hospital") {
+      put("box", P.chimneyClay, 0.16, 1.34, -0.4, 0.05, 0.14, 0.05);
+      life.addChimney(group, 0.16, 1.42, -0.4);
+    }
   } else if (island.kit === "warehouse") {
     put("box", P.cd7c7a2, 0, 0.74, -0.2, 0.9, 0.4, 0.46);
     put("box", P.cb98348, 0.55, 0.64, 0.15, 0.2, 0.16, 0.2);
@@ -3632,7 +3808,7 @@ function addKit(group, island, lamps, kit) {
   } else if (island.kit === "school") {
     put("box", P.cf3efe2, 0, 0.7, -0.3, 0.8, 0.36, 0.4);
     put("cyl", P.c5c6670, 0.55, 0.8, 0.15, 0.04, 0.55, 0.04);
-    put("box", P.cd4544a, 0.66, 0.98, 0.15, 0.18, 0.1, 0.02);
+    putFlag(0.55, 1.02, 0.15);
   } else if (island.kit === "rings") {
     [P.c2a9a90, P.ce0a04a, P.c6a8f4e].forEach((color, index) => {
       const scale = (0.16 + index * 0.05) / 0.5;

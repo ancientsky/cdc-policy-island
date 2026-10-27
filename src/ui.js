@@ -1,5 +1,7 @@
 import { DATA_AS_OF, dayNote, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
+import { MISSIONS } from "./missions.js";
+import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
 
 const INTRO_KEY = "cdc-policy-island-intro-v1";
 
@@ -106,6 +108,222 @@ export function mount({ scene, islands, flows }) {
   const toggleKey = { names: "toggleNames", cargo: "toggleCargo", flows: "toggleFlows", freeze: "toggleFreeze", bird: "toggleBird" };
   let introIndex = 0;
   let lastFocus = null;
+  const quiet = new URLSearchParams(location.search).has("quiet");
+  let book = loadPassport();
+  let stampFreshId = null;
+  let stampTimer = 0;
+  let flipping = false;
+  let mileTimer = 0;
+  let finaleTimer = 0;
+  const hud = document.querySelector(".hud");
+  const passportHud = document.createElement("div");
+  passportHud.className = "passport-hud";
+  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="passport-bar" id="passport-bar"></span>`;
+  hud.append(passportHud);
+  const guide = document.createElement("section");
+  guide.id = "guide";
+  guide.className = "guide";
+  guide.hidden = true;
+  guide.innerHTML = `<div class="guide-face" id="guide-face"></div><p class="guide-say" id="guide-say"></p><button type="button" class="btn btn--solid" id="guide-go"></button>`;
+  const mission = document.createElement("section");
+  mission.id = "mission";
+  mission.className = "mission";
+  mission.hidden = true;
+  mission.setAttribute("aria-live", "polite");
+  mission.innerHTML = `<div class="mission-rotator"><div class="mission-face mission-front"><b class="mission-kicker"></b><p class="mission-text"></p></div><div class="mission-face mission-back"><b class="mission-done"></b><p class="mission-next"></p></div></div>`;
+  const mile = document.createElement("p");
+  mile.id = "mile";
+  mile.className = "mile";
+  mile.hidden = true;
+  hud.append(guide, mission, mile);
+  guide.querySelector("#guide-go").addEventListener("click", () => {
+    book.welcome = Date.now();
+    savePassport(book);
+    sessionStorage.setItem(INTRO_KEY, "1");
+    guide.hidden = true;
+    paintMission();
+    paintPins();
+    advanceMissions();
+  });
+
+  function placePassport() {
+    const narrow = window.matchMedia("(max-width: 980px)").matches;
+    const head = document.querySelector(".ledger-head");
+    if (narrow && head) head.prepend(passportHud);
+    else hud.insertBefore(passportHud, hud.querySelector(".disclaimer-short") || hud.children[1] || null);
+  }
+
+  function paintPassport(pop) {
+    const view = {
+      islands: Object.keys(book.islands).length,
+      items: Object.keys(book.items).length,
+      flows: Object.keys(book.flows).length,
+    };
+    const count = passportHud.querySelector(".passport-count");
+    count.textContent = t("passportCount", { n: view.islands });
+    if (pop) {
+      count.classList.remove("pop");
+      void count.offsetWidth;
+      count.classList.add("pop");
+    }
+    passportHud.querySelector(".passport-bar").innerHTML = ordered.map((island) => (
+      book.islands[island.id] ? `<i style="background:${island.accent}"></i>` : "<i></i>"
+    )).join("");
+    stats.textContent = t("passportStats", {
+      items: view.items,
+      itemTotal: itemCount(),
+      flows: view.flows,
+      flowTotal: flows.length,
+    });
+  }
+
+  function paintPins() {
+    const current = MISSIONS.find((row) => !book.missions[row.id]);
+    const ping = Boolean(book.welcome) && current?.id === "m1";
+    for (const el of document.querySelectorAll(".pin")) {
+      el.classList.toggle("stamped", Boolean(book.islands[el.dataset.island]));
+      el.classList.toggle("ping", ping && el.dataset.island === "watch");
+    }
+  }
+
+  function paintGuideCopy() {
+    guide.querySelector("#guide-face").textContent = t("guideMark");
+    guide.querySelector("#guide-say").textContent = t("guideHello");
+    guide.querySelector("#guide-go").textContent = t("guideGo");
+    if (!mile.hidden && mile.dataset.key) mile.textContent = t(mile.dataset.key);
+  }
+
+  function showGuide() {
+    guide.hidden = false;
+    mission.hidden = true;
+    paintGuideCopy();
+    const titleCard = document.querySelector("#title-card");
+    if (titleCard) {
+      titleCard.classList.add("gone");
+      titleCard.hidden = true;
+    }
+  }
+
+  function paintMission() {
+    const current = MISSIONS.find((row) => !book.missions[row.id]);
+    const show = Boolean(book.welcome) && Boolean(current);
+    mission.hidden = !show;
+    mission.dataset.id = current ? current.id : "";
+    if (!current) return;
+    mission.querySelector(".mission-kicker").textContent = t("missionKicker");
+    mission.querySelector(".mission-text").textContent = t(current.key);
+  }
+
+  function noteMosquito(value) {
+    const q = String(value || "").toLowerCase();
+    if (q.includes("蚊子") || q.includes("mosquito") || q.includes("蚊")) state.mosquito = true;
+  }
+
+  function showMile(key) {
+    mile.dataset.key = key;
+    mile.hidden = false;
+    mile.textContent = t(key);
+    window.clearTimeout(mileTimer);
+    mileTimer = window.setTimeout(() => { mile.hidden = true; }, 2400);
+  }
+
+  function playStamp() {
+    document.dispatchEvent(new CustomEvent("cdc-cue", { detail: "stamp" }));
+  }
+
+  function cancelStamp() {
+    window.clearTimeout(stampTimer);
+    stampTimer = 0;
+  }
+
+  function ribbonList() {
+    return [...ordered].sort((a, b) => a.row - b.row || a.no.localeCompare(b.no)).map((island) => ({
+      id: island.id,
+      accent: island.accent,
+      row: island.row,
+    }));
+  }
+
+  function beginFinale() {
+    cancelStamp();
+    state.selected = null;
+    scene.setHotItem?.(null);
+    writeHash();
+    renderList();
+    renderSheet();
+    paintRail();
+    scene.celebrate(ribbonList(), showGrad);
+  }
+
+  function showGrad() {
+    mission.hidden = true;
+    modal.dataset.mode = "grad";
+    $("modal-kicker").textContent = t("guideName");
+    $("modal-title").textContent = t("gradTitle");
+    const seals = ordered.map((island) => `<i class="seal" style="--c:${island.accent}">${esc(island.pin)}</i>`).join("");
+    $("modal-body").innerHTML = `<p>${esc(t("gradBody"))}</p><div class="seals">${seals}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
+    $("modal-next").textContent = t("gradAgain");
+    $("modal-skip").hidden = false;
+    $("modal-skip").textContent = t("gradReset");
+    $("modal-dots").hidden = true;
+    placeCoach(0);
+    openModal();
+  }
+
+  function applyStamp(id) {
+    const fresh = stampIsland(book, id);
+    if (!fresh) return false;
+    stampFreshId = id;
+    paintPassport(true);
+    paintPins();
+    playStamp();
+    const seen = Object.keys(book.islands).length;
+    if (seen === 1 || seen === 7) showMile(seen === 1 ? "mile1" : "mile7");
+    if (seen === 14 && !book.done) {
+      book.done = true;
+      savePassport(book);
+      window.clearTimeout(finaleTimer);
+      finaleTimer = window.setTimeout(beginFinale, 420);
+    }
+    return true;
+  }
+
+  function armStamp(id) {
+    cancelStamp();
+    stampTimer = window.setTimeout(() => {
+      stampTimer = 0;
+      if (selectedIslandId() !== id) return;
+      if (applyStamp(id)) renderSheet();
+      advanceMissions();
+    }, 1500);
+  }
+
+  function missionUi() {
+    return { minutes: state.minutes, mosquito: Boolean(state.mosquito) };
+  }
+
+  function advanceMissions() {
+    if (flipping || !book.welcome) return;
+    const current = MISSIONS.find((row) => !book.missions[row.id]);
+    if (!current || !current.check(book, game, missionUi())) return;
+    markMission(book, current.id);
+    paintPins();
+    const next = MISSIONS.find((row) => !book.missions[row.id]);
+    flipping = true;
+    mission.hidden = false;
+    mission.querySelector(".mission-done").textContent = t("missionDone");
+    mission.querySelector(".mission-next").textContent = next ? t(next.key) : t("gradTitle");
+    mission.classList.remove("instant");
+    mission.classList.add("flip");
+    window.setTimeout(() => {
+      mission.classList.add("instant");
+      mission.classList.remove("flip");
+      paintMission();
+      paintPins();
+      flipping = false;
+      advanceMissions();
+    }, 1320);
+  }
 
   function buildFilters() {
     $("phase-buttons").innerHTML = phases.map((phase) => {
@@ -197,7 +415,9 @@ export function mount({ scene, islands, flows }) {
     for (const button of document.querySelectorAll("[data-toggle]")) button.textContent = t(toggleKey[button.dataset.toggle]);
     buildFilters();
     paintRail();
-    stats.textContent = t("stats", { islands: islands.length, items: itemCount(), flows: flows.length });
+    paintPassport(false);
+    paintGuideCopy();
+    paintMission();
     syncDrawerButton();
   }
 
@@ -231,6 +451,7 @@ export function mount({ scene, islands, flows }) {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = themeColor[theme];
     pokeCaption();
+    advanceMissions();
   }
 
   function renderList() {
@@ -374,7 +595,17 @@ export function mount({ scene, islands, flows }) {
       return `<button type="button" class="btn detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.name)}</b><small>${esc(phaseLabel[item.phase])}</small></span><em>${esc(item.text)}</em></button>`;
     }).join("");
     const links = related.map((flow) => `<button type="button" class="btn" data-flow="${flow.id}">${esc(flow.title)}</button>`).join("");
-    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2><p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
+    const fresh = stampFreshId === island.id;
+    const seal = book.islands[island.id]
+      ? `<i class="stamp${fresh ? " fresh" : ""}" style="--c:${island.accent}">${esc(t("stampLabel"))}</i>`
+      : "";
+    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2><p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
+    if (fresh) {
+      stampFreshId = null;
+      sheet.classList.remove("bump");
+      void sheet.offsetWidth;
+      sheet.classList.add("bump");
+    }
     const current = sheet.querySelector(".detail-item.on");
     current?.scrollIntoView({ block: "nearest" });
     measureSafe();
@@ -391,6 +622,8 @@ export function mount({ scene, islands, flows }) {
     renderList();
     renderSheet();
     paintRail();
+    armStamp(id);
+    advanceMissions();
   }
 
   function selectItem(islandId, itemId) {
@@ -398,13 +631,17 @@ export function mount({ scene, islands, flows }) {
     if (!island?.items.some((item) => item.id === itemId)) return;
     dismissPerson();
     closeGerm();
+    cancelStamp();
     state.selected = { type: "item", islandId, itemId };
     scene.focusIslands([islandId]);
     scene.setHotItem(itemId);
     writeHash();
+    if (stampItem(book, itemId)) paintPassport(false);
+    applyStamp(islandId);
     renderList();
     renderSheet();
     paintRail();
+    advanceMissions();
   }
 
   function selectFlow(id) {
@@ -412,18 +649,22 @@ export function mount({ scene, islands, flows }) {
     if (!flow) return;
     dismissPerson();
     closeGerm();
+    cancelStamp();
     state.selected = { type: "flow", id, flow };
     scene.focusIslands([flow.a, flow.b]);
     scene.setHotItem(null);
     writeHash();
+    if (stampFlow(book, id)) paintPassport(false);
     renderList();
     renderSheet();
     paintRail();
+    advanceMissions();
   }
 
   function clearSelection() {
     dismissPerson();
     closeGerm();
+    cancelStamp();
     state.selected = null;
     scene.overview();
     scene.setHotItem(null);
@@ -445,12 +686,13 @@ export function mount({ scene, islands, flows }) {
 
   function placeCoach(index) {
     const card = modal.querySelector(".modal-card");
-    card.classList.remove("step-1", "step-2", "step-3", "step-4", "mode-static");
+    card.classList.remove("step-1", "step-2", "step-3", "step-4", "mode-static", "mode-grad");
     document.querySelectorAll(".head.pulse").forEach((el) => el.classList.remove("pulse"));
     const mode = modal.dataset.mode;
     const dots = $("modal-dots");
-    if (mode === "help" || mode === "about") {
+    if (mode === "help" || mode === "about" || mode === "grad") {
       card.classList.add("mode-static");
+      if (mode === "grad") card.classList.add("mode-grad");
       document.body.classList.remove("intro");
       dots.hidden = true;
       measureSafe();
@@ -533,10 +775,14 @@ export function mount({ scene, islands, flows }) {
     if (modal.dataset.mode === "help") {
       $("modal-kicker").textContent = t("helpKicker");
       $("modal-title").textContent = t("helpTitle");
-      $("modal-body").textContent = t("helpBody");
+      $("modal-body").innerHTML = helpHtml();
       $("modal-next").textContent = t("gotIt");
       $("modal-skip").hidden = true;
       placeCoach(0);
+      return;
+    }
+    if (modal.dataset.mode === "grad") {
+      showGrad();
       return;
     }
     if (modal.dataset.mode === "about") {
@@ -560,10 +806,17 @@ export function mount({ scene, islands, flows }) {
     game.total += 1;
     writeGame(game);
     paintScore();
+    advanceMissions();
     counter.classList.remove("pop");
     void counter.offsetWidth;
     counter.classList.add("pop");
     showToast(info);
+  });
+  scene.onMarkFlow((id) => {
+    if (stampFlow(book, id)) {
+      paintPassport(false);
+      advanceMissions();
+    }
   });
   scene.onPick((hit) => {
     if (!hit) {
@@ -579,6 +832,12 @@ export function mount({ scene, islands, flows }) {
   });
   scene.onArrive((event) => {
     if (!event) return;
+    if (event.flow?.id && state.selected?.type === "flow" && state.selected.id === event.flow.id) {
+      if (stampFlow(book, event.flow.id)) {
+        paintPassport(false);
+        advanceMissions();
+      }
+    }
     const text = t("handoff", { from: byId.get(event.from).name, what: event.carried, to: byId.get(event.to).name });
     state.log.unshift({ time: fmt(state.minutes), text });
     if (state.log.length > 12) state.log.length = 12;
@@ -629,8 +888,10 @@ export function mount({ scene, islands, flows }) {
   }
   search.addEventListener("input", () => {
     state.query = search.value;
+    noteMosquito(search.value);
     scene.setQuery(search.value);
     renderList();
+    advanceMissions();
   });
   $("phase-buttons").addEventListener("click", (event) => {
     const button = event.target.closest("[data-phase]");
@@ -711,18 +972,35 @@ export function mount({ scene, islands, flows }) {
     pop.hidden = !pop.hidden;
     paintLangButton();
   });
+  function helpHtml() {
+    const steps = introSteps().map((step) => `<p><b>${esc(step.title)}</b><br>${esc(step.body)}</p>`).join("");
+    return `<p>${esc(t("helpBody"))}</p>${steps}`;
+  }
   $("help").addEventListener("click", () => {
     modal.dataset.mode = "help";
     $("modal-kicker").textContent = t("helpKicker");
     $("modal-title").textContent = t("helpTitle");
-    $("modal-body").textContent = t("helpBody");
+    $("modal-body").innerHTML = helpHtml();
     $("modal-next").textContent = t("gotIt");
     $("modal-skip").hidden = true;
     placeCoach(0);
     openModal();
   });
   $("about").addEventListener("click", showAbout);
-  $("modal-skip").addEventListener("click", closeModal);
+  $("modal-skip").addEventListener("click", () => {
+    if (modal.dataset.mode === "grad") {
+      if (!window.confirm(t("gradResetAsk"))) return;
+      resetPassport(book);
+      stampFreshId = null;
+      flipping = false;
+      paintPassport(true);
+      paintPins();
+      paintMission();
+      closeModal();
+      return;
+    }
+    closeModal();
+  });
   modal.querySelector(".modal-card").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && event.target.tagName !== "BUTTON") {
       event.preventDefault();
@@ -743,8 +1021,10 @@ export function mount({ scene, islands, flows }) {
     }
   });
   $("modal-next").addEventListener("click", () => {
-    if (modal.dataset.mode === "help" || modal.dataset.mode === "about") {
+    if (modal.dataset.mode === "help" || modal.dataset.mode === "about" || modal.dataset.mode === "grad") {
+      const grad = modal.dataset.mode === "grad";
       closeModal();
+      if (grad) paintMission();
       return;
     }
     if (introIndex >= introSteps().length - 1) closeModal();
@@ -807,6 +1087,9 @@ export function mount({ scene, islands, flows }) {
       const nodes = [
         document.querySelector(".brand"),
         document.querySelector("#disclaimer-short"),
+        document.querySelector(".passport-hud"),
+        document.querySelector("#guide"),
+        document.querySelector("#mission"),
         document.querySelector(".rail"),
         ledger,
         sheet,
@@ -949,12 +1232,17 @@ export function mount({ scene, islands, flows }) {
     }
   });
   const watcher = new ResizeObserver(() => measureSafe());
-  for (const el of [document.querySelector(".brand"), document.querySelector(".dial"), ledger, sheet, document.querySelector(".rail"), document.querySelector("#disclaimer-short")]) {
+  for (const el of [document.querySelector(".brand"), document.querySelector(".dial"), ledger, sheet, document.querySelector(".rail"), document.querySelector("#disclaimer-short"), guide, mission]) {
     if (el) watcher.observe(el);
   }
   window.addEventListener("resize", measureSafe);
 
   const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const deepLink = Boolean(params.get("item") || params.get("flow") || params.get("island"));
+  if (deepLink && !book.welcome) {
+    book.welcome = Date.now();
+    savePassport(book);
+  }
   paintChrome();
   paintClock();
   phaseNote.textContent = phases[0].note;
@@ -963,7 +1251,10 @@ export function mount({ scene, islands, flows }) {
   if (params.get("item") && params.get("island")) selectItem(params.get("island"), params.get("item"));
   else if (params.get("flow")) selectFlow(params.get("flow"));
   else if (params.get("island")) selectIsland(params.get("island"));
-  else if (!new URLSearchParams(location.search).has("quiet") && !sessionStorage.getItem(INTRO_KEY)) showIntro(0);
+  placePassport();
+  window.addEventListener("resize", placePassport);
+  if (!quiet && !book.welcome && !deepLink) showGuide();
+  else paintMission();
 
   $("source-link").href = SOURCE_INDEX;
   measureSafe();
@@ -978,6 +1269,7 @@ export function mount({ scene, islands, flows }) {
       state.bird = scene.isBird();
       syncBirdOnly();
       compass.style.transform = `rotate(${scene.getTheta()}rad)`;
+      paintPins();
     },
   };
 

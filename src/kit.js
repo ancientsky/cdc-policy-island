@@ -1,6 +1,7 @@
 // Original implementation for this project. Not derived from third-party source code.
 import {
   Color,
+  DoubleSide,
   DynamicDrawUsage,
   InstancedBufferAttribute,
   InstancedMesh,
@@ -28,6 +29,42 @@ glowMat.onBeforeCompile = (shader) => {
 };
 
 const solidMat = new MeshStandardMaterial({ roughness: 0.78, metalness: 0 });
+
+const CROWN = `
+float h = clamp((position.y + 0.5) / 1.0, 0.0, 1.0);
+#ifdef USE_INSTANCING
+  vec4 wp = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+#else
+  vec4 wp = modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+#endif
+transformed.x += sin(uTime * 1.8 + wp.x * 1.3 + wp.z * 0.7) * 0.16 * h * uAmp;
+transformed.z += cos(uTime * 1.4 + wp.z * 1.1) * 0.11 * h * uAmp;
+`;
+
+const FLAG = `
+float along = clamp((position.x + 0.09) / 0.18, 0.0, 1.0);
+transformed.z += sin(uTime * 6.0 - position.x * 30.0) * 0.012 * along * uAmp;
+`;
+
+function bindBend(material, motion, body, mark) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = motion.uTime;
+    shader.uniforms.uAmp = motion.uAmp;
+    shader.vertexShader = `uniform float uTime;\nuniform float uAmp;\n${shader.vertexShader.replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>\n${body}`,
+    )}`;
+    motion[mark] = true;
+  };
+}
+
+// Crown and flag bends share the water clock. uAmp is 0 when motion is reduced.
+export function bindSway(material, motion) {
+  bindBend(material, motion, CROWN, "crowned");
+}
+
+const swayMat = new MeshStandardMaterial({ roughness: 0.86, metalness: 0 });
+const flagMat = new MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: DoubleSide });
 
 const dummy = new Object3D();
 const world = new Matrix4();
@@ -78,7 +115,9 @@ function labelFor(kind, glow) {
   return kind;
 }
 
-export function createKit() {
+export function createKit(motion) {
+  bindSway(swayMat, motion);
+  bindBend(flagMat, motion, FLAG, "flagged");
   const geos = new Map();
   const records = [];
   const meshes = [];
@@ -154,7 +193,7 @@ export function createKit() {
     else mesh = new InstancedMesh(geoCopy, material, list.length);
     mesh.name = `kit-${label}`;
     mesh.frustumCulled = false;
-    const noCast = glow || label === "trunk" || label === "leaf" || label === "sprig" || label === "bole" || label.startsWith("flat-");
+    const noCast = glow || label === "trunk" || label === "leaf" || label === "sprig" || label === "bole" || label === "flag" || label.startsWith("flat-");
     mesh.castShadow = !noCast;
     mesh.receiveShadow = !glow && label !== "leaf" && label !== "sprig";
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
@@ -180,7 +219,11 @@ export function createKit() {
     }
     for (const [label, list] of groups) {
       const glow = list[0].glow;
-      const mesh = makeInstances(label, geos.get(list[0].kind), glow ? glowMat : solidMat, list, glow);
+      let material = solidMat;
+      if (glow) material = glowMat;
+      else if (label === "pine" || label === "round" || label === "frond") material = swayMat;
+      else if (label === "flag") material = flagMat;
+      const mesh = makeInstances(label, geos.get(list[0].kind), material, list, glow);
       scene.add(mesh);
       meshes.push(mesh);
     }

@@ -55,7 +55,7 @@ const byIsland = new Map();
 let sea = emptySea();
 
 function emptySea() {
-  return { boats: [], islets: [], boatClear: Infinity, isletClear: Infinity };
+  return { boats: [], islets: [], boatGroups: [], boatClear: Infinity, isletClear: Infinity };
 }
 
 export function resetDecor() {
@@ -983,6 +983,7 @@ function addBoat(scene, kit, spot, rng) {
   group.rotation.y = rng() * Math.PI * 2;
   group.userData.kind = "boat";
   scene.add(group);
+  sea.boatGroups.push(group);
   seaPut(kit, group, { kind: "rbox", color: HULL, y: 0.1, sx: 0.52, sy: 0.12, sz: 0.2, cast: true });
   seaPut(kit, group, { kind: "cyl", color: WOOD, y: 0.28, sx: 0.02, sy: 0.28, sz: 0.02 });
   seaPut(kit, group, { kind: "tetra", color: SAIL, y: 0.4, z: -0.02, sx: 0.22, sy: 0.28, sz: 0.12 });
@@ -999,6 +1000,10 @@ export function addSeaDecor(scene, kit, placed, lamps = []) {
   sea.boatClear = boats.reduce((min, spot) => Math.min(min, spot.near), Infinity);
   islets.forEach((spot, index) => addIslet(scene, kit, spot, ISLET[index % ISLET.length], lamps));
   for (const spot of boats) addBoat(scene, kit, spot, rng);
+}
+
+export function seaState() {
+  return sea;
 }
 
 export function decorReport() {

@@ -1,6 +1,7 @@
 // Original implementation for this project. Not derived from third-party source code.
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { bindSway } from "./kit.js";
 
 // Basin, far ridges, forest and clouds around the 14 islands.
 // World +x is east, +z is south. The default camera sits on +z (theta 0.18,
@@ -40,7 +41,7 @@ function qualityPlan(quality) {
   return { seg: 200, trees: 6000 };
 }
 
-export function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [] } = {}) {
+export function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null } = {}) {
   const plan = qualityPlan(quality);
   const rng = mulberry(0x22e170);
   const noise = new SimplexNoise({ random: rng });
@@ -187,9 +188,10 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     spots.push({ x, y, z, scale: 0.72 + rng() * 0.4, pine: rng() < 0.55 });
   }
 
-  function plant(geo, list, color) {
+  function plant(geo, list, color, sway) {
     if (!list.length) return null;
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true });
+    if (sway && motion) bindSway(mat, motion);
     const mesh = new THREE.InstancedMesh(geo, mat, list.length);
     mesh.userData.kind = "forest";
     mesh.castShadow = true;
@@ -210,9 +212,9 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   }
   const pines = spots.filter((spot) => spot.pine);
   const rounds = spots.filter((spot) => !spot.pine);
-  plant(pineGeo, pines, 0x5c9a70);
-  plant(roundGeo, rounds, 0x6a9a58);
-  plant(trunkGeo, spots, 0x9a7a58);
+  plant(pineGeo, pines, 0x5c9a70, true);
+  plant(roundGeo, rounds, 0x6a9a58, true);
+  plant(trunkGeo, spots, 0x9a7a58, false);
 
   const ridgeMix = [0.3, 0.55, 0.78];
   const ridgeBase = [new THREE.Color(0x68967a), new THREE.Color(0x7d92a4), new THREE.Color(0x8aa4b4)];
@@ -256,7 +258,12 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   });
 
   const cloudGeo = new THREE.IcosahedronGeometry(1, 2);
-  const cloudMat = new THREE.MeshBasicMaterial({ color: 0xf3f0e8 });
+  const cloudMat = new THREE.MeshBasicMaterial({
+    color: 0xf3f0e8,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+  });
   const cloudBase = new THREE.Color(0xf3f0e8);
   const cloudCount = 12;
   const puffsPer = 11;
@@ -305,6 +312,45 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   }
   writeClouds();
 
+  const shadowGeo = new THREE.CircleGeometry(4.2, 20);
+  shadowGeo.rotateX(-Math.PI / 2);
+  const shadowCanvas = document.createElement("canvas");
+  shadowCanvas.width = 64;
+  shadowCanvas.height = 64;
+  const shadowCtx = shadowCanvas.getContext("2d");
+  const shadowGrad = shadowCtx.createRadialGradient(32, 32, 2, 32, 32, 32);
+  shadowGrad.addColorStop(0, "rgba(36, 44, 52, 1)");
+  shadowGrad.addColorStop(0.55, "rgba(36, 44, 52, 0.55)");
+  shadowGrad.addColorStop(1, "rgba(36, 44, 52, 0)");
+  shadowCtx.fillStyle = shadowGrad;
+  shadowCtx.fillRect(0, 0, 64, 64);
+  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    map: shadowTex,
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: false,
+  });
+  const shadowMesh = new THREE.InstancedMesh(shadowGeo, shadowMat, cloudCount);
+  shadowMesh.userData.kind = "cloud-shadow";
+  shadowMesh.raycast = () => {};
+  shadowMesh.frustumCulled = false;
+  shadowMesh.renderOrder = 2;
+  const shadowDummy = new THREE.Object3D();
+  function writeShadows() {
+    clouds.forEach((cloud, index) => {
+      shadowDummy.position.set(cloud.x, 0.41, cloud.z);
+      shadowDummy.rotation.set(0, 0, 0);
+      shadowDummy.scale.set(1, 1, 1);
+      shadowDummy.updateMatrix();
+      shadowMesh.setMatrixAt(index, shadowDummy.matrix);
+    });
+    shadowMesh.instanceMatrix.needsUpdate = true;
+  }
+  writeShadows();
+  scene.add(shadowMesh);
+  meshes.push(shadowMesh);
+
   const lampSpots = [];
   let lampGuard = 0;
   while (lampSpots.length < 36 && lampGuard < 200) {
@@ -352,14 +398,22 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     });
     lampMat.opacity = night;
     cloudMat.color.copy(cloudBase).lerp(haze, 0.18);
+    cloudMat.opacity = 1 - night * 0.65;
   }
 
-  function update(dt) {
-    for (const cloud of clouds) {
-      cloud.x += dt * cloud.speed;
-      if (cloud.x > 78) cloud.x = -78;
+  function update(dt, opts = {}) {
+    if (!opts.hold) {
+      for (const cloud of clouds) {
+        cloud.x += dt * cloud.speed;
+        if (cloud.x > 78) cloud.x = -78;
+      }
     }
     writeClouds();
+    writeShadows();
+  }
+
+  function cloudSample() {
+    return clouds.map((cloud) => ({ x: cloud.x, y: cloud.y, z: cloud.z }));
   }
 
   function info() {
@@ -375,5 +429,5 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     };
   }
 
-  return { setTime, update, heightAt, info };
+  return { setTime, update, heightAt, info, cloudSample };
 }
