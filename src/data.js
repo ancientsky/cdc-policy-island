@@ -3,6 +3,8 @@
 // Standing disease work stays labeled as such. The ministry plan and annual review
 // are governance, not a fifteenth island.
 
+import { applyPlain, plain } from "./plain.js";
+
 export const SOURCE_INDEX = "https://www.cdc.gov.tw/Category/MPage/kVzFWokFW3l9_YeB8idzuw";
 export const DATA_AS_OF = "2026-10";
 const CDC_HOME = "https://www.cdc.gov.tw/";
@@ -59,10 +61,10 @@ export const islands = [
     href: "https://nidss.cdc.gov.tw/",
     hrefLabel: "看全國傳染病統計",
     items: [
-      { id: "watch-notify", name: "法定傳染病通報", phase: "now", hours: [[8, 18]], keywords: ["通報", "法定", "醫師"], text: "醫師與檢驗單位依《傳染病防治法》的時限通報。疫情中心要的是收得齊，不是多一本報表。" },
-      { id: "watch-duty", name: "疫情中心值勤", phase: "now", hours: [[0, 24]], keywords: ["值勤", "二十四小時", "疫情中心"], text: "國內外警訊有人看、有人交接。達門檻就啟動疫調，而不是下一個上班日再處理。" },
-      { id: "watch-signal", name: "多元訊號", phase: "near", hours: [[9, 17]], keywords: ["就診", "類流感", "污水", "預警"], text: "門急診就診趨勢先於個別確診。污水等環境訊號若要納入，是拿來補通報的延遲，不是取代個案。" },
-      { id: "watch-level", name: "風險分級", phase: "mid", hours: [[10, 16]], keywords: ["分級", "預警", "地方"], text: "把監視指標收成地方這週用得上的風險級別：該加強的是接種、清孳生源，還是機構群聚。" },
+      { id: "watch-notify", name: "法定傳染病通報", phase: "now", hours: [[8, 18]], keywords: ["通報", "法定", "醫師"], detail: "醫師與檢驗單位依《傳染病防治法》的時限通報。疫情中心要的是收得齊，不是多一本報表。" },
+      { id: "watch-duty", name: "疫情中心值勤", phase: "now", hours: [[0, 24]], keywords: ["值勤", "二十四小時", "疫情中心"], detail: "國內外警訊有人看、有人交接。達門檻就啟動疫調，而不是下一個上班日再處理。" },
+      { id: "watch-signal", name: "多元訊號", phase: "near", hours: [[9, 17]], keywords: ["就診", "類流感", "污水", "預警"], detail: "門急診就診趨勢先於個別確診。污水等環境訊號若要納入，是拿來補通報的延遲，不是取代個案。" },
+      { id: "watch-level", name: "風險分級", phase: "mid", hours: [[10, 16]], keywords: ["分級", "預警", "地方"], detail: "把監視指標收成地方這週用得上的風險級別：該加強的是接種、清孳生源，還是機構群聚。" },
     ],
   },
   {
@@ -80,14 +82,11 @@ export const islands = [
     source: "新興傳染病暨流感大流行應變整備及邊境檢疫計畫（2022–2027）",
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢邊境檢疫）",
-    actions: [
-      { icon: "check", label: "出國回來如果發燒或拉肚子，入境時主動告訴機場檢疫人員。", detail: "發燒或拉肚子時，主動告訴檢疫人員。", href: null },
-    ],
     items: [
-      { id: "border-port", name: "航空港口檢疫", phase: "now", hours: [[5, 23]], keywords: ["機場", "港口", "檢疫", "體溫"], text: "對入境旅客、機組與船舶做檢疫詢問和症狀評估。異常就分流、採檢，不讓隊伍本身變成風險。" },
-      { id: "border-travel", name: "旅遊史與症狀", phase: "now", hours: [[5, 23]], keywords: ["旅遊史", "入境", "發燒"], text: "發熱、呼吸道症狀和蚊媒疫區旅遊史，當天要變成疫情中心看得到的名單。" },
-      { id: "border-surge", name: "檢疫量能", phase: "near", hours: [[8, 18]], keywords: ["隔離", "人力", "大流行"], text: "動線、隔離空間和輪班人力平時就留得住，新型病原或流感大流行時才放得大。這項在 2022 至 2027 的整備計畫裡。計畫寫明這段是爆發前的準備，不是應變動員。" },
-      { id: "border-vector", name: "交通工具病媒", phase: "now", hours: [[0, 24]], keywords: ["船舶", "航空器", "病媒", "登革熱"], text: "航空器與船舶的病媒和環境衛生要查。登革熱不必等社區出現病例，才發現蚊子先下了船。" },
+      { id: "border-port", name: "航空港口檢疫", phase: "now", hours: [[5, 23]], keywords: ["機場", "港口", "檢疫", "體溫"], detail: "對入境旅客、機組與船舶做檢疫詢問和症狀評估。異常就分流、採檢，不讓隊伍本身變成風險。" },
+      { id: "border-travel", name: "旅遊史與症狀", phase: "now", hours: [[5, 23]], keywords: ["旅遊史", "入境", "發燒"], detail: "發熱、呼吸道症狀和蚊媒疫區旅遊史，當天要變成疫情中心看得到的名單。" },
+      { id: "border-surge", name: "檢疫量能", phase: "near", hours: [[8, 18]], keywords: ["隔離", "人力", "大流行"], detail: "動線、隔離空間和輪班人力平時就留得住，新型病原或流感大流行時才放得大。這項在 2022 至 2027 的整備計畫裡。計畫寫明這段是爆發前的準備，不是應變動員。" },
+      { id: "border-vector", name: "交通工具病媒", phase: "now", hours: [[0, 24]], keywords: ["船舶", "航空器", "病媒", "登革熱"], detail: "航空器與船舶的病媒和環境衛生要查。登革熱不必等社區出現病例，才發現蚊子先下了船。" },
     ],
   },
   {
@@ -106,10 +105,10 @@ export const islands = [
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢檢驗網絡）",
     items: [
-      { id: "lab-net", name: "全國檢驗分工", phase: "now", hours: [[9, 18]], keywords: ["檢驗", "參考實驗室", "合約"], text: "一般檢體在地做，特殊病原送參考實驗室。分工要寫得出哪一種病原、哪一級實驗室。" },
-      { id: "lab-seq", name: "基因體定序", phase: "mid", hours: [[0, 8], [18, 24]], keywords: ["定序", "基因體", "流感", "新冠"], text: "流感、新冠、腸病毒和其他病原的流行株要定得出來。網絡計畫走到 2030，定序是中程要站穩的量能，不是一次性專案。" },
-      { id: "lab-biosafety", name: "生物安全與保全", phase: "now", hours: [[9, 18]], keywords: ["生物安全", "病原", "庫存"], text: "高風險病原的操作、庫存和人員管制依生物安全等級管理。量能變大時，這套制度要一起變大。" },
-      { id: "lab-campus", name: "防疫中心興建", phase: "far", hours: [[9, 17]], keywords: ["防疫中心", "高防護實驗室", "2032"], text: "行政院 115 年 3 月第二次修正。工期自 110 年至 121 年，也就是 2021 到 2032。國家衛生指揮中心、國家級實驗室和行政部門收進昆陽基地的同一棟，含高防護實驗室。房子要到 2032 才收，不是 2027。房子本身不是防疫。" },
+      { id: "lab-net", name: "全國檢驗分工", phase: "now", hours: [[9, 18]], keywords: ["檢驗", "參考實驗室", "合約"], detail: "一般檢體在地做，特殊病原送參考實驗室。分工要寫得出哪一種病原、哪一級實驗室。" },
+      { id: "lab-seq", name: "基因體定序", phase: "mid", hours: [[0, 8], [18, 24]], keywords: ["定序", "基因體", "流感", "新冠"], detail: "流感、新冠、腸病毒和其他病原的流行株要定得出來。網絡計畫走到 2030，定序是中程要站穩的量能，不是一次性專案。" },
+      { id: "lab-biosafety", name: "生物安全與保全", phase: "now", hours: [[9, 18]], keywords: ["生物安全", "病原", "庫存"], detail: "高風險病原的操作、庫存和人員管制依生物安全等級管理。量能變大時，這套制度要一起變大。" },
+      { id: "lab-campus", name: "防疫中心興建", phase: "far", hours: [[9, 17]], keywords: ["防疫中心", "高防護實驗室", "2032"], detail: "行政院 115 年 3 月第二次修正。工期自 110 年至 121 年，也就是 2021 到 2032。國家衛生指揮中心、國家級實驗室和行政部門收進昆陽基地的同一棟，含高防護實驗室。房子要到 2032 才收，不是 2027。房子本身不是防疫。" },
     ],
   },
   {
@@ -128,11 +127,11 @@ export const islands = [
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢疫苗）",
     items: [
-      { id: "vax-routine", name: "常規公費疫苗", phase: "now", hours: [[8, 17]], keywords: ["公費", "麻疹", "日本腦炎", "幼兒"], text: "幼兒與既有對象的常規時程要維持。麻疹、日本腦炎這類已控制的疾病，是靠每一個出生世代繼續打。" },
-      { id: "vax-season", name: "季節流感與新冠", phase: "now", hours: [[8, 20]], keywords: ["流感疫苗", "新冠", "長者", "高風險"], text: "每季開打，高風險與長者優先，為了減少重症和死亡。開打日不是終點，庫存和接種率才是。" },
-      { id: "vax-cold", name: "冷鏈與調撥", phase: "now", hours: [[6, 18]], keywords: ["冷鏈", "封緘", "衛生局", "庫存"], text: "從封緘、冷儲到縣市衛生局，溫度和庫存要看得到，縣市之間調得動。" },
-      { id: "vax-fund", name: "基金長得住", phase: "far", hours: [[9, 17]], keywords: ["疫苗基金", "財源", "緊急採購"], text: "第四期的正式名稱是充實國家疫苗基金及促進國民免疫力計畫，收到 2028。長期要留下的是財源和緊急採購。這一條是買、送、打，和產業計畫不是同一份。" },
-      { id: "vax-industry", name: "疫苗產業韌性", phase: "mid", hours: [[9, 17]], keywords: ["疫苗產業", "預購協議", "研發", "115"], text: "這是基金以外的另一份計畫，自 115 年 1 月 1 日至 119 年 12 月 31 日，衛生福利部與經濟部一起做。工作是大流行疫苗的準備與預購、研發、國內供應的韌性，以及產業的國際連結。基金負責買得到；這一項負責做得出來、急時擴得開。" },
+      { id: "vax-routine", name: "常規公費疫苗", phase: "now", hours: [[8, 17]], keywords: ["公費", "麻疹", "日本腦炎", "幼兒"], detail: "幼兒與既有對象的常規時程要維持。麻疹、日本腦炎這類已控制的疾病，是靠每一個出生世代繼續打。" },
+      { id: "vax-season", name: "季節流感與新冠", phase: "now", hours: [[8, 20]], keywords: ["流感疫苗", "新冠", "長者", "高風險"], detail: "每季開打，高風險與長者優先，為了減少重症和死亡。開打日不是終點，庫存和接種率才是。" },
+      { id: "vax-cold", name: "冷鏈與調撥", phase: "now", hours: [[6, 18]], keywords: ["冷鏈", "封緘", "衛生局", "庫存"], detail: "從封緘、冷儲到縣市衛生局，溫度和庫存要看得到，縣市之間調得動。" },
+      { id: "vax-fund", name: "基金長得住", phase: "far", hours: [[9, 17]], keywords: ["疫苗基金", "財源", "緊急採購"], detail: "第四期的正式名稱是充實國家疫苗基金及促進國民免疫力計畫，收到 2028。長期要留下的是財源和緊急採購。這一條是買、送、打，和產業計畫不是同一份。" },
+      { id: "vax-industry", name: "疫苗產業韌性", phase: "mid", hours: [[9, 17]], keywords: ["疫苗產業", "預購協議", "研發", "115"], detail: "這是基金以外的另一份計畫，自 115 年 1 月 1 日至 119 年 12 月 31 日，衛生福利部與經濟部一起做。工作是大流行疫苗的準備與預購、研發、國內供應的韌性，以及產業的國際連結。基金負責買得到；這一項負責做得出來、急時擴得開。" },
     ],
   },
   {
@@ -150,14 +149,11 @@ export const islands = [
     source: "常設業務，與新興傳染病暨流感大流行應變整備及邊境檢疫計畫（2022–2027）、急性監測第四期（2025–2028）交界",
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢流感）",
-    actions: [
-      { icon: "check", label: "咳嗽、打噴嚏時用手肘遮住口鼻；生病了就在家休息。", detail: "生病了就在家休息。", href: null },
-    ],
     items: [
-      { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別"], text: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
-      { id: "flu-drug", name: "抗病毒藥物", phase: "now", hours: [[9, 17]], keywords: ["抗病毒", "合約醫院", "庫存"], text: "合約醫院的藥劑存量和效期要在流行期調得動。藥和疫苗是兩條補給線，不能互相替代。" },
-      { id: "flu-cluster", name: "機構群聚", phase: "now", hours: [[9, 18]], keywords: ["護理之家", "群聚", "學校"], text: "護理之家、學校和矯正機關出現群聚時，給採檢、給藥和隔離建議，並回報監測。" },
-      { id: "flu-novel", name: "新型呼吸道腳本", phase: "near", hours: [[9, 17]], keywords: ["大流行", "新興", "腳本"], text: "為流感大流行或新的呼吸道病毒預留監視、藥品和溝通腳本。整備計畫收到 2027，腳本要在那之前寫得能演練。" },
+      { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別"], detail: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
+      { id: "flu-drug", name: "抗病毒藥物", phase: "now", hours: [[9, 17]], keywords: ["抗病毒", "合約醫院", "庫存"], detail: "合約醫院的藥劑存量和效期要在流行期調得動。藥和疫苗是兩條補給線，不能互相替代。" },
+      { id: "flu-cluster", name: "機構群聚", phase: "now", hours: [[9, 18]], keywords: ["護理之家", "群聚", "學校"], detail: "護理之家、學校和矯正機關出現群聚時，給採檢、給藥和隔離建議，並回報監測。" },
+      { id: "flu-novel", name: "新型呼吸道腳本", phase: "near", hours: [[9, 17]], keywords: ["大流行", "新興", "腳本"], detail: "為流感大流行或新的呼吸道病毒預留監視、藥品和溝通腳本。整備計畫收到 2027，腳本要在那之前寫得能演練。" },
     ],
   },
   {
@@ -175,14 +171,11 @@ export const islands = [
     source: "急性傳染病流行風險監控與管理第四期計畫（2025–2028）裡的腸病毒與腸道傳染病章節。開學季仍和教托育機構一起做。",
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢腸病毒）",
-    actions: [
-      { icon: "check", label: "家裡有弟弟妹妹，如果他一直想睡、手腳突然抽動或一直吐，要馬上告訴大人帶去看醫生。", detail: "嗜睡、手腳突然抽動或一直吐，要馬上告訴大人。", href: null },
-    ],
     items: [
-      { id: "entero-sign", name: "重症前兆衛教", phase: "now", hours: [[7, 20]], keywords: ["嗜睡", "肌躍", "嘔吐", "家長"], text: "提醒家長辨識嗜睡、肌躍型抽搐、持續嘔吐等重症前兆，儘速就醫。衛教要在流行上升前就在，而不是上新聞以後。" },
-      { id: "entero-school", name: "教托育監視", phase: "now", hours: [[7, 16]], keywords: ["幼兒園", "停課", "缺勤"], text: "幼兒園與國小的缺勤、停課和群聚回報衛生單位。這是監測的前段，不是學校自己的內部統計。" },
-      { id: "entero-hand", name: "手部與環境", phase: "now", hours: [[7, 16]], keywords: ["洗手", "消毒", "肥皂"], text: "肥皂洗手，玩具和常用表面要消毒。腸病毒靠這一套，比靠停課通知可靠。" },
-      { id: "entero-term", name: "開學季聯合防護", phase: "now", hours: [[7, 16]], keywords: ["開學", "流感", "新冠"], text: "開學前後把腸病毒、流感和蚊媒防護收成學校做得到的一套動作，避免三份公文各講各的。" },
+      { id: "entero-sign", name: "重症前兆衛教", phase: "now", hours: [[7, 20]], keywords: ["嗜睡", "肌躍", "嘔吐", "家長"], detail: "提醒家長辨識嗜睡、肌躍型抽搐、持續嘔吐等重症前兆，儘速就醫。衛教要在流行上升前就在，而不是上新聞以後。" },
+      { id: "entero-school", name: "教托育監視", phase: "now", hours: [[7, 16]], keywords: ["幼兒園", "停課", "缺勤"], detail: "幼兒園與國小的缺勤、停課和群聚回報衛生單位。這是監測的前段，不是學校自己的內部統計。" },
+      { id: "entero-hand", name: "手部與環境", phase: "now", hours: [[7, 16]], keywords: ["洗手", "消毒", "肥皂"], detail: "肥皂洗手，玩具和常用表面要消毒。腸病毒靠這一套，比靠停課通知可靠。" },
+      { id: "entero-term", name: "開學季聯合防護", phase: "now", hours: [[7, 16]], keywords: ["開學", "流感", "新冠"], detail: "開學前後把腸病毒、流感和蚊媒防護收成學校做得到的一套動作，避免三份公文各講各的。" },
     ],
   },
   {
@@ -200,14 +193,11 @@ export const islands = [
     source: "急性傳染病流行風險監控與管理第四期計畫（2025–2028）裡的病媒監測與孳生源清除。社區清積水仍是常設業務。",
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢登革熱）",
-    actions: [
-      { icon: "check", label: "下雨後幫忙「巡、倒、清、刷」：花盆底盤、瓶罐、廢輪胎的積水都倒掉。", detail: "花盆底盤、瓶罐、廢輪胎的積水都倒掉。", href: null },
-    ],
     items: [
-      { id: "dengue-source", name: "孳生源清除", phase: "now", hours: [[6, 10], [15, 18]], keywords: ["積水", "容器", "花盆"], text: "容器、花盆和積水處要巡、要清。雨後的空窗比藥劑的庫存更常決定下一週的指數。" },
-      { id: "dengue-index", name: "病媒蚊密度", phase: "now", hours: [[7, 17]], keywords: ["誘卵", "指數", "成蚊"], text: "用密度看這一區的風險。指數上升而還沒有本土病例時，就該先清，不等確診。" },
-      { id: "dengue-crew", name: "社區動員", phase: "now", hours: [[7, 11]], keywords: ["里", "環保", "衛生局"], text: "里、環保和衛生單位一起清。單靠化學防治撐不住下一場雨。" },
-      { id: "dengue-routine", name: "日常化，而不是緊急動員", phase: "far", hours: [[9, 17]], keywords: ["制度化", "市政"], text: "長期要留下的是清積水變成日常市政。緊急噴藥和醫療整備是疫情升高時的加開，不是常態本身。" },
+      { id: "dengue-source", name: "孳生源清除", phase: "now", hours: [[6, 10], [15, 18]], keywords: ["積水", "容器", "花盆"], detail: "容器、花盆和積水處要巡、要清。雨後的空窗比藥劑的庫存更常決定下一週的指數。" },
+      { id: "dengue-index", name: "病媒蚊密度", phase: "now", hours: [[7, 17]], keywords: ["誘卵", "指數", "成蚊"], detail: "用密度看這一區的風險。指數上升而還沒有本土病例時，就該先清，不等確診。" },
+      { id: "dengue-crew", name: "社區動員", phase: "now", hours: [[7, 11]], keywords: ["里", "環保", "衛生局"], detail: "里、環保和衛生單位一起清。單靠化學防治撐不住下一場雨。" },
+      { id: "dengue-routine", name: "日常化，而不是緊急動員", phase: "far", hours: [[9, 17]], keywords: ["制度化", "市政"], detail: "長期要留下的是清積水變成日常市政。緊急噴藥和醫療整備是疫情升高時的加開，不是常態本身。" },
     ],
   },
   {
@@ -225,14 +215,11 @@ export const islands = [
     source: "我國加入 WHO 2035 消除結核第三期計畫（2026–2030）。名稱裡的 2035 是目標年，不是會員資格，消除也還沒有達成。",
     href: "https://www.cdc.gov.tw/Category/ListPage/2fbGet7KwqEwnjGAy-Zbyg",
     hrefLabel: "看結核病防治專區",
-    actions: [
-      { icon: "check", label: "咳嗽超過兩週，要請大人帶你去看醫生。", detail: "咳嗽超過兩週就去看醫生。", href: null },
-    ],
     items: [
-      { id: "tb-find", name: "主動發現", phase: "now", hours: [[9, 17]], keywords: ["接觸者", "篩檢", "高風險"], text: "在接觸者和高風險族群裡找出發病的人，不等症狀自己走到門診。" },
-      { id: "tb-dots", name: "都治與完成治療", phase: "now", hours: [[9, 17]], keywords: ["都治", "DOTS", "完成率"], text: "直接觀察治療和關懷，是為了完成率，不是為了打卡。沒吃完的療程會把抗藥性留在社區。" },
-      { id: "tb-ltbi", name: "潛伏結核治療", phase: "near", hours: [[9, 17]], keywords: ["潛伏", "LTBI", "接觸者"], text: "對接觸者提供潛伏感染治療，減少日後發病。這是第三期要推進的工作，不是已經做完的例行公事。" },
-      { id: "tb-2035", name: "守到消除門檻", phase: "far", hours: [[9, 17]], keywords: ["2035", "發生率", "抗藥性"], text: "2030 的計畫結束後，2035 仍要有人看發生率和抗藥性結核。分子快速檢測縮短的是診斷空窗，不能取代後續追蹤。" },
+      { id: "tb-find", name: "主動發現", phase: "now", hours: [[9, 17]], keywords: ["接觸者", "篩檢", "高風險"], detail: "在接觸者和高風險族群裡找出發病的人，不等症狀自己走到門診。" },
+      { id: "tb-dots", name: "都治與完成治療", phase: "now", hours: [[9, 17]], keywords: ["都治", "DOTS", "完成率"], detail: "直接觀察治療和關懷，是為了完成率，不是為了打卡。沒吃完的療程會把抗藥性留在社區。" },
+      { id: "tb-ltbi", name: "潛伏結核治療", phase: "near", hours: [[9, 17]], keywords: ["潛伏", "LTBI", "接觸者"], detail: "對接觸者提供潛伏感染治療，減少日後發病。這是第三期要推進的工作，不是已經做完的例行公事。" },
+      { id: "tb-2035", name: "守到消除門檻", phase: "far", hours: [[9, 17]], keywords: ["2035", "發生率", "抗藥性"], detail: "2030 的計畫結束後，2035 仍要有人看發生率和抗藥性結核。分子快速檢測縮短的是診斷空窗，不能取代後續追蹤。" },
     ],
   },
   {
@@ -251,10 +238,10 @@ export const islands = [
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢愛滋）",
     items: [
-      { id: "hiv-test", name: "擴大篩檢", phase: "now", hours: [[12, 20]], keywords: ["匿名", "自我篩檢", "篩檢"], text: "匿名篩檢、自我篩檢，以及就醫時提供的檢驗，是為了找出還不知道自己感染的人。" },
-      { id: "hiv-prep", name: "暴露前預防", phase: "now", hours: [[9, 17]], keywords: ["PrEP", "暴露前"], text: "對有感染風險的人提供 PrEP 和定期追蹤。它是治療以外的預防，不是取代保險套或篩檢。" },
-      { id: "hiv-treat", name: "治療即預防", phase: "now", hours: [[9, 17]], keywords: ["U=U", "病毒量", "治療"], text: "確診後儘速治療、病毒量測不到，才能降低再傳染。慢下來的那一截通常不是藥物，是銜接。" },
-      { id: "hiv-2030", name: "2030 之前的覆蓋", phase: "mid", hours: [[9, 17]], keywords: ["2030", "污名", "覆蓋率"], text: "第一期在 2026 年結束，2030 仍是目標，不是已經消除。114 年的檢討仍寫著有人不知道自己感染、延遲診斷還在。污名若還在，最需要進來的人不會出現在統計裡。" },
+      { id: "hiv-test", name: "擴大篩檢", phase: "now", hours: [[12, 20]], keywords: ["匿名", "自我篩檢", "篩檢"], detail: "匿名篩檢、自我篩檢，以及就醫時提供的檢驗，是為了找出還不知道自己感染的人。" },
+      { id: "hiv-prep", name: "暴露前預防", phase: "now", hours: [[9, 17]], keywords: ["PrEP", "暴露前"], detail: "對有感染風險的人提供 PrEP 和定期追蹤。它是治療以外的預防，不是取代保險套或篩檢。" },
+      { id: "hiv-treat", name: "治療即預防", phase: "now", hours: [[9, 17]], keywords: ["U=U", "病毒量", "治療"], detail: "確診後儘速治療、病毒量測不到，才能降低再傳染。慢下來的那一截通常不是藥物，是銜接。" },
+      { id: "hiv-2030", name: "2030 之前的覆蓋", phase: "mid", hours: [[9, 17]], keywords: ["2030", "污名", "覆蓋率"], detail: "第一期在 2026 年結束，2030 仍是目標，不是已經消除。114 年的檢討仍寫著有人不知道自己感染、延遲診斷還在。污名若還在，最需要進來的人不會出現在統計裡。" },
     ],
   },
   {
@@ -273,10 +260,10 @@ export const islands = [
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢病毒性肝炎）",
     items: [
-      { id: "hepa-b", name: "B 型肝炎疫苗世代", phase: "now", hours: [[9, 17]], keywords: ["B肝", "幼兒", "帶原"], text: "維持幼兒 B 肝接種，守住已經降下來的慢性帶原。這一件和疫苗基金是同一條冷鏈的不同疾病。" },
-      { id: "hepa-c", name: "C 型肝炎治療", phase: "now", hours: [[9, 17]], keywords: ["C肝", "口服", "抗病毒"], text: "C 肝用口服抗病毒藥治療。篩檢陽性就要接到開得到藥的院所，不停在一張檢驗報告。" },
-      { id: "hepa-screen", name: "高風險與年齡篩檢", phase: "near", hours: [[9, 17]], keywords: ["篩檢", "年齡"], text: "在特定年齡和風險條件提供 B、C 肝篩檢，避免只靠自覺症狀。症狀出現時，往往已經不是公衛要的那個時間點。" },
-      { id: "hepa-follow", name: "治完以後仍要有人看", phase: "far", hours: [[9, 17]], keywords: ["追蹤", "復發", "新感染"], text: "治療告一段落後，新感染和需要追蹤的人仍要有出口。消除不是結案公文，是發生率不再回升。" },
+      { id: "hepa-b", name: "B 型肝炎疫苗世代", phase: "now", hours: [[9, 17]], keywords: ["B肝", "幼兒", "帶原"], detail: "維持幼兒 B 肝接種，守住已經降下來的慢性帶原。這一件和疫苗基金是同一條冷鏈的不同疾病。" },
+      { id: "hepa-c", name: "C 型肝炎治療", phase: "now", hours: [[9, 17]], keywords: ["C肝", "口服", "抗病毒"], detail: "C 肝用口服抗病毒藥治療。篩檢陽性就要接到開得到藥的院所，不停在一張檢驗報告。" },
+      { id: "hepa-screen", name: "高風險與年齡篩檢", phase: "near", hours: [[9, 17]], keywords: ["篩檢", "年齡"], detail: "在特定年齡和風險條件提供 B、C 肝篩檢，避免只靠自覺症狀。症狀出現時，往往已經不是公衛要的那個時間點。" },
+      { id: "hepa-follow", name: "治完以後仍要有人看", phase: "far", hours: [[9, 17]], keywords: ["追蹤", "復發", "新感染"], detail: "治療告一段落後，新感染和需要追蹤的人仍要有出口。消除不是結案公文，是發生率不再回升。" },
     ],
   },
   {
@@ -295,10 +282,10 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
     hrefLabel: "看感染管制專頁",
     items: [
-      { id: "ipc-hospital", name: "醫院感染管制", phase: "now", hours: [[9, 17]], keywords: ["醫院", "隔離", "查核"], text: "隔離空間、防護裝備和群聚通報要接得上臨床。查核看的是做得到，不是計畫書有沒有這一章。" },
-      { id: "ipc-ltc", name: "長照機構群聚", phase: "now", hours: [[9, 17]], keywords: ["長照", "護理之家", "群聚"], text: "流感、腸胃道和呼吸道群聚要早期發現、分艙、訪視。機構裡的一個晚通報，會變成監測島上的一整週。" },
-      { id: "ipc-hand", name: "照護點的手部衛生", phase: "now", hours: [[0, 24]], keywords: ["洗手", "順從度"], text: "洗手設備和順從度是最便宜、也最常失效的措施。醫院這一件不下班，因為交班本身就是風險最高的縫。" },
-      { id: "ipc-route", name: "特殊病原的動線", phase: "near", hours: [[9, 17]], keywords: ["動線", "後送", "隔離"], text: "特殊病原個案的動線、防護和後送醫院要事先講好。等個案到了急診再找負壓，就不算整備。" },
+      { id: "ipc-hospital", name: "醫院感染管制", phase: "now", hours: [[9, 17]], keywords: ["醫院", "隔離", "查核"], detail: "隔離空間、防護裝備和群聚通報要接得上臨床。查核看的是做得到，不是計畫書有沒有這一章。" },
+      { id: "ipc-ltc", name: "長照機構群聚", phase: "now", hours: [[9, 17]], keywords: ["長照", "護理之家", "群聚"], detail: "流感、腸胃道和呼吸道群聚要早期發現、分艙、訪視。機構裡的一個晚通報，會變成監測島上的一整週。" },
+      { id: "ipc-hand", name: "照護點的手部衛生", phase: "now", hours: [[0, 24]], keywords: ["洗手", "順從度"], detail: "洗手設備和順從度是最便宜、也最常失效的措施。醫院這一件不下班，因為交班本身就是風險最高的縫。" },
+      { id: "ipc-route", name: "特殊病原的動線", phase: "near", hours: [[9, 17]], keywords: ["動線", "後送", "隔離"], detail: "特殊病原個案的動線、防護和後送醫院要事先講好。等個案到了急診再找負壓，就不算整備。" },
     ],
   },
   {
@@ -317,10 +304,10 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
     hrefLabel: "看抗藥性監視專頁",
     items: [
-      { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院"], text: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
-      { id: "amr-watch", name: "抗藥性監視", phase: "now", hours: [[9, 18]], keywords: ["抗藥性", "菌株", "THAS"], text: "臨床分離株的抗藥性比例，按菌種回饋給醫院。沒有持續上傳的藥物敏感性，行動計畫只剩百分比的空格。" },
-      { id: "amr-animal", name: "動物與環境", phase: "near", hours: [[9, 17]], keywords: ["One Health", "動物", "環境"], text: "與農業、環境部門對齊動物用藥和環境中的抗藥性。近期要做的是把人醫以外的資料接進來。" },
-      { id: "amr-joint", name: "同一張跨部會的桌子", phase: "mid", hours: [[9, 17]], keywords: ["政策會報", "聯合行動", "2029", "自評"], text: "行政院於 114 年 4 月 30 日核定國家防疫一體政策會報。聯合行動方案涵蓋 115 年至 119 年，把人醫、動物、食品和環境放在同一張桌子，範圍比抗藥性大。抗藥性行動計畫是其中的抗藥性切片，收到 2029，115 年 3 月修訂過。核心能力仍是對照國際工具做自評或外部評核。" },
+      { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院"], detail: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
+      { id: "amr-watch", name: "抗藥性監視", phase: "now", hours: [[9, 18]], keywords: ["抗藥性", "菌株", "THAS"], detail: "臨床分離株的抗藥性比例，按菌種回饋給醫院。沒有持續上傳的藥物敏感性，行動計畫只剩百分比的空格。" },
+      { id: "amr-animal", name: "動物與環境", phase: "near", hours: [[9, 17]], keywords: ["One Health", "動物", "環境"], detail: "與農業、環境部門對齊動物用藥和環境中的抗藥性。近期要做的是把人醫以外的資料接進來。" },
+      { id: "amr-joint", name: "同一張跨部會的桌子", phase: "mid", hours: [[9, 17]], keywords: ["政策會報", "聯合行動", "2029", "自評"], detail: "行政院於 114 年 4 月 30 日核定國家防疫一體政策會報。聯合行動方案涵蓋 115 年至 119 年，把人醫、動物、食品和環境放在同一張桌子，範圍比抗藥性大。抗藥性行動計畫是其中的抗藥性切片，收到 2029，115 年 3 月修訂過。核心能力仍是對照國際工具做自評或外部評核。" },
     ],
   },
   {
@@ -339,11 +326,11 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/ListPage/Otpn7pDwnMd2UoVG-QEzdw",
     hrefLabel: "看整備應變專頁",
     items: [
-      { id: "ready-stock", name: "防疫物資儲備", phase: "now", hours: [[9, 18]], keywords: ["物資", "防護", "試劑", "效期"], text: "個人防護設備、檢測試劑和治療藥要有安全存量、效期和調撥順位。過期的儲備等於沒有儲備。" },
-      { id: "ready-command", name: "指揮與情資架構", phase: "now", hours: [[0, 24]], keywords: ["指揮中心", "疫情中心", "權責"], text: "需要跨部會時，能從日常疫情中心升到指揮中心。權責事先寫好，才不會在事件當天重新發明。" },
-      { id: "ready-beds", name: "醫療量能約定", phase: "near", hours: [[9, 17]], keywords: ["病床", "採檢", "急診"], text: "與醫療網約定重症床、採檢和人力，避免單一病原擠垮急診。這是整備計畫裡還沒有完全變成日常的那一截。" },
-      { id: "ready-drill", name: "演練", phase: "now", hours: [[9, 16]], keywords: ["演練", "桌演", "實兵"], text: "用桌面演練和實兵找出計畫寫得通、現場做不到的段落。沒有事後清單的演練，只是活動。" },
-      { id: "ready-info", name: "防疫資訊基盤", phase: "mid", hours: [[9, 18]], keywords: ["資訊", "資安", "資料治理", "AI"], text: "資訊基盤計畫自 115 年至 119 年。五條策略是韌性與安全的資訊基礎（含配合防疫中心興建的資安標準機房）、資料治理、交換與通報標準、防疫服務裡的人工智慧，以及資訊人才。這一項是整備島上的資訊，不取代演練。" },
+      { id: "ready-stock", name: "防疫物資儲備", phase: "now", hours: [[9, 18]], keywords: ["物資", "防護", "試劑", "效期"], detail: "個人防護設備、檢測試劑和治療藥要有安全存量、效期和調撥順位。過期的儲備等於沒有儲備。" },
+      { id: "ready-command", name: "指揮與情資架構", phase: "now", hours: [[0, 24]], keywords: ["指揮中心", "疫情中心", "權責"], detail: "需要跨部會時，能從日常疫情中心升到指揮中心。權責事先寫好，才不會在事件當天重新發明。" },
+      { id: "ready-beds", name: "醫療量能約定", phase: "near", hours: [[9, 17]], keywords: ["病床", "採檢", "急診"], detail: "與醫療網約定重症床、採檢和人力，避免單一病原擠垮急診。這是整備計畫裡還沒有完全變成日常的那一截。" },
+      { id: "ready-drill", name: "演練", phase: "now", hours: [[9, 16]], keywords: ["演練", "桌演", "實兵"], detail: "用桌面演練和實兵找出計畫寫得通、現場做不到的段落。沒有事後清單的演練，只是活動。" },
+      { id: "ready-info", name: "防疫資訊基盤", phase: "mid", hours: [[9, 18]], keywords: ["資訊", "資安", "資料治理", "AI"], detail: "資訊基盤計畫自 115 年至 119 年。五條策略是韌性與安全的資訊基礎（含配合防疫中心興建的資安標準機房）、資料治理、交換與通報標準、防疫服務裡的人工智慧，以及資訊人才。這一項是整備島上的資訊，不取代演練。" },
     ],
   },
   {
@@ -362,10 +349,10 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/Page/pLGVAwA60glWsIoMUWKNYA",
     hrefLabel: "看國際衛生條例對口頁",
     items: [
-      { id: "global-intel", name: "國際疫情交換", phase: "now", hours: [[9, 21]], keywords: ["情資", "鄰近", "交換"], text: "合作國家和鄰近地區的事件，要進到疫情中心的值勤，而不是停在一份轉寄的電子報。" },
-      { id: "global-ihr", name: "核心能力檢視", phase: "now", hours: [[9, 17]], keywords: ["IHR", "核心能力", "對口"], text: "依國際衛生條例的核心能力自我檢視：偵測、通報、應變和邊境。聯合行動方案寫的也是對照國際工具做自評或外部評核。對口要有名字和班表，不能只有一個信箱。" },
-      { id: "global-people", name: "人才與技術合作", phase: "near", hours: [[9, 17]], keywords: ["培訓", "FETP", "技術"], text: "防疫訓練和技術合作是近期要維持的管道。人的網絡比臨時的視訊會議耐用。" },
-      { id: "global-say", name: "對內說明與對外同步", phase: "now", hours: [[10, 21]], keywords: ["風險溝通", "記者會", "說明"], text: "對公眾的說明和對合作對象的通報要是同一套事實。兩個版本的數字，會先在國內被發現。" },
+      { id: "global-intel", name: "國際疫情交換", phase: "now", hours: [[9, 21]], keywords: ["情資", "鄰近", "交換"], detail: "合作國家和鄰近地區的事件，要進到疫情中心的值勤，而不是停在一份轉寄的電子報。" },
+      { id: "global-ihr", name: "核心能力檢視", phase: "now", hours: [[9, 17]], keywords: ["IHR", "核心能力", "對口"], detail: "依國際衛生條例的核心能力自我檢視：偵測、通報、應變和邊境。聯合行動方案寫的也是對照國際工具做自評或外部評核。對口要有名字和班表，不能只有一個信箱。" },
+      { id: "global-people", name: "人才與技術合作", phase: "near", hours: [[9, 17]], keywords: ["培訓", "FETP", "技術"], detail: "防疫訓練和技術合作是近期要維持的管道。人的網絡比臨時的視訊會議耐用。" },
+      { id: "global-say", name: "對內說明與對外同步", phase: "now", hours: [[10, 21]], keywords: ["風險溝通", "記者會", "說明"], detail: "對公眾的說明和對合作對象的通報要是同一套事實。兩個版本的數字，會先在國內被發現。" },
     ],
   },
 ];
@@ -428,6 +415,8 @@ export const flows = [
   { id: "f18", a: "vax", b: "ready", title: "冷鏈與緊急調撥", carried: "冷鏈", text: "疫苗基金的常規冷鏈，大流行時要能改成緊急接種的配送網。" },
 ];
 
+applyPlain(islands, flows, plain.zh);
+
 export function hourCovers(spans, hour) {
   return spans.some(([a, b]) => (a <= b ? hour >= a && hour < b : hour >= a || hour < b));
 }
@@ -455,14 +444,21 @@ export function validate() {
     for (const pillar of island.pillars) {
       if (!pillarIds.has(pillar)) errors.push(`${island.id} bad pillar ${pillar}`);
     }
+    if (!island.blurbKid || !island.fact) errors.push(`${island.id} missing kid layer`);
+    if (!island.actions || island.actions.length < 2 || island.actions.length > 4) errors.push(`${island.id} actions`);
+    for (const action of island.actions ?? []) {
+      if (action.href != null && !String(action.href).startsWith("tel:")) errors.push(`${island.id} href`);
+    }
     for (const item of island.items) {
       if (!phasesOk.has(item.phase)) errors.push(`${item.id} bad phase`);
       if (!Array.isArray(item.hours) || !Array.isArray(item.hours[0])) errors.push(`${item.id} bad hours`);
+      if (!item.detail || !item.kid) errors.push(`${item.id} missing detail or kid`);
     }
   }
   for (const flow of flows) {
     if (!ids.has(flow.a) || !ids.has(flow.b)) errors.push(`flow ${flow.id} endpoint`);
     if (flow.a === flow.b) errors.push(`flow ${flow.id} loop`);
+    if (!flow.kidTitle || !flow.kid) errors.push(`flow ${flow.id} missing kid`);
   }
   if (islands.length !== 14) errors.push("expected 14 islands");
   if (errors.length) throw new Error(errors.join("; "));

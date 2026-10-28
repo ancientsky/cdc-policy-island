@@ -370,8 +370,8 @@ body.intro .title-card { opacity: 0; }
   grid-template-columns: 48px 1fr;
   gap: 10px;
   align-items: center;
-  margin: 0 0 12px;
-  padding: 10px;
+  margin: 0 0 8px;
+  padding: 8px;
   border-radius: 16px;
   background: var(--field);
 }
@@ -396,12 +396,47 @@ body.intro .title-card { opacity: 0; }
 .about-lines { margin: 0; padding-left: 1.2em; font: 400 var(--fs-md)/1.75 var(--sans); color: #24312c; }
 .chip { font-style: normal; border: 1px solid var(--c); color: var(--c); border-radius: 999px; padding: 1px 7px; font-size: var(--fs-xs); letter-spacing: 0; }
 .sheet .eyebrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.detail-items { display: grid; gap: 6px; margin: 8px 0 12px; }
-.detail-item { display: grid; gap: 4px; padding: 8px 12px; border-radius: 20px; }
+.detail-items { display: grid; gap: 4px; margin: 4px 0 8px; }
+.detail-item { display: grid; gap: 2px; padding: 6px 12px; border-radius: 20px; }
 .detail-item span { display: flex; justify-content: space-between; gap: 8px; width: 100%; }
 .detail-item small { color: var(--muted); }
 .detail-item em { font-style: normal; color: var(--muted); }
 .sheet h3 { margin: 8px 0; font-size: var(--fs-sm); font-weight: 700; }
+.sheet .todo,
+.sheet .fact {
+  margin: 0 0 8px;
+  padding: 6px 8px 6px 10px;
+  border-left: 4px solid var(--c, var(--teal));
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--c, var(--teal)) 12%, transparent);
+}
+.sheet .todo h3,
+.sheet .fact h3 {
+  margin: 0 0 4px;
+  font: 700 16px/1.3 var(--sans);
+}
+.sheet .todo ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sheet .todo a,
+.sheet .todo .act {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  color: inherit;
+  text-decoration: none;
+  line-height: 1.6;
+}
+.sheet .todo b { display: block; font: 700 15px/1.6 var(--sans); }
+.sheet .todo small { display: block; font: 400 14px/1.6 var(--sans); color: var(--ink); }
+.sheet .fact p,
+.sheet .kid-blurb { margin: 0 0 8px; font: 400 14px/1.6 var(--sans); }
+.sheet .fact p { margin: 0; }
+.sheet .act-ico { margin-top: 3px; }
+.sheet .out-title { margin: 8px 0 4px; }
+.adult-items { display: grid; gap: 8px; margin: 8px 0; }
+.adult-items p { margin: 0; }
+.adult-items small { color: var(--muted); margin-left: 6px; font-size: var(--fs-xs); }
+.sheet .detail-item em { color: var(--ink); font-size: 14px; line-height: 1.6; }
 .person-photo {
   width: 96px;
   height: 96px;

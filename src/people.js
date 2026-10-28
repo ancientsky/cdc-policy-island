@@ -763,7 +763,7 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
         roleKey: ROLE_KEY[person.role],
         lineKey: LINE_KEY[person.role],
         flowId: flow.id,
-        flowTitle: flow.title,
+        flowTitle: flow.kidTitle || flow.title,
         carried: flow.carried,
         fromName: from.nick,
         toName: to.nick,

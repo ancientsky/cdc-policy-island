@@ -6,6 +6,8 @@ import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
 const SOUND_OFF = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M16 9.2l5 5.6M21 9.2l-5 5.6"/></svg>`;
+const ICON_CHECK = `<svg class="act-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 8.2 6.4 12 13 4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_PHONE = `<svg class="act-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3.2 2.6h2.1l1 2.4-1.3.9a8.2 8.2 0 0 0 3.7 3.7l.9-1.3 2.4 1v2.1c0 .6-.5 1.1-1.1 1.1C6.4 12.5 3.5 9.6 3.5 3.7c0-.6.5-1.1 1.1-1.1z"/></svg>`;
 
 const INTRO_KEY = "cdc-policy-island-intro-v1";
 
@@ -498,10 +500,10 @@ export function mount({ scene, islands, flows }) {
   function renderList() {
     const q = state.query.trim().toLowerCase().replace(/\s+/g, "");
     if (state.tab === "flows") {
-      const rows = flows.filter((flow) => !q || [flow.title, flow.text, flow.carried, flow._alias, byId.get(flow.a).name, byId.get(flow.b).name, byId.get(flow.a).nick, byId.get(flow.b).nick].join(" ").toLowerCase().replace(/\s+/g, "").includes(q));
+      const rows = flows.filter((flow) => !q || [flow.title, flow.kidTitle, flow.text, flow.kid, flow.carried, flow._alias, byId.get(flow.a).name, byId.get(flow.b).name, byId.get(flow.a).nick, byId.get(flow.b).nick].join(" ").toLowerCase().replace(/\s+/g, "").includes(q));
       tree.innerHTML = rows.length ? rows.map((flow) => {
         const on = state.selected?.type === "flow" && state.selected.id === flow.id;
-        return `<button type="button" class="btn flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.title)}</b><span>${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
+        return `<button type="button" class="btn flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.kidTitle || flow.title)}</b><span>${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
       }).join("") : `<p class="empty">${esc(t("emptyFlow"))}</p>`;
       return;
     }
@@ -513,7 +515,7 @@ export function mount({ scene, islands, flows }) {
     }
     const cards = ordered.filter((island) => {
       if (!q) return true;
-      const blob = [island.name, island.nick, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
+      const blob = [island.name, island.nick, island.pin, island.blurb, island.blurbKid, island.source, ...island.items.flatMap((item) => [item.name, item.detail, item.kid, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
       return blob.includes(q);
     });
     tree.innerHTML = cards.length ? cards.map((island) => {
@@ -626,16 +628,25 @@ export function mount({ scene, islands, flows }) {
     sheet.hidden = false;
     if (selected.type === "flow") {
       const flow = selected.flow;
-      sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.title)}</h2><p class="route">${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</p><p>${esc(flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p>`;
+      sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.kidTitle || flow.title)}</h2><p class="route">${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</p><p>${esc(flow.kid || flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p><b>${esc(flow.title)}</b></p><p>${esc(flow.text)}</p></details>`;
       return;
     }
     const island = byId.get(selected.type === "item" ? selected.islandId : selected.id);
     const related = flows.filter((flow) => flow.a === island.id || flow.b === island.id);
     const items = island.items.map((item) => {
       const on = selected.type === "item" && selected.itemId === item.id;
-      return `<button type="button" class="btn detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.name)}</b><small>${esc(phaseLabel[item.phase])}</small></span><em>${esc(item.text)}</em></button>`;
+      return `<button type="button" class="btn detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.name)}</b></span><em>${esc(item.kid)}</em></button>`;
     }).join("");
-    const links = related.map((flow) => `<button type="button" class="btn" data-flow="${flow.id}">${esc(flow.title)}</button>`).join("");
+    const links = related.map((flow) => `<button type="button" class="btn" data-flow="${flow.id}">${esc(flow.kidTitle || flow.title)}</button>`).join("");
+    const actions = (island.actions ?? []).map((action) => {
+      const icon = action.icon === "phone" ? ICON_PHONE : ICON_CHECK;
+      const body = `<span><b>${esc(action.label)}</b>${action.detail ? `<small>${esc(action.detail)}</small>` : ""}</span>`;
+      const inner = `${icon}${body}`;
+      return action.href
+        ? `<li><a href="${esc(action.href)}">${inner}</a></li>`
+        : `<li><div class="act">${inner}</div></li>`;
+    }).join("");
+    const adultItems = island.items.map((item) => `<p><b>${esc(item.name)}</b><small>${esc(phaseLabel[item.phase])}</small><br>${esc(item.detail)}</p>`).join("");
     const fresh = stampFreshId === island.id;
     const seal = book.islands[island.id]
       ? `<i class="stamp${fresh ? " fresh" : ""}" style="--c:${island.accent}">${esc(t("stampLabel"))}</i>`
@@ -643,7 +654,8 @@ export function mount({ scene, islands, flows }) {
     const say = island.say
       ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`
       : "";
-    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
+    sheet.style.setProperty("--c", island.accent);
+    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${esc(island.source)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     if (fresh) {
       stampFreshId = null;
       sheet.classList.remove("bump");

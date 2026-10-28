@@ -1,4 +1,5 @@
 import { dayNotes, flows, islands, phaseLabel, phases, pillars } from "./data.js";
+import { applyPlain, plain } from "./plain.js";
 
 const LANG_KEY = "cdc-island-lang";
 
@@ -48,7 +49,9 @@ const ui = {
     about1: "本站依疾病管制署公開資料整理，非官方網站。資料截至 2026 年 10 月。",
     about2: "島的位置和海上的病菌是為了好懂而畫的比喻。",
     about3: "最新資訊與防疫諮詢請洽疾管署網站或 1922 防疫專線。",
-    adultSummary: "政策背景與計畫來源",
+    adultSummary: "給大人看：政策背景、計畫名稱、年份與原文",
+    youCan: "你可以做的事",
+    didYouKnow: "你知道嗎？",
     toolClean: "清積水",
     toolCheck: "入境檢疫",
     toolShield: "打疫苗",
@@ -97,7 +100,7 @@ const ui = {
     close: "關閉",
     flowEyebrow: "運送路線",
     carried: "這條線上搬的是「{what}」。",
-    outTitle: "從這裡送出去",
+    outTitle: "這座島會送東西給…",
     carry: "攜帶 {what}",
     emptyFlow: "沒有符合的運送路線。",
     emptyLog: "還沒有人送貨喔！打開「運送路線」，看他們把檢體和疫苗送去哪裡。",
@@ -213,7 +216,9 @@ const ui = {
     about1: "Arranged from public Taiwan CDC material. Not an official site. Data as of October 2026.",
     about2: "Island positions and the germs offshore are drawn so the connections are easier to see.",
     about3: "For the latest information or health advice, use the Taiwan CDC website or the 1922 hotline.",
-    adultSummary: "Program background and sources",
+    adultSummary: "For adults: background, plan names, years, and the original wording",
+    youCan: "You can help",
+    didYouKnow: "Did you know?",
     toolClean: "Empty water",
     toolCheck: "Screening",
     toolShield: "Get vaccinated",
@@ -262,7 +267,7 @@ const ui = {
     close: "Close",
     flowEyebrow: "Route",
     carried: "What moves on this line: “{what}”.",
-    outTitle: "Sent on from here",
+    outTitle: "This island sends things to…",
     carry: "Carries {what}",
     emptyFlow: "No route matches.",
     emptyLog: "Nobody has made a delivery yet! Open “Routes” and see where specimens and vaccines go.",
@@ -378,7 +383,9 @@ const ui = {
     about1: "本サイトは台湾疾病管制署の公開資料を整理したもので、公式サイトではありません。資料は2026年10月時点です。",
     about2: "島の位置と海上の病原体は、つながりをわかりやすくするための比喩です。",
     about3: "最新情報と相談は、台湾CDCのサイトまたは1922防疫專線へ。",
-    adultSummary: "政策の背景と計画の出典",
+    adultSummary: "おとな向け：政策の背景、計画の名前、年、原文",
+    youCan: "きみにもできること",
+    didYouKnow: "知っていますか？",
     toolClean: "水を捨てる",
     toolCheck: "検疫",
     toolShield: "接種",
@@ -427,7 +434,7 @@ const ui = {
     close: "閉じる",
     flowEyebrow: "輸送",
     carried: "この線で運ぶのは「{what}」。",
-    outTitle: "ここから送り出す",
+    outTitle: "この島が届ける先…",
     carry: "運ぶもの {what}",
     emptyFlow: "合う輸送ルートはない。",
     emptyLog: "まだ誰も配達していないよ！「輸送ルート」を開いて、検体とワクチンがどこへ行くか見てみよう。",
@@ -1061,15 +1068,25 @@ function snapshot() {
       nick: island.nick,
       say: island.say,
       blurb: island.blurb,
+      blurbKid: island.blurbKid,
+      fact: island.fact,
+      actions: island.actions.map((row) => ({ ...row })),
       source: island.source,
       hrefLabel: island.hrefLabel,
       items: Object.fromEntries(island.items.map((itemRow) => [itemRow.id, {
         name: itemRow.name,
-        text: itemRow.text,
+        detail: itemRow.detail,
+        kid: itemRow.kid,
         keywords: [...(itemRow.keywords ?? [])],
       }])),
     }])),
-    flows: Object.fromEntries(flows.map((flow) => [flow.id, { title: flow.title, text: flow.text, carried: flow.carried }])),
+    flows: Object.fromEntries(flows.map((flow) => [flow.id, {
+      title: flow.title,
+      text: flow.text,
+      carried: flow.carried,
+      kidTitle: flow.kidTitle,
+      kid: flow.kid,
+    }])),
   };
 }
 
@@ -1085,12 +1102,17 @@ function restore() {
     island.nick = saved.nick;
     island.say = saved.say;
     island.blurb = saved.blurb;
+    island.blurbKid = saved.blurbKid;
+    island.fact = saved.fact;
+    island.actions = saved.actions.map((row) => ({ ...row }));
     island.source = saved.source;
     island.hrefLabel = saved.hrefLabel;
     for (const itemRow of island.items) {
       const savedItem = saved.items[itemRow.id];
       itemRow.name = savedItem.name;
-      itemRow.text = savedItem.text;
+      itemRow.detail = savedItem.detail;
+      itemRow.kid = savedItem.kid;
+      delete itemRow.text;
       itemRow.keywords = [...savedItem.keywords];
     }
   }
@@ -1133,18 +1155,20 @@ function paint(code) {
       const translated = row.items[itemRow.id];
       const saved = savedIsland.items[itemRow.id];
       itemRow.name = translated.name;
-      itemRow.text = translated.text;
-      itemRow.keywords = [...translated.keywords, ...saved.keywords, saved.name];
+      itemRow.detail = translated.text;
+      delete itemRow.text;
+      itemRow.keywords = [...translated.keywords, ...saved.keywords, saved.name, saved.kid];
     }
     island.items[0].keywords.push(savedIsland.name, savedIsland.pin, savedIsland.nick);
   }
+  applyPlain(islands, flows, plain[code]);
   for (const flow of flows) {
     const [title, carried, text] = flowCopy[code][flow.id];
     const saved = shot.flows[flow.id];
     flow.title = title;
     flow.carried = carried;
     flow.text = text;
-    flow._alias = [saved.title, saved.carried, saved.text].join(" ");
+    flow._alias = [saved.title, saved.kidTitle, saved.carried, saved.text, saved.kid].join(" ");
   }
 }
 
@@ -1202,9 +1226,18 @@ export function localeGaps(code) {
       gaps.push(island.id);
       continue;
     }
-    for (const itemRow of island.items) if (!row.items[itemRow.id]) gaps.push(itemRow.id);
+    for (const itemRow of island.items) {
+      if (!row.items[itemRow.id]) gaps.push(itemRow.id);
+      if (!plain[code]?.item?.[itemRow.id]) gaps.push(`${itemRow.id}.kid`);
+    }
+    if (!plain[code]?.blurbKid?.[island.id]) gaps.push(`${island.id}.blurbKid`);
+    if (!plain[code]?.fact?.[island.id]) gaps.push(`${island.id}.fact`);
+    if (!plain[code]?.actions?.[island.id]) gaps.push(`${island.id}.actions`);
     if (!sayCopy[code]?.[island.id]) gaps.push(`${island.id}.say`);
   }
-  for (const flow of flows) if (!flowCopy[code][flow.id]) gaps.push(flow.id);
+  for (const flow of flows) {
+    if (!flowCopy[code][flow.id]) gaps.push(flow.id);
+    if (!plain[code]?.flow?.[flow.id]) gaps.push(`${flow.id}.kid`);
+  }
   return gaps;
 }
