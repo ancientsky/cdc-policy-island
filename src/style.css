@@ -925,7 +925,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   .brand strong { font-size: var(--fs-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tools .btn { height: 40px; }
   #home, #list, #lang-btn { width: auto; min-width: 40px; padding: 0 8px; }
-  #help { width: 40px; padding: 0; }
+  #help, #sound { width: 40px; padding: 0; }
   .disclaimer-short { display: none; }
   body.intro .disclaimer-short {
     display: block;

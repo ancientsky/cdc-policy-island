@@ -11,6 +11,7 @@ import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, r
 import { createLife } from "./life.js";
 import { createEnvironment } from "./environment.js";
 import { createPeople } from "./people.js";
+import { play as playSfx } from "./sfx.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
@@ -706,16 +707,13 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         hotIndex = -1;
         for (const threat of threats) threat.hot = false;
       }
-      if (hoverId !== island.id) {
-        hoverId = island.id;
-        refresh();
-      }
+      if (assignHover(island.id)) refresh();
       holdRender = Math.max(holdRender, 0.3);
     });
     pinButton.addEventListener("pointerleave", () => {
       if (pinHover === island.id) pinHover = null;
       if (hoverId === island.id) {
-        hoverId = null;
+        assignHover(null);
         refresh();
         holdRender = Math.max(holdRender, 0.3);
       }
@@ -904,6 +902,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let frozen = false;
   let bird = false;
   let hoverId = null;
+  // Tick only when the pointer comes onto an island from empty space.
+  function assignHover(next) {
+    if (next === hoverId) return false;
+    const prev = hoverId;
+    hoverId = next;
+    if (prev == null && next) playSfx("hover", next);
+    return true;
+  }
   let pinHover = null;
   let hoverItem = null;
   let hotItem = null;
@@ -1523,6 +1529,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     crews,
     onArrive: (event) => {
       flashHandoff(event.to, event.carried);
+      playSfx("arrive");
       arriveCb(event);
     },
   });
@@ -2238,8 +2245,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       tool: threat.tool,
       routed,
     };
+    playSfx("hit");
     strikeCb(info);
-    if (routed) repelCb({ islandId: threat.islandId, tool: threat.tool, routed: true });
+    if (routed) {
+      playSfx("repel");
+      repelCb({ islandId: threat.islandId, tool: threat.tool, routed: true });
+    }
     holdRender = Math.max(holdRender, 0.45);
   }
 
@@ -2463,8 +2474,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           hotIndex = -1;
           for (const threat of threats) threat.hot = false;
         }
-        if (hoverId !== pinHover) {
-          hoverId = pinHover;
+        if (assignHover(pinHover)) {
           refresh();
           holdRender = Math.max(holdRender, 0.3);
         }
@@ -2472,10 +2482,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       } else if (picked?.kind === "threat") {
         people.setHover(-1);
         hoverItem = null;
-        if (hoverId !== null) {
-          hoverId = null;
-          refresh();
-        }
+        if (assignHover(null)) refresh();
         if (hotIndex !== picked.index) holdRender = 0.3;
         hotIndex = picked.index;
         for (const threat of threats) threat.hot = threats[hotIndex] === threat;
@@ -2486,8 +2493,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         if (hotIndex >= 0) holdRender = 0.3;
         hotIndex = -1;
         for (const threat of threats) threat.hot = false;
-        if (hoverId !== null) {
-          hoverId = null;
+        if (assignHover(null)) {
           refresh();
           holdRender = 0.3;
         }
@@ -2499,7 +2505,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         for (const threat of threats) threat.hot = false;
         if (hoverItem !== picked.itemId || hoverId !== picked.islandId) {
           hoverItem = picked.itemId;
-          hoverId = picked.islandId;
+          assignHover(picked.islandId);
           refresh();
           holdRender = Math.max(holdRender, 0.3);
         }
@@ -2512,7 +2518,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         const id = picked?.kind === "island" ? picked.islandId : null;
         if (id !== hoverId || hoverItem) {
           hoverItem = null;
-          hoverId = id;
+          assignHover(id);
           refresh();
           holdRender = 0.3;
         }

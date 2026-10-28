@@ -2,6 +2,10 @@ import { DATA_AS_OF, dayNote, hourCovers, itemCount, phaseLabel, phases, pillars
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
+import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
+
+const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
+const SOUND_OFF = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M16 9.2l5 5.6M21 9.2l-5 5.6"/></svg>`;
 
 const INTRO_KEY = "cdc-policy-island-intro-v1";
 
@@ -229,6 +233,7 @@ export function mount({ scene, islands, flows }) {
 
   function playStamp() {
     document.dispatchEvent(new CustomEvent("cdc-cue", { detail: "stamp" }));
+    playSfx("stamp");
   }
 
   function cancelStamp() {
@@ -306,7 +311,8 @@ export function mount({ scene, islands, flows }) {
     if (flipping || !book.welcome) return;
     const current = MISSIONS.find((row) => !book.missions[row.id]);
     if (!current || !current.check(book, game, missionUi())) return;
-    markMission(book, current.id);
+    if (!markMission(book, current.id)) return;
+    playSfx("mission");
     paintPins();
     const next = MISSIONS.find((row) => !book.missions[row.id]);
     flipping = true;
@@ -372,6 +378,15 @@ export function mount({ scene, islands, flows }) {
     $("list").setAttribute("aria-expanded", String(open));
   }
 
+  function paintSound() {
+    const button = $("sound");
+    if (!button) return;
+    const on = isOn();
+    button.setAttribute("aria-pressed", String(on));
+    button.setAttribute("aria-label", t("sound"));
+    button.innerHTML = on ? SOUND_ON : SOUND_OFF;
+  }
+
   function paintChrome() {
     document.documentElement.lang = getLang() === "zh" ? "zh-Hant" : getLang();
     document.title = t("title");
@@ -391,6 +406,7 @@ export function mount({ scene, islands, flows }) {
     $("home").textContent = t("home");
     $("list").textContent = t("list");
     $("help").setAttribute("aria-label", t("help"));
+    paintSound();
     $("hero-title").innerHTML = esc(t("heroTitle")).replaceAll("\n", "<br>");
     $("hero-lead").innerHTML = esc(t("heroLead")).replaceAll("\n", "<br>");
     search.placeholder = t("search");
@@ -613,6 +629,7 @@ export function mount({ scene, islands, flows }) {
 
   function selectIsland(id) {
     if (!byId.has(id)) return;
+    playSfx("select");
     dismissPerson();
     closeGerm();
     state.selected = { type: "island", id };
@@ -629,6 +646,7 @@ export function mount({ scene, islands, flows }) {
   function selectItem(islandId, itemId) {
     const island = byId.get(islandId);
     if (!island?.items.some((item) => item.id === itemId)) return;
+    playSfx("item");
     dismissPerson();
     closeGerm();
     cancelStamp();
@@ -976,6 +994,10 @@ export function mount({ scene, islands, flows }) {
     const steps = introSteps().map((step) => `<p><b>${esc(step.title)}</b><br>${esc(step.body)}</p>`).join("");
     return `<p>${esc(t("helpBody"))}</p>${steps}`;
   }
+  $("sound").addEventListener("click", () => {
+    toggleSound();
+    paintSound();
+  });
   $("help").addEventListener("click", () => {
     modal.dataset.mode = "help";
     $("modal-kicker").textContent = t("helpKicker");
@@ -1034,6 +1056,12 @@ export function mount({ scene, islands, flows }) {
     if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
       event.preventDefault();
       $("help").click();
+    } else if (!event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.isComposing && (event.key === "m" || event.key === "M")) {
+      const el = event.target;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) return;
+      toggleSound();
+      paintSound();
     } else if (event.key === "Escape") {
       if (!$("lang-pop").hidden) {
         $("lang-pop").hidden = true;
