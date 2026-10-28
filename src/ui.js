@@ -458,6 +458,34 @@ export function mount({ scene, islands, flows }) {
     paintGuideCopy();
     paintMission();
     syncDrawerButton();
+    armFactLine();
+  }
+
+  const factMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let factIndex = 0;
+  let factTimer = 0;
+  function paintFactLine() {
+    const button = $("fact-tick");
+    const island = ordered[factIndex];
+    if (!button || !island) return;
+    button.dataset.island = island.id;
+    button.querySelector("b").textContent = t("didYouKnow");
+    button.querySelector("span").textContent = island.fact;
+  }
+  function armFactLine() {
+    if (factTimer) clearInterval(factTimer);
+    factTimer = 0;
+    if (!ordered.length) return;
+    if (factMedia.matches) factIndex = 0;
+    if (factIndex >= ordered.length) factIndex = 0;
+    paintFactLine();
+    if (factMedia.matches || ordered.length < 2) return;
+    factTimer = setInterval(() => {
+      let next = factIndex;
+      while (next === factIndex) next = Math.floor(Math.random() * ordered.length);
+      factIndex = next;
+      paintFactLine();
+    }, 8000);
   }
 
   function writeHash() {
@@ -655,7 +683,8 @@ export function mount({ scene, islands, flows }) {
       ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`
       : "";
     sheet.style.setProperty("--c", island.accent);
-    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${esc(island.source)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${esc(island.source)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;
       sheet.classList.remove("bump");
@@ -1080,6 +1109,11 @@ export function mount({ scene, islands, flows }) {
     });
   }
   $("home").addEventListener("click", clearSelection);
+  factMedia.addEventListener("change", armFactLine);
+  $("fact-tick").addEventListener("click", () => {
+    const id = $("fact-tick").dataset.island;
+    if (id) selectIsland(id);
+  });
   $("list").addEventListener("click", () => {
     if (ledger.classList.contains("open")) {
       ledger.classList.remove("open", "half");

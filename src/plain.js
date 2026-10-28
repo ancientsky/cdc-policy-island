@@ -6,7 +6,7 @@ const tel = (label, detail) => ({ icon: "phone", label, detail, href: "tel:1922"
 
 const zhHot = tel("撥打 1922 防疫專線", "免付費、全年無休。也可撥 0800-001922。");
 const enHot = tel("Call the 1922 health line", "Toll-free, every day of the year. You can also call 0800-001922.");
-const jaHot = tel("1922 に電話する", "無料で、年中無休です。0800-001922 でもかけられます。");
+const jaHot = tel("1922 に電話します", "無料で、年中無休です。0800-001922 でもかけられます。");
 
 export const plain = {
   zh: {
