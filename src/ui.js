@@ -1,7 +1,7 @@
 import { DATA_AS_OF, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
-import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
+import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, save as savePassport, stampIsland } from "./passport.js";
 import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
@@ -130,7 +130,7 @@ export function mount({ scene, islands, flows }) {
   guide.id = "guide";
   guide.className = "guide";
   guide.hidden = true;
-  guide.innerHTML = `<div class="guide-face" id="guide-face"></div><p class="guide-say" id="guide-say"></p><button type="button" class="btn btn--solid" id="guide-go"></button>`;
+  guide.innerHTML = `<div class="guide-face" id="guide-face"></div><div class="guide-copy"><b class="guide-title" id="guide-title"></b><p class="guide-say" id="guide-say"></p></div><button type="button" class="btn btn--solid" id="guide-go"></button>`;
   const mission = document.createElement("section");
   mission.id = "mission";
   mission.className = "mission";
@@ -150,6 +150,7 @@ export function mount({ scene, islands, flows }) {
     paintMission();
     paintPins();
     advanceMissions();
+    selectIsland("border");
   });
 
   function placePassport() {
@@ -194,9 +195,14 @@ export function mount({ scene, islands, flows }) {
 
   function paintGuideCopy() {
     guide.querySelector("#guide-face").textContent = t("guideMark");
+    guide.querySelector("#guide-title").textContent = t("guideTitle");
     guide.querySelector("#guide-say").textContent = t("guideHello");
     guide.querySelector("#guide-go").textContent = t("guideGo");
-    if (!mile.hidden && mile.dataset.key) mile.textContent = t(mile.dataset.key);
+    const capFace = $("caption-face");
+    if (capFace) capFace.textContent = t("guideMark");
+    if (!mile.hidden && mile.dataset.key) {
+      mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(t(mile.dataset.key))}</span>`;
+    }
   }
 
   function showGuide() {
@@ -228,7 +234,7 @@ export function mount({ scene, islands, flows }) {
   function showMile(key) {
     mile.dataset.key = key;
     mile.hidden = false;
-    mile.textContent = t(key);
+    mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(t(key))}</span>`;
     window.clearTimeout(mileTimer);
     mileTimer = window.setTimeout(() => { mile.hidden = true; }, 2400);
   }
@@ -268,10 +274,10 @@ export function mount({ scene, islands, flows }) {
     $("modal-kicker").textContent = t("guideName");
     $("modal-title").textContent = t("gradTitle");
     const seals = ordered.map((island) => `<i class="seal" style="--c:${island.accent}">${esc(island.pin)}</i>`).join("");
-    $("modal-body").innerHTML = `<p>${esc(t("gradBody"))}</p><div class="seals">${seals}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
+    $("modal-body").innerHTML = `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(t("gradBody"))}</p></div><div class="seals">${seals}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
     $("modal-next").textContent = t("gradAgain");
     $("modal-skip").hidden = false;
-    $("modal-skip").textContent = t("gradReset");
+    $("modal-skip").textContent = t("home");
     $("modal-dots").hidden = true;
     placeCoach(0);
     openModal();
@@ -466,8 +472,11 @@ export function mount({ scene, islands, flows }) {
     clock.textContent = fmt(state.minutes);
     const nextMinute = String(Math.floor(state.minutes));
     if (day.value !== nextMinute) day.value = nextMinute;
-    const join = getLang() === "en" ? ". " : "。";
-    dayNoteEl.textContent = `${note.title}${join}${note.text}`;
+    const titled = /[。！？!?]$/.test(note.title);
+    const gap = titled ? (getLang() === "en" ? " " : "") : (getLang() === "en" ? ". " : "。");
+    const capFace = $("caption-face");
+    if (capFace) capFace.textContent = t("guideMark");
+    dayNoteEl.textContent = `${t("chapterBy")}${note.title}${gap}${note.text}`;
     status.textContent = t("onDuty", { n: awake });
     scene.setMinutes(state.minutes);
     paintTicks();
@@ -625,7 +634,10 @@ export function mount({ scene, islands, flows }) {
     const seal = book.islands[island.id]
       ? `<i class="stamp${fresh ? " fresh" : ""}" style="--c:${island.accent}">${esc(t("stampLabel"))}</i>`
       : "";
-    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2><p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
+    const say = island.say
+      ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`
+      : "";
+    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2>${say}<p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
     if (fresh) {
       stampFreshId = null;
       sheet.classList.remove("bump");
@@ -816,7 +828,7 @@ export function mount({ scene, islands, flows }) {
     $("modal-kicker").textContent = `${index + 1} / ${steps.length}`;
     $("modal-title").textContent = step.title;
     $("modal-body").textContent = step.body;
-    $("modal-next").textContent = index === steps.length - 1 ? t("start") : t("next");
+    $("modal-next").textContent = index === steps.length - 1 ? t("guideGo") : t("next");
     $("modal-skip").textContent = t("skip");
     $("modal-skip").hidden = index === steps.length - 1;
     paintDots(index, steps.length);
@@ -1082,7 +1094,7 @@ export function mount({ scene, islands, flows }) {
     paintLangButton();
   });
   function helpHtml() {
-    const steps = introSteps().map((step) => `<p><b>${esc(step.title)}</b><br>${esc(step.body)}</p>`).join("");
+    const steps = introSteps().slice(1).map((step) => `<p><b>${esc(step.title)}</b><br>${esc(step.body)}</p>`).join("");
     return `<p>${esc(t("helpBody"))}</p>${steps}`;
   }
   $("sound").addEventListener("click", () => {
@@ -1102,14 +1114,9 @@ export function mount({ scene, islands, flows }) {
   $("about").addEventListener("click", showAbout);
   $("modal-skip").addEventListener("click", () => {
     if (modal.dataset.mode === "grad") {
-      if (!window.confirm(t("gradResetAsk"))) return;
-      resetPassport(book);
-      stampFreshId = null;
-      flipping = false;
-      paintPassport(true);
-      paintPins();
-      paintMission();
       closeModal();
+      clearSelection();
+      paintMission();
       return;
     }
     closeModal();
@@ -1140,8 +1147,10 @@ export function mount({ scene, islands, flows }) {
       if (grad) paintMission();
       return;
     }
-    if (introIndex >= introSteps().length - 1) closeModal();
-    else showIntro(introIndex + 1);
+    if (introIndex >= introSteps().length - 1) {
+      closeModal();
+      selectIsland("border");
+    } else showIntro(introIndex + 1);
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "?" || (event.key === "/" && event.shiftKey)) {

@@ -88,6 +88,10 @@ const ui = {
     toggleBird: "鳥瞰",
     viewMenu: "顯示",
     chapterBy: "琵琵：",
+    plateFlu: "噴嚏怪",
+    plateEntero: "髒手怪",
+    plateAedes: "斑斑蚊",
+    plateTb: "頑固菌",
     dutyStart: "{nick}・{item} 開始值班",
     togglesLabel: "顯示",
     close: "關閉",
@@ -153,6 +157,7 @@ const ui = {
     carryPhone: "疫情消息",
     carrySit: "社區消息",
     guideName: "琵琵隊長",
+    guideTitle: "嗨！我是琵琵隊長",
     guideMark: "琵",
     guideHello: "我是一隻黑面琵鷺，每年冬天都飛來台灣。這次我要帶你巡邏 14 座防疫島。病菌每天都想偷偷登陸台灣，島上的人就是要把它們擋下來！",
     guideGo: "出發！",
@@ -248,6 +253,10 @@ const ui = {
     toggleBird: "Overhead",
     viewMenu: "View",
     chapterBy: "Pipi: ",
+    plateFlu: "Sneezer",
+    plateEntero: "Grimy",
+    plateAedes: "Stripey",
+    plateTb: "Stubborn Bug",
     dutyStart: "{nick} · {item} starts a shift",
     togglesLabel: "Display",
     close: "Close",
@@ -313,6 +322,7 @@ const ui = {
     carryPhone: "a health alert",
     carrySit: "neighborhood news",
     guideName: "Captain Pipi",
+    guideTitle: "Hi! I'm Captain Pipi",
     guideMark: "P",
     guideHello: "I'm a black-faced spoonbill. I fly to Taiwan every winter. This time I'll patrol the 14 prevention islands with you. Germs try to land every day, and the people on the islands are here to stop them!",
     guideGo: "Let's go!",
@@ -408,6 +418,10 @@ const ui = {
     toggleBird: "俯瞰",
     viewMenu: "表示",
     chapterBy: "ピピ：",
+    plateFlu: "クシャミン",
+    plateEntero: "ヨゴレン",
+    plateAedes: "シマカちゃん",
+    plateTb: "ガンコ菌",
     dutyStart: "{nick}・{item}の当番開始",
     togglesLabel: "表示",
     close: "閉じる",
@@ -473,6 +487,7 @@ const ui = {
     carryPhone: "発生情報",
     carrySit: "町の知らせ",
     guideName: "ピピ隊長",
+    guideTitle: "やあ！ピピ隊長だよ",
     guideMark: "ピ",
     guideHello: "わたしはクロツラヘラサギ。毎年冬に台湾へ飛んでくる。今回は14の防疫島をいっしょにパトロールするよ。病原体は毎日こっそり上陸しようとする。島の人たちがそれを止めているんだ！",
     guideGo: "出発！",
@@ -502,22 +517,22 @@ const ui = {
 
 const intro = {
   zh: [
-    { kicker: "01  /  政策發展島", title: "十四座島，一張防疫網", body: "這裡把疾管署公開的防治計畫排成可以走進去的島。輪廓是臺灣：最北是邊境，最南是登革熱，離岸的那一座是抗藥性。" },
-    { kicker: "02", title: "點一格，看裡面的工作", body: "島上的房子是具體工作：通報、冷鏈、清孳生源、PrEP。點房子，或從清單進去。" },
-    { kicker: "03", title: "弧線是交件，不是裝飾", body: "兩座島之間的線，表示檢體、名單或物資要交過去。沒有這些接點，計畫會各做各的。", showFlows: true },
-    { kicker: "04", title: "底下有兩種時間", body: "「防疫的一天」看這個時段誰在值班。「政策階段」把工作分成本期、近期建設、中程目標，和要守到 2035 的長期消除。" },
+    { kicker: "1 / 4", title: "嗨！我是琵琵隊長", body: "我是一隻黑面琵鷺，每年冬天都飛來台灣。這次我要帶你巡邏 14 座防疫島。病菌每天都想偷偷登陸台灣，島上的人就是要把它們擋下來！" },
+    { kicker: "2 / 4", title: "看到海上的壞傢伙了嗎？", body: "紅紅刺刺的是噴嚏怪，有條紋的是斑斑蚊。島上的人會用洗手、倒積水、打疫苗、把藥吃完，把它們擋在外面。點一座島，看看那裡的人在忙什麼！" },
+    { kicker: "3 / 4", title: "防疫是一場接力賽", body: "島和島之間的彩色弧線是運送路線。港口抓到可疑的病人，就要把檢體快遞到偵探島。只要有一棒掉了，病菌就會溜進來！", showFlows: true },
+    { kicker: "4 / 4", title: "準備好了嗎？", body: "下面的時間軸可以快轉一天：半夜誰還在值班？上學時間誰最忙？我們從最北邊的港口守門島開始！" },
   ],
   en: [
-    { kicker: "01  /  Policy islands", title: "Fourteen islands, one net", body: "Public Taiwan CDC programs, set out as islands you can enter. The outline is Taiwan: quarantine at the north, dengue at the south, and antimicrobial resistance just offshore." },
-    { kicker: "02", title: "Open a cell, read the work", body: "The buildings are concrete tasks: notification, the cold chain, clearing breeding sites, PrEP. Click a building, or enter from the list." },
-    { kicker: "03", title: "The arc is a handoff", body: "A line between two islands means a specimen, a list, or supplies has to cross. Without those joints, each program works alone.", showFlows: true },
-    { kicker: "04", title: "Two kinds of time", body: "“A prevention day” shows who is on duty at this hour. “Program phase” splits the work into this period, near-term build, the path to 2030, and what still has to hold through 2035." },
+    { kicker: "1 / 4", title: "Hi! I'm Captain Pipi", body: "I'm a black-faced spoonbill. I fly to Taiwan every winter. This time I'll patrol the 14 prevention islands with you. Germs try to land every day, and the people on the islands are here to stop them!" },
+    { kicker: "2 / 4", title: "See the troublemakers at sea?", body: "The spiky red one is Sneezer. The striped one is Stripey. People on the islands stop them by washing hands, tipping out standing water, getting vaccines, and finishing the medicine. Click an island and see what the people there are doing!" },
+    { kicker: "3 / 4", title: "Prevention is a relay", body: "The colored arcs between islands are delivery routes. When the harbor finds a traveler who might be ill, the specimen has to race to Detective Island. Drop one baton, and a germ slips in!", showFlows: true },
+    { kicker: "4 / 4", title: "Ready?", body: "The timeline below can fast-forward a whole day. Who is still on duty at midnight? Who is busiest when school starts? We begin at Harbor Gate Island, the one farthest north!" },
   ],
   ja: [
-    { kicker: "01  /  政策の島", title: "十四の島、一つの網", body: "台湾CDCの公開計画を、入れる島に並べた。輪郭は台湾。北端が水際、南端がデング熱、沖の一島が薬剤耐性。" },
-    { kicker: "02", title: "一マスを開くと仕事がある", body: "島の建物は具体的な仕事。届出、コールドチェーン、発生源の除去、PrEP。建物を押すか、一覧から入る。" },
-    { kicker: "03", title: "弧は受け渡し", body: "二つの島を結ぶ線は、検体、名簿、物資が渡ることを示す。この継ぎ目がなければ、計画はばらばらに動く。", showFlows: true },
-    { kicker: "04", title: "時間は二種類", body: "「防疫の一日」はこの時間に誰が当番かを見る。「計画の段階」は今期、近期の整備、2030年までの仕事、2035年まで残す仕事に分ける。" },
+    { kicker: "1 / 4", title: "やあ！ピピ隊長だよ", body: "わたしはクロツラヘラサギ。毎年冬に台湾へ飛んでくる。今回は14の防疫島をいっしょにパトロールするよ。病原体は毎日こっそり上陸しようとする。島の人たちがそれを止めているんだ！" },
+    { kicker: "2 / 4", title: "海のわるいのが見えた？", body: "赤くてトゲトゲなのはクシャミン。しましまなのはシマカちゃん。島の人は、手洗い、水たまりを空にすること、ワクチン、薬を飲みきることで、外に止めているよ。島を押して、そこで何をしているか見てみよう！" },
+    { kicker: "3 / 4", title: "防疫はリレーだ", body: "島と島のあいだの色の弧は輸送ルート。港で疑わしい患者を見つけたら、検体をたんていの島へ急いで届ける。一棒でも落とすと、病原体が入り込むよ！", showFlows: true },
+    { kicker: "4 / 4", title: "準備はいい？", body: "下の時間軸で一日を早送りできるよ。夜中は誰が当番？学校の時間は誰がいちばん忙しい？いちばん北の港の門番島から始めよう！" },
   ],
 };
 
@@ -598,6 +613,41 @@ const nickCopy = {
     amr: "スーパー耐性菌の島",
     ready: "備えの倉庫島",
     global: "世界とつながる電波の島",
+  },
+};
+
+const sayCopy = {
+  en: {
+    watch: "This is the lookout! When a doctor finds an infectious disease, the news comes here. The lights stay on all 24 hours.",
+    border: "Planes and ships from abroad have to pass this gate first. I'm a migratory bird, and I fly in through here every year too!",
+    lab: "Welcome to Detective Island! When a doctor says someone is ill, this is where we find out who did it.",
+    vax: "A vaccine is like showing your body the wanted poster first. When the real germ arrives, the body recognizes it right away!",
+    flu: "Achoo! Every winter, Sneezer comes to give everyone a test. This island helps people pass.",
+    entero: "Enterovirus loves to hide on toys and little hands. Children under five are the ones it can make very sick.",
+    dengue: "Stripey is here! Instead of swatting mosquitoes, keep them from hatching at all.",
+    tb: "Stubborn Bug really is stubborn. The medicine has to be taken for more than 6 months, with not a single day off.",
+    hiv: "There is good medicine for HIV now. Get tested early, take the medicine, and you can go to school and work like everyone else.",
+    hepa: "The liver is a quiet organ. It can be ill without hurting much, so a test is how you find the problem.",
+    ipc: "Hospitals have the most patients, so germs spread most easily there. That is why the people here wash their hands the most carefully.",
+    amr: "Careful! Some bacteria have met so many antibiotics that they trained into superbugs that will not go down.",
+    ready: "This is the prevention warehouse. Masks, gowns, and medicine are stored on ordinary days, so a big outbreak does not turn into a scramble.",
+    global: "Germs don't need a passport to go abroad! That is why we trade news with countries around the world.",
+  },
+  ja: {
+    watch: "ここは見張り塔！お医者さんが見つけた感染症の知らせは、ここに届くよ。この明かりは24時間ついているんだ。",
+    border: "外国から来る飛行機と船は、まずこの門を通る。わたしは渡り鳥。毎年ここから飛んで入るんだ！",
+    lab: "たんていの島へようこそ！お医者さんが「だれか病気だ」と言ったら、ここで「犯人はだれか」を調べるよ。",
+    vax: "ワクチンは、体に先に「指名手配の写真」を見せるようなもの。本物の病原体が来たら、体はすぐにわかる！",
+    flu: "ハックション！毎年冬、クシャミンがテストを受けに来る。この島は、みんなが合格できるようにするよ。",
+    entero: "エンテロウイルスはおもちゃと小さな手に隠れるのが大好き。5歳未満の子どもがいちばん重症になりやすい。",
+    dengue: "シマカちゃんが来た！蚊を叩くより、そもそも生まれないようにしよう。",
+    tb: "ガンコ菌は本当にがんこ。薬は6か月以上、一日も休まず飲み続けるんだ。",
+    hiv: "エイズのウイルスには、いま良い薬がある。早く検査して、きちんと飲めば、みんなと同じように学校へ行けるし、働ける。",
+    hepa: "肝臓はとても静かな臓器。病気でもあまり痛まないから、検査で見つけるんだ。",
+    ipc: "病院は患者さんが一番多い。病原体も広がりやすい。だからここの人は手洗いがいちばん丁寧。",
+    amr: "気をつけて！抗生物質を受けすぎた細菌が、倒されないスーパー耐性菌になることがある。",
+    ready: "ここは防疫の倉庫。ふだんからマスク、防護衣、薬をしまっておく。大きな流行のとき、あわてなくてすむ。",
+    global: "病原体はパスポートなしで出国する！だから世界の国々と情報を交換するんだ。",
   },
 };
 
@@ -1009,6 +1059,7 @@ function snapshot() {
       name: island.name,
       pin: island.pin,
       nick: island.nick,
+      say: island.say,
       blurb: island.blurb,
       source: island.source,
       hrefLabel: island.hrefLabel,
@@ -1032,6 +1083,7 @@ function restore() {
     island.name = saved.name;
     island.pin = saved.pin;
     island.nick = saved.nick;
+    island.say = saved.say;
     island.blurb = saved.blurb;
     island.source = saved.source;
     island.hrefLabel = saved.hrefLabel;
@@ -1071,6 +1123,7 @@ function paint(code) {
     island.name = row.name;
     island.pin = row.pin;
     island.nick = nickCopy[code][island.id];
+    island.say = sayCopy[code][island.id];
     island.blurb = row.blurb;
     island.source = row.source;
     island.hrefLabel = row.hrefLabel;
@@ -1149,6 +1202,7 @@ export function localeGaps(code) {
       continue;
     }
     for (const itemRow of island.items) if (!row.items[itemRow.id]) gaps.push(itemRow.id);
+    if (!sayCopy[code]?.[island.id]) gaps.push(`${island.id}.say`);
   }
   for (const flow of flows) if (!flowCopy[code][flow.id]) gaps.push(flow.id);
   return gaps;

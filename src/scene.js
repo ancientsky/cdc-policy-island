@@ -923,6 +923,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let elapsed = 0;
   const threats = [];
   const threatHits = [];
+  const plateMarks = [];
+  let platesDirty = false;
   const crews = [];
   const crewMarks = [];
   const handoffPops = [];
@@ -936,6 +938,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     _threatDir.y = 0;
     if (_threatDir.lengthSq() > 1e-8) threat.mesh.rotation.y = Math.atan2(-_threatDir.x, -_threatDir.z);
     threat.mesh.updateWorldMatrix(true, true);
+    platesDirty = true;
   }
 
   function poseCrew(crew, from, to, alpha) {
@@ -1428,16 +1431,26 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       return { home, halt };
     }
     const roster = [
-      { make: () => makeMosquito(), id: "dengue", tool: "clean", rate: 0.046 },
-      { make: () => makeMosquito(), id: "border", tool: "check", rate: 0.04 },
-      { make: () => makeVirus(0xd2694a), id: "flu", tool: "shield", rate: 0.038 },
-      { make: () => makeVirus(0x5aa86a), id: "entero", tool: "wash", rate: 0.04 },
-      { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034 },
+      { make: () => makeMosquito(), id: "dengue", tool: "clean", rate: 0.046, plate: "plateAedes" },
+      { make: () => makeMosquito(), id: "border", tool: "check", rate: 0.04, plate: "plateAedes" },
+      { make: () => makeVirus(0xd2694a), id: "flu", tool: "shield", rate: 0.038, plate: "plateFlu" },
+      { make: () => makeVirus(0x5aa86a), id: "entero", tool: "wash", rate: 0.04, plate: "plateEntero" },
+      { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034, plate: "plateTb" },
     ];
     roster.forEach((spec, index) => {
       const built = spec.make();
       const raid = approach(index, views.get(spec.id).base);
       addThreat(built.group, built.head, built.nose, raid.home, raid.halt, spec.rate, 1.1, spec.tool, spec.id);
+      const threat = threats[threats.length - 1];
+      const plateEl = document.createElement("div");
+      plateEl.className = "threat-name";
+      plateEl.dataset.plate = spec.plate;
+      plateEl.textContent = t(spec.plate);
+      const plate = new CSS2DObject(plateEl);
+      plate.position.set(0, 0.85, 0);
+      threat.mesh.add(plate);
+      threat.plateEl = plateEl;
+      plateMarks.push({ el: plateEl, key: spec.plate });
     });
     placeCrews();
   }
@@ -2672,6 +2685,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let labelForce = false;
 
   function labelsStill() {
+    if (platesDirty) {
+      platesDirty = false;
+      return false;
+    }
     if (liveWakes.length) {
       labelForce = true;
       return false;
@@ -3550,6 +3567,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
       }
       for (const mark of crewMarks) mark.el.textContent = t(mark.key);
+      for (const mark of plateMarks) mark.el.textContent = t(mark.key);
       people.relabel();
       placeTip();
       refresh();
@@ -3638,6 +3656,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         }
       }
       if (threats.length !== 5) errors.push(`expected 5 threats, saw ${threats.length}`);
+      if (plateMarks.length !== 5) errors.push(`expected 5 nameplates, saw ${plateMarks.length}`);
       for (const threat of threats) {
         const radius = threat.hit?.geometry?.parameters?.radius ?? 0;
         if (radius * threat.scale0 < 0.499) errors.push(`hit sphere on ${threat.islandId} is under 0.5`);

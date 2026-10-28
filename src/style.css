@@ -357,6 +357,17 @@ body.intro .title-card { opacity: 0; }
 .sheet[hidden] { display: none; }
 .sheet p, .detail-item em { max-width: 34em; text-wrap: pretty; }
 .sheet h2 { font: 700 var(--fs-xl)/1.3 var(--serif); letter-spacing: 0.02em; margin: 0 0 8px; }
+.sheet-say {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--field);
+}
+.sheet-say .guide-say { margin: 0; }
 .sheet .x {
   position: sticky;
   top: 0;
@@ -408,9 +419,10 @@ body.intro .title-card { opacity: 0; }
 .germ .k { margin: 8px 0 2px; font-size: 13px; font-weight: 700; }
 .germ p { margin: 0 0 6px; font-size: 14px; line-height: 1.6; }
 .germ .do { border-left: 4px solid var(--teal); padding-left: 8px; }
-.threat-tip {
+.threat-tip, .threat-name {
   font-size: 12px;
   line-height: 1.4;
+  font-weight: 700;
   color: #fff;
   background: #1f2d33;
   border-radius: 999px;
@@ -525,18 +537,35 @@ body.intro .title-card { opacity: 0; }
   width: fit-content;
   max-width: min(520px, calc(100vw - 32px));
   margin: 0;
-  padding: 6px 14px;
+  padding: 6px 12px 6px 8px;
   border-radius: 999px;
   background: rgba(8, 28, 30, 0.72);
   color: #fff;
   font: 400 var(--fs-md)/1.45 var(--sans);
-  text-align: center;
+  text-align: left;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 400ms ease;
+}
+.caption-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  transition: opacity 400ms ease;
+  min-width: 0;
+}
+.caption-face {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #1f6f68;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font: 700 14px/1 var(--serif);
 }
 .caption.idle { opacity: 0; }
 #status { color: inherit; }
@@ -870,8 +899,11 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   display: grid;
   grid-template-columns: 48px 1fr;
   gap: 8px 10px;
+  align-items: start;
   padding: 14px;
 }
+.guide-copy { min-width: 0; }
+.guide-title { display: block; margin: 0 0 4px; font: 700 var(--fs-md)/1.3 var(--serif); }
 .guide-face {
   width: 48px;
   height: 48px;
@@ -915,6 +947,9 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   margin: 0;
   padding: 10px 12px;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font: 700 var(--fs-md)/1.45 var(--serif);
 }
 .sheet .stamp {
@@ -1202,7 +1237,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   .guide, .mission {
     left: 8px;
     right: auto;
-    top: calc(60px + env(safe-area-inset-top));
+    top: calc(104px + env(safe-area-inset-top));
     bottom: auto;
     width: min(280px, calc(100vw - 16px));
   }
