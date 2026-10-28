@@ -30,6 +30,7 @@ const _blobAt = new THREE.Vector3();
 const _proj = new THREE.Vector3();
 const mixA = new THREE.Color();
 const mixB = new THREE.Color();
+const ASLEEP = new THREE.Color(0x8a8f93);
 const lookTop = new THREE.Color();
 const lookHor = new THREE.Color();
 const lookBot = new THREE.Color();
@@ -619,6 +620,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       shown: reduced ? 1 : 0,
       spring: 1,
       sv: 0,
+      wasAwake: false,
+      wakeAge: null,
+      flash: 0,
+      baseGlow: 0,
     };
   }
 
@@ -772,6 +777,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       pulseRing: null,
       fade: 1,
       fadeTarget: 1,
+      awake: true,
       pinShown: Boolean(reduced),
       treeRecs: group.userData.treeRecs,
       introIndex: 0,
@@ -881,7 +887,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   for (const route of flowViews) layoutRoute(route);
 
   const skinHex = [P.cf0c7a4, P.cd9a57a, P.cc48a6a, P.c8d5a3c];
-  let cargoOn = true;
+  let cargoOn = false;
   const TOOL_KEY = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
 
   function anchorFront(mesh, yHead, nosePos) {
@@ -898,7 +904,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let pillarSet = new Set();
   let query = "";
   let showAllFlows = false;
-  let namesOn = false;
+  let namesOn = true;
   let frozen = false;
   let bird = false;
   let hoverId = null;
@@ -1517,6 +1523,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   let pickCb = () => {};
   let arriveCb = () => {};
+  let dutyCb = () => {};
+  let glowReady = false;
+  const wakeQueue = [];
+  const liveWakes = [];
   let markCb = () => {};
   let strikeCb = () => {};
   let repelCb = () => {};
@@ -1913,6 +1923,47 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
   }
 
+  function pumpWakes() {
+    while (liveWakes.length < 3 && wakeQueue.length) {
+      const job = wakeQueue.shift();
+      const el = document.createElement("div");
+      el.className = "wake-label";
+      el.textContent = job.name;
+      const obj = new CSS2DObject(el);
+      obj.position.set(0, 0.95, 0);
+      job.building.group.add(obj);
+      liveWakes.push({ obj, el, name: job.name, age: 0 });
+    }
+  }
+
+  function enqueueWake(building, name) {
+    wakeQueue.push({ building, name });
+    pumpWakes();
+  }
+
+  function stepWakes(step) {
+    let changed = false;
+    for (let i = liveWakes.length - 1; i >= 0; i -= 1) {
+      const job = liveWakes[i];
+      job.age += step;
+      if (job.age < 1.6) continue;
+      job.obj.removeFromParent();
+      job.el.remove();
+      liveWakes.splice(i, 1);
+      changed = true;
+    }
+    if (changed) pumpWakes();
+  }
+
+  function wakeFactor(age) {
+    if (age == null) return 1;
+    const u = age / 0.26;
+    if (u >= 1) return 1;
+    const up = u <= 0.5 ? easeOutBack(u / 0.5) : 1;
+    const down = u <= 0.5 ? 1 : 1 - (u - 0.5) / 0.5;
+    return 1 + 0.18 * up * down;
+  }
+
   function applyClock() {
     const hour = minutes / 60;
     const look = lookAtHour(hour);
@@ -1974,12 +2025,29 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       disc.color.set(night > 0.5 ? 0xffcf8a : view.island.accent);
       disc.opacity = active ? 0.12 + night * 0.28 : 0;
       view.glow.visible = disc.opacity > 0.02;
+      let islandAwake = false;
       for (const building of view.buildings) {
-        const awake = building.group.visible && hourCovers(building.item.hours, hour);
-        const amount = awake ? 0.1 + night * 3.2 : night * 0.25;
-        for (const win of building.windows) win.glowAmount = amount;
+        const covers = hourCovers(building.item.hours, hour);
+        if (covers) islandAwake = true;
+        if (!glowReady) building.wasAwake = covers;
+        else if (covers && !building.wasAwake) {
+          building.wasAwake = true;
+          if (!reduced) {
+            building.wakeAge = 0;
+            building.flash = 1;
+          }
+          enqueueWake(building, building.item.name);
+          dutyCb({ islandId: view.island.id, item: building.item.name });
+        } else if (!covers) building.wasAwake = false;
+        const shown = building.group.visible && covers;
+        const amount = shown ? 0.1 + night * 3.2 : night * 0.25;
+        building.baseGlow = amount;
+        const lift = building.flash > 0 ? 2 * building.flash : 0;
+        for (const win of building.windows) win.glowAmount = Math.max(amount, lift);
       }
+      view.awake = islandAwake;
     }
+    glowReady = true;
     kit.touch();
   }
 
@@ -2282,6 +2350,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const hoverK = 1 - Math.exp(-step * 14);
     const clock = introClock();
     let islandBusy = false;
+    let glowPulse = false;
+    stepWakes(step);
+    if (liveWakes.length || wakeQueue.length) islandBusy = true;
     for (const view of views.values()) {
       const landStart = 200 + view.introIndex * 70;
       let isleE = 1;
@@ -2322,7 +2393,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           mat.opacity = view.fade;
         }
       }
-      view.landMat.color.setRGB(1, 1, 1).lerp(view.accent, view.hover * 0.12);
+      view.landMat.color.setRGB(1, 1, 1);
+      if (!view.awake) mixHex(view.landMat.color, ASLEEP, 0.3, view.landMat.color);
+      view.landMat.color.lerp(view.accent, view.hover * 0.12);
       poseRing(view);
       if (view.pulseT != null && view.pulseRing) {
         islandBusy = true;
@@ -2360,7 +2433,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           building.spring = springTarget;
           building.sv = 0;
         } else islandBusy = true;
-        const scale = Math.max(0, presence * building.spring);
+        if (building.wakeAge != null) {
+          building.wakeAge += step;
+          if (building.wakeAge >= 0.26) building.wakeAge = null;
+          else islandBusy = true;
+        }
+        if (building.flash > 0) {
+          building.flash = Math.max(0, building.flash - step / 0.26);
+          const lift = 2 * building.flash;
+          for (const win of building.windows) win.glowAmount = Math.max(building.baseGlow, lift);
+          islandBusy = true;
+          glowPulse = true;
+        }
+        const wakeMul = reduced ? 1 : wakeFactor(building.wakeAge);
+        const scale = Math.max(0, presence * building.spring * wakeMul);
         if (Math.abs(building.group.scale.x - scale) > 0.0001) {
           building.group.scale.setScalar(scale);
           islandBusy = true;
@@ -2369,6 +2455,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         if (building.group.visible !== visible) building.group.visible = visible;
       });
     }
+    if (glowPulse) kit.touch();
     const riseU = waterMat.uniforms.isleRise.value;
     let riseI = 0;
     for (const view of views.values()) {
@@ -2585,6 +2672,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let labelForce = false;
 
   function labelsStill() {
+    if (liveWakes.length) {
+      labelForce = true;
+      return false;
+    }
     if (tipObj.visible || itemTip.visible || hotIndex >= 0) return false;
     if (people.bubblesOn() || handoffPops.length) {
       labelForce = true;
@@ -3179,6 +3270,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           shadowRatio: horiz / Math.max(0.001, sun.position.y),
           looks: LOOKS.length,
           flows: flowViews.filter((route) => route.line.visible === true).length,
+          cargo: cargoOn,
+          names: namesOn,
           flowDash: flowViews[0]?.mat.uniforms.dashOffset.value ?? 0,
           flowCount: flowViews[0]?.geo.instanceCount ?? -1,
           flowOpacity: flowViews[0]?.mat.opacity ?? -1,
@@ -3304,6 +3397,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           pinHold: view.pinEl.classList.contains("hold"),
           pop: view.pinEl.querySelector("b")?.classList.contains("pop") || false,
           fade: view.fade,
+          awake: Boolean(view.awake),
+          land: view.landMat.color.getHexString(),
+          bx: view.base.x,
+          bz: view.base.z,
+          scales: view.buildings.map((building) => Math.round(building.group.scale.x * 1000) / 1000),
           tree: view.treeRecs[0]?.scaleMul ?? 1,
           introIndex: view.introIndex,
           ring: view.ring.visible,
@@ -3494,6 +3592,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     setHotItem(id) { hotItem = id; },
     onPick(fn) { pickCb = fn; },
     onArrive(fn) { arriveCb = fn; },
+    onDuty(fn) { dutyCb = typeof fn === "function" ? fn : () => {}; },
+    wakeState() {
+      return { live: liveWakes.map((job) => job.name), queued: wakeQueue.length };
+    },
     onStrike(fn) { strikeCb = fn; },
     onRepel(fn) { repelCb = fn; },
     celebrate,
@@ -3514,6 +3616,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         sun: [sun.position.x, sun.position.y, sun.position.z],
         shadowRatio: horiz / Math.max(0.001, sun.position.y),
         looks: LOOKS.length,
+        cargo: cargoOn,
+        names: namesOn,
       };
     },
     selfTest() {

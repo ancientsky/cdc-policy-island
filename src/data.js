@@ -31,13 +31,13 @@ export const phaseLabel = {
 };
 
 export const dayNotes = [
-  { from: 0, to: 5, title: "夜班值勤", text: "疫情中心守國際情資與國內警訊。基因體定序還在跑，港口留下船舶班，醫院的感染管制不打烊。" },
-  { from: 5, to: 8, title: "交班與清晨巡檢", text: "夜班把未完成的事件交給早班。社區開始清積水，機場打開早高峰檢疫。" },
-  { from: 8, to: 12, title: "門診、校園、通報", text: "接種門診、學校點名、診所通報一起進來。監測網在這一節最吵。" },
-  { from: 12, to: 15, title: "檢驗與訪視", text: "上午的檢體進實驗室。結核關懷、肝炎治療和醫院查核在下午繼續跑。" },
-  { from: 15, to: 18, title: "第二輪社區", text: "登革熱巡檢再出一輪。長照機構把白天的群聚訊號補進通報。" },
-  { from: 18, to: 21, title: "篩檢與說明", text: "匿名篩檢在傍晚比較進得去。需要對公眾說明時，也多半排在這個時段。" },
-  { from: 21, to: 24, title: "跨境夜班", text: "紅眼航班與船舶還在進。另一個時區的疫情交換開始變多，定序室重新忙起來。" },
+  { from: 0, to: 5, focus: "watch", title: "半夜，你在睡覺", text: "疫情中心的燈還亮著。值班的人盯著國內外的消息，港口也有人守著半夜靠岸的船。" },
+  { from: 5, to: 8, focus: "border", title: "天亮了！", text: "夜班把還沒處理完的事交給早班。里長伯開始巡水溝、倒積水，機場迎接第一批回國的旅客。" },
+  { from: 8, to: 12, focus: "vax", title: "上課鐘響", text: "學校點名、診所看診、疫苗門診開張。這是瞭望塔最忙的時候，病例回報一筆一筆湧進來。" },
+  { from: 12, to: 15, focus: "lab", title: "午餐後的偵探時間", text: "早上採的檢體送進實驗室，偵探們開始找兇手。關懷員出門，陪結核病人吃藥。" },
+  { from: 15, to: 18, focus: "dengue", title: "放學了", text: "倒積水小隊出發第二輪。安養中心也回報：今天有沒有很多爺爺奶奶在咳嗽？" },
+  { from: 18, to: 21, focus: "hiv", title: "晚餐時間", text: "匿名篩檢站開門了。如果有重要的防疫消息，也常常在這個時段向大家說明。" },
+  { from: 21, to: 24, focus: "global", title: "你準備睡了", text: "紅眼班機還在降落。地球另一邊的國家正好上班，國際情報又多了起來。" },
 ];
 
 const pillarName = Object.fromEntries(pillars.map((p) => [p.id, p.name]));
@@ -369,6 +369,24 @@ export const islands = [
     ],
   },
 ];
+
+const NICK = {
+  watch: "瞭望塔島",
+  border: "港口守門島",
+  lab: "病菌偵探島",
+  vax: "疫苗盾牌島",
+  flu: "噴嚏島",
+  entero: "洗手小學島",
+  dengue: "倒積水島",
+  tb: "吃完藥島",
+  hiv: "紅絲帶島",
+  hepa: "護肝島",
+  ipc: "乾淨醫院島",
+  amr: "超級細菌島",
+  ready: "防疫倉庫島",
+  global: "世界電台島",
+};
+for (const island of islands) island.nick = NICK[island.id];
 
 export const flows = [
   { id: "f01", a: "border", b: "watch", title: "入境訊號進監測", carried: "旅遊史名單", text: "邊境的異常症狀和旅遊史，當天就要變成疫情中心看得到的訊號。" },

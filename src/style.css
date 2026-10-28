@@ -547,19 +547,115 @@ body.intro .title-card { opacity: 0; }
   right: 400px;
   bottom: 16px;
   width: auto;
-  max-width: 560px;
+  max-width: 640px;
   height: 56px;
   margin-inline: auto;
   padding: 8px;
   border-radius: 999px;
   display: grid;
-  grid-template-columns: 40px 56px 1fr auto;
+  grid-template-columns: 40px 56px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
 }
 #play { width: 40px; height: 40px; border-radius: 50%; padding: 0; }
 #clock { font: 700 var(--fs-lg)/1 var(--sans); min-width: 52px; }
-#day { width: 100%; accent-color: var(--teal); }
+#route { height: 36px; padding: 0 12px; font-size: var(--fs-sm); }
+.track { position: relative; height: 28px; display: grid; align-items: center; min-width: 0; }
+#day { width: 100%; accent-color: var(--teal); position: relative; z-index: 1; margin: 0; }
+.ticks { position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; z-index: 2; pointer-events: none; }
+.tick {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  pointer-events: auto;
+}
+.tick::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--ink);
+}
+.tick.on::before { background: var(--teal); box-shadow: 0 0 0 3px var(--paper-solid); }
+.chapter {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  z-index: 5;
+  width: min(460px, calc(100vw - 24px));
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 20px;
+  pointer-events: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--gloss), var(--shadow);
+  transform: translateX(-50%) translateY(12px);
+  opacity: 0;
+  transition: transform 240ms ease, opacity 240ms ease;
+}
+.chapter[hidden] { display: none; }
+.chapter.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+.chapter-face {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1f6f68;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font: 700 20px/1 var(--serif);
+}
+.chapter-copy { min-width: 0; }
+#chapter-title { margin: 0; font: 700 22px/1.25 var(--serif); }
+#chapter-body {
+  margin: 2px 0 0;
+  font: 400 14px/1.4 var(--sans);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.view-menu {
+  position: absolute;
+  top: 72px;
+  right: 16px;
+  z-index: 6;
+  display: flex;
+  padding: 6px;
+  border-radius: 16px;
+}
+.view-menu[hidden] { display: none; }
+.wake-label {
+  font: 700 12px/1.2 var(--sans);
+  background: var(--paper-solid);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 3px 8px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: wake-float 1.6s ease forwards;
+}
+@keyframes wake-float {
+  0% { transform: translateY(6px); opacity: 0; }
+  12% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; transform: translateY(-6px); }
+  100% { transform: translateY(-16px); opacity: 0; }
+}
 body.detail .dial { left: 412px; right: 400px; width: auto; max-width: 480px; margin-inline: auto; }
 .filter-pop {
   position: absolute;
@@ -889,18 +985,18 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   background: #fff8f6; color: #8d1d1d; border-radius: 20px;
 }
 
-.brand, .rail, .dial, .toggles, .ledger, .sheet, .germ, .modal-card, .compass, #lang-pop, .filter-pop {
+.brand, .rail, .dial, .toggles, .ledger, .sheet, .germ, .modal-card, .compass, #lang-pop, .filter-pop, .view-menu {
   background: var(--paper);
   -webkit-backdrop-filter: blur(20px) saturate(1.7);
   backdrop-filter: blur(20px) saturate(1.7);
   border: 1px solid var(--line);
   box-shadow: inset 0 1px 0 var(--gloss), var(--shadow);
 }
-.brand, .rail, .dial, .toggles, .compass, #lang-pop, .filter-pop {
+.brand, .rail, .dial, .toggles, .compass, #lang-pop, .filter-pop, .view-menu {
   box-shadow: inset 0 1px 0 var(--gloss), 0 6px 18px -8px rgba(6, 48, 50, 0.35);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .brand, .rail, .dial, .toggles, .ledger, .sheet, .germ, .modal-card, .compass, #lang-pop, .filter-pop {
+  .brand, .rail, .dial, .toggles, .ledger, .sheet, .germ, .modal-card, .compass, #lang-pop, .filter-pop, .view-menu {
     background: var(--paper-solid);
   }
 }
@@ -925,7 +1021,9 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   .brand strong { font-size: var(--fs-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tools .btn { height: 40px; }
   #home, #list, #lang-btn { width: auto; min-width: 40px; padding: 0 8px; }
-  #help, #sound { width: 40px; padding: 0; }
+  #help, #sound, #bird, #view-btn { width: 40px; padding: 0; }
+  .chapter { top: calc(64px + env(safe-area-inset-top)); }
+  .view-menu { top: calc(64px + env(safe-area-inset-top)); right: 8px; }
   .disclaimer-short { display: none; }
   body.intro .disclaimer-short {
     display: block;
@@ -985,9 +1083,8 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
     bottom: calc(var(--sheet-peek) + 8px);
     height: 56px;
     padding: 6px 8px;
-    padding-right: calc(var(--toggle-lane) + 12px);
     z-index: 3;
-    grid-template-columns: 44px 52px minmax(0, 1fr);
+    grid-template-columns: 40px 48px minmax(0, 1fr) auto;
   }
   #filter { display: none; }
   .toggles {
@@ -1046,6 +1143,9 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   }
 }
 
+@media (max-width: 520px) {
+  .badge { display: none; }
+}
 @media (max-width: 980px) and (pointer: coarse) {
   .dial { height: 64px; }
   .toggles { height: 44px; bottom: calc(var(--sheet-peek) + 18px); }
@@ -1066,7 +1166,17 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   }
   .ledger.half, .ledger.open { height: auto; }
   .ledger:not(.half):not(.open) #search { display: initial; }
-  .dial { display: none; }
+  .dial {
+    display: flex;
+    left: auto;
+    right: calc(8px + env(safe-area-inset-right));
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    height: 44px;
+    padding: 4px;
+  }
+  .dial > :not(#route) { display: none; }
   .toggles {
     display: flex;
     position: absolute;
@@ -1104,7 +1214,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   body.detail .mile { left: 412px; top: auto; bottom: 190px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .veil, .title-card, .ledger, .modal-card, .caption, .breathe, .pin b { transition: none; animation: none; }
+  .veil, .title-card, .ledger, .modal-card, .caption, .breathe, .pin b, .chapter, .wake-label { transition: none; animation: none; }
   .pin.ping b::before, .stamp.fresh, .passport-count.pop, .sheet.bump { animation: none; }
   .mission-rotator { transition: none; }
 }

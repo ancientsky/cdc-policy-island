@@ -1,4 +1,4 @@
-import { DATA_AS_OF, dayNote, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
+import { DATA_AS_OF, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
@@ -36,10 +36,9 @@ export function mount({ scene, islands, flows }) {
     selected: null,
     minutes: 8 * 60 + 20,
     playing: false,
-    names: false,
-    cargo: true,
+    names: true,
+    cargo: false,
     flows: false,
-    freeze: false,
     bird: false,
     log: [],
     person: null,
@@ -109,7 +108,10 @@ export function mount({ scene, islands, flows }) {
   const modal = $("modal");
   const ledger = $("ledger");
 
-  const toggleKey = { names: "toggleNames", cargo: "toggleCargo", flows: "toggleFlows", freeze: "toggleFreeze", bird: "toggleBird" };
+  const toggleKey = { names: "toggleNames", flows: "toggleFlows", bird: "toggleBird" };
+  let chapterHold = 0;
+  let chapterShown = null;
+  let chapterTimer = 0;
   let introIndex = 0;
   let lastFocus = null;
   const quiet = new URLSearchParams(location.search).has("quiet");
@@ -420,15 +422,22 @@ export function mount({ scene, islands, flows }) {
     $("filter").textContent = t("filter");
     day.setAttribute("aria-label", t("dayLabel"));
     $("pillar-note").textContent = t("pillarNote");
-    document.querySelector(".toggles")?.setAttribute("aria-label", t("togglesLabel"));
     document.querySelector(".tools")?.setAttribute("aria-label", t("mapLabel"));
+    $("view-btn")?.setAttribute("aria-label", t("viewMenu"));
     const veilText = $("veil-text");
     if (veilText) veilText.textContent = t("veil");
     paintScore();
     if (toastInfo && !toast.hidden) showToast(toastInfo);
     $("c")?.setAttribute("aria-label", t("canvas"));
     paintLangButton();
-    for (const button of document.querySelectorAll("[data-toggle]")) button.textContent = t(toggleKey[button.dataset.toggle]);
+    for (const button of document.querySelectorAll("[data-toggle]")) {
+      const key = toggleKey[button.dataset.toggle];
+      if (!key) continue;
+      if (button.id === "bird") button.setAttribute("aria-label", t(key));
+      else button.textContent = t(key);
+    }
+    paintTicks();
+    paintChapter();
     buildFilters();
     paintRail();
     paintPassport(false);
@@ -461,6 +470,7 @@ export function mount({ scene, islands, flows }) {
     dayNoteEl.textContent = `${note.title}${join}${note.text}`;
     status.textContent = t("onDuty", { n: awake });
     scene.setMinutes(state.minutes);
+    paintTicks();
     const theme = themeFromMinutes(state.minutes);
     document.documentElement.dataset.theme = theme;
     const themeColor = { morning: "#fbe3c8", noon: "#dff3f6", evening: "#3b2a5c", night: "#0b1426" };
@@ -692,6 +702,64 @@ export function mount({ scene, islands, flows }) {
     paintRail();
   }
 
+  function paintTicks() {
+    const host = $("chapter-ticks");
+    if (!host) return;
+    if (host.childElementCount !== dayNotes.length) {
+      host.innerHTML = dayNotes.map((_note, index) => `<button type="button" class="tick" data-chapter="${index}"></button>`).join("");
+    }
+    const current = dayNote(state.minutes);
+    dayNotes.forEach((note, index) => {
+      const button = host.children[index];
+      const on = current === note;
+      button.style.left = `${(note.from / 24) * 100}%`;
+      button.setAttribute("aria-label", note.title);
+      button.classList.toggle("on", on);
+      button.setAttribute("aria-current", on ? "true" : "false");
+    });
+  }
+
+  function paintChapter() {
+    if (!chapterShown) return;
+    $("chapter-face").textContent = t("guideMark");
+    $("chapter-title").textContent = chapterShown.title;
+    $("chapter-body").textContent = `${t("chapterBy")}${chapterShown.text}`;
+  }
+
+  function hideChapter() {
+    const card = $("chapter");
+    if (!card) return;
+    chapterShown = null;
+    card.classList.remove("show");
+    window.clearTimeout(chapterTimer);
+    chapterTimer = window.setTimeout(() => {
+      if (!chapterShown) card.hidden = true;
+    }, 240);
+  }
+
+  function showChapter(note) {
+    const card = $("chapter");
+    if (!card || !note) return;
+    chapterShown = note;
+    window.clearTimeout(chapterTimer);
+    card.hidden = false;
+    paintChapter();
+    card.classList.remove("show");
+    void card.offsetWidth;
+    card.classList.add("show");
+    if (note.focus) scene.focusIslands([note.focus]);
+  }
+
+  function jumpChapter(index) {
+    const note = dayNotes[index];
+    if (!note) return;
+    state.minutes = note.from * 60;
+    chapterHold = 1.8;
+    showChapter(note);
+    paintClock();
+    syncToggles();
+  }
+
   function syncToggles() {
     for (const button of document.querySelectorAll("[data-toggle]")) {
       button.setAttribute("aria-pressed", String(state[button.dataset.toggle]));
@@ -756,7 +824,9 @@ export function mount({ scene, islands, flows }) {
     openModal();
     if (step.showFlows) {
       state.flows = true;
+      state.cargo = true;
       scene.setShowAllFlows(true);
+      scene.setCargo(true);
       syncToggles();
     }
   }
@@ -847,6 +917,14 @@ export function mount({ scene, islands, flows }) {
     }
     if (hit.kind === "item") selectItem(hit.islandId, hit.itemId);
     else selectIsland(hit.islandId);
+  });
+  scene.onDuty((event) => {
+    if (!event) return;
+    const island = byId.get(event.islandId);
+    const text = t("dutyStart", { nick: island?.nick || "", item: event.item || "" });
+    state.log.unshift({ time: fmt(state.minutes), text });
+    if (state.log.length > 12) state.log.length = 12;
+    if (state.tab === "log") renderList();
   });
   scene.onArrive((event) => {
     if (!event) return;
@@ -940,9 +1018,16 @@ export function mount({ scene, islands, flows }) {
   });
   day.addEventListener("input", () => {
     state.playing = false;
+    chapterHold = 0;
+    hideChapter();
     state.minutes = Number(day.value);
     syncToggles();
     paintClock();
+  });
+  $("chapter-ticks").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chapter]");
+    if (!button) return;
+    jumpChapter(Number(button.dataset.chapter));
   });
   $("play").addEventListener("click", () => {
     state.playing = !state.playing;
@@ -952,13 +1037,13 @@ export function mount({ scene, islands, flows }) {
   for (const button of document.querySelectorAll("[data-toggle]")) {
     button.addEventListener("click", () => {
       const key = button.dataset.toggle;
+      if (!toggleKey[key]) return;
       state[key] = !state[key];
       if (key === "names") scene.setNames(state.names);
-      if (key === "cargo") scene.setCargo(state.cargo);
-      if (key === "flows") scene.setShowAllFlows(state.flows);
-      if (key === "freeze") {
-        scene.setFreeze(state.freeze);
-        if (state.freeze) state.playing = false;
+      if (key === "flows") {
+        state.cargo = state.flows;
+        scene.setShowAllFlows(state.flows);
+        scene.setCargo(state.flows);
       }
       if (key === "bird") scene.setBird(state.bird);
       syncToggles();
@@ -983,6 +1068,12 @@ export function mount({ scene, islands, flows }) {
   $("filter").addEventListener("click", (event) => {
     event.stopPropagation();
     showFilter("filter");
+  });
+  $("view-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
+    const menu = $("view-menu");
+    menu.hidden = !menu.hidden;
+    $("view-btn").setAttribute("aria-expanded", String(!menu.hidden));
   });
   $("lang-btn").addEventListener("click", (event) => {
     event.stopPropagation();
@@ -1066,6 +1157,9 @@ export function mount({ scene, islands, flows }) {
       if (!$("lang-pop").hidden) {
         $("lang-pop").hidden = true;
         paintLangButton();
+      } else if (!$("view-menu").hidden) {
+        $("view-menu").hidden = true;
+        $("view-btn").setAttribute("aria-expanded", "false");
       } else if (!$("filter-pop").hidden) {
         $("filter-pop").hidden = true;
         $("filter").setAttribute("aria-expanded", "false");
@@ -1258,6 +1352,10 @@ export function mount({ scene, islands, flows }) {
       $("filter").setAttribute("aria-expanded", "false");
       setPane(state.tab);
     }
+    if (!$("view-menu").hidden && !event.target.closest("#view-menu, #view-btn")) {
+      $("view-menu").hidden = true;
+      $("view-btn").setAttribute("aria-expanded", "false");
+    }
   });
   const watcher = new ResizeObserver(() => measureSafe());
   for (const el of [document.querySelector(".brand"), document.querySelector(".dial"), ledger, sheet, document.querySelector(".rail"), document.querySelector("#disclaimer-short"), guide, mission]) {
@@ -1271,6 +1369,8 @@ export function mount({ scene, islands, flows }) {
     book.welcome = Date.now();
     savePassport(book);
   }
+  scene.setNames(state.names);
+  scene.setCargo(state.flows);
   paintChrome();
   paintClock();
   phaseNote.textContent = phases[0].note;
@@ -1287,10 +1387,32 @@ export function mount({ scene, islands, flows }) {
   $("source-link").href = SOURCE_INDEX;
   measureSafe();
 
+  if (import.meta.env.DEV) {
+    window.__day = {
+      note: () => {
+        const note = dayNote(state.minutes);
+        return { from: note.from, focus: note.focus, title: note.title };
+      },
+      hold: () => chapterHold,
+      wakes: () => scene.wakeState?.() ?? { live: [], queued: 0 },
+    };
+  }
+
   return {
     tick(dt) {
-      if (state.playing && !state.freeze) {
-        state.minutes = (state.minutes + dt * 42) % 1440;
+      if (chapterHold > 0) {
+        chapterHold = Math.max(0, chapterHold - dt);
+        if (chapterHold === 0) hideChapter();
+      } else if (state.playing) {
+        const prev = dayNote(state.minutes);
+        let nextMin = state.minutes + dt * 30;
+        if (nextMin >= 1440) nextMin %= 1440;
+        const next = dayNote(nextMin);
+        if (next !== prev) {
+          state.minutes = next.from * 60;
+          chapterHold = 1.8;
+          showChapter(next);
+        } else state.minutes = nextMin;
         paintClock();
       }
       if (!state.bird && scene.isBird()) state.bird = false;

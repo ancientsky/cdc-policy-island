@@ -18,14 +18,26 @@
       <strong id="brand-title">防疫島大冒險</strong>
       <span id="badge" class="badge" title="本站非疾病管制署官方網站，內容依公開資料整理" aria-label="本站非疾病管制署官方網站，內容依公開資料整理">非官方</span>
       <nav class="tools" aria-label="地圖">
-        <button id="home" type="button" class="btn">全景</button>
+        <button id="home" type="button" class="btn">看全島</button>
+        <button id="bird" type="button" class="btn btn--icon" data-toggle="bird" aria-pressed="false" aria-label="鳥瞰"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 12c2.4-4 5.2-6 9-6s6.6 2 9 6c-2.4 4-5.2 6-9 6s-6.6-2-9-6z"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg></button>
         <button id="list" type="button" class="btn" aria-expanded="false">清單</button>
         <button id="sound" type="button" class="btn btn--icon" aria-pressed="true" aria-label="音效"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg></button>
         <button id="help" type="button" class="btn btn--icon" aria-label="操作說明">?</button>
+        <button id="view-btn" type="button" class="btn btn--icon" aria-expanded="false" aria-haspopup="true" aria-label="顯示"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 3.2v2.2M12 18.6v2.2M3.2 12h2.2M18.6 12h2.2M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6"/></svg></button>
         <button id="lang-btn" type="button" class="btn" aria-haspopup="true" aria-expanded="false">中 ▾</button>
       </nav>
       <div id="lang-pop" class="pop" hidden></div>
     </header>
+    <div id="view-menu" class="pop view-menu" hidden>
+      <button type="button" class="btn" data-toggle="names" aria-pressed="true">島名</button>
+    </div>
+    <section id="chapter" class="chapter" hidden>
+      <div class="chapter-face" id="chapter-face">琵</div>
+      <div class="chapter-copy">
+        <h2 id="chapter-title"></h2>
+        <p id="chapter-body"></p>
+      </div>
+    </section>
     <p id="disclaimer-short" class="disclaimer-short">非官方網站・依疾管署公開資料整理</p>
     <div class="title-card" id="title-card">
       <h1 id="hero-title">十四座島<br>排成臺灣輪廓</h1>
@@ -57,18 +69,15 @@
     <article class="sheet" id="sheet" hidden aria-live="polite"></article>
     <p class="caption" id="caption"><span id="day-note"></span> <span id="status" aria-live="polite"></span></p>
     <section class="dial" aria-label="時間與篩選">
-      <button id="play" type="button" class="btn btn--icon btn--solid" aria-pressed="false" aria-label="播放一天">▶</button>
+      <button id="play" type="button" class="btn btn--icon btn--solid" aria-pressed="false" aria-label="快轉一天">▶</button>
       <output id="clock">08:20</output>
-      <input id="day" type="range" min="0" max="1439" value="500" aria-label="防疫的一天，以分鐘計">
+      <div class="track">
+        <input id="day" type="range" min="0" max="1439" value="500" aria-label="防疫的一天，以分鐘計">
+        <div class="ticks" id="chapter-ticks"></div>
+      </div>
+      <button id="route" type="button" class="btn" data-toggle="flows" aria-pressed="false">運送路線</button>
       <button id="filter" type="button" class="btn" aria-expanded="false" aria-haspopup="true">篩選</button>
     </section>
-    <div class="toggles" role="toolbar" aria-label="顯示">
-      <button type="button" class="btn" data-toggle="names" aria-pressed="false">名牌</button>
-      <button type="button" class="btn" data-toggle="cargo" aria-pressed="true">搬運</button>
-      <button type="button" class="btn" data-toggle="flows" aria-pressed="false">協作線</button>
-      <button type="button" class="btn" data-toggle="freeze" aria-pressed="false">暫停</button>
-      <button type="button" class="btn" data-toggle="bird" aria-pressed="false">鳥瞰</button>
-    </div>
     <div id="filter-pop" class="pop filter-pop" hidden>
       <div class="choices" id="phase-buttons"></div>
       <p class="note" id="phase-note"></p>

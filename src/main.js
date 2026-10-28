@@ -41,6 +41,7 @@ function fallbackScene() {
     setHotItem: noop,
     onPick: noop,
     onArrive: noop,
+    onDuty: noop,
     onStrike: noop,
     onRepel: noop,
     celebrate: (_list, done) => { if (typeof done === "function") done(); },
