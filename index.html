@@ -11,7 +11,7 @@
 </head>
 <body>
   <div id="view">
-    <canvas id="c" aria-label="十四座六邊形組成臺灣輪廓的政策島。完整文字在清單。"></canvas>
+    <canvas id="c" aria-label="十四座島排成臺灣的形狀。完整說明在清單裡。"></canvas>
   </div>
   <div class="hud">
     <header class="brand">
@@ -40,21 +40,21 @@
     </section>
     <p id="disclaimer-short" class="disclaimer-short">非官方網站・依疾管署公開資料整理</p>
     <div class="title-card" id="title-card">
-      <h1 id="hero-title">十四座島<br>排成臺灣輪廓</h1>
-      <p id="hero-lead">點一座島，看這項工作在做什麼。</p>
+      <h1 id="hero-title">病菌想登陸台灣？<br>先過這 14 座島！</h1>
+      <p id="hero-lead">每座島都有一群人在守門。<br>點一座島，看他們怎麼接力擋病菌。</p>
     </div>
-    <nav class="rail" id="rail" aria-label="政策島"></nav>
-    <aside class="ledger" id="ledger" aria-label="政策清單" data-pane="islands">
+    <nav class="rail" id="rail" aria-label="島嶼"></nav>
+    <aside class="ledger" id="ledger" aria-label="島嶼任務清單" data-pane="islands">
       <div class="ledger-head">
         <p id="disclaimer-peek" class="disclaimer-peek">非官方網站・依疾管署公開資料整理</p>
         <p class="stats" id="stats"></p>
-        <input id="search" type="search" placeholder="搜尋政策、PrEP、孳生源…" aria-label="搜尋政策或協作">
+        <input id="search" type="search" placeholder="搜尋：蚊子、疫苗、洗手…" aria-label="搜尋島、蚊子、疫苗、洗手">
         <div class="tabs" role="tablist">
-          <button type="button" class="btn on" data-tab="islands" id="tab-islands" aria-selected="true">政策島</button>
-          <button type="button" class="btn" data-tab="flows" id="tab-flows" aria-selected="false">協作 18</button>
-          <button type="button" class="btn" data-tab="log" id="tab-log" aria-selected="false">紀錄</button>
-          <button type="button" class="btn only-narrow" data-tab="phase" id="tab-phase" aria-selected="false">階段</button>
-          <button type="button" class="btn only-narrow" data-tab="pillar" id="tab-pillar" aria-selected="false">主軸</button>
+          <button type="button" class="btn on" data-tab="islands" id="tab-islands" aria-selected="true">島嶼</button>
+          <button type="button" class="btn" data-tab="flows" id="tab-flows" aria-selected="false">運送路線 18</button>
+          <button type="button" class="btn" data-tab="log" id="tab-log" aria-selected="false">送貨紀錄</button>
+          <button type="button" class="btn only-narrow" data-tab="phase" id="tab-phase" aria-selected="false">時間</button>
+          <button type="button" class="btn only-narrow" data-tab="pillar" id="tab-pillar" aria-selected="false">小隊</button>
         </div>
       </div>
       <div class="ledger-scroll">
@@ -79,10 +79,12 @@
       <button id="filter" type="button" class="btn" aria-expanded="false" aria-haspopup="true">篩選</button>
     </section>
     <div id="filter-pop" class="pop filter-pop" hidden>
+      <p class="filter-kicker" id="phase-kicker">從現在到 2035</p>
       <div class="choices" id="phase-buttons"></div>
       <p class="note" id="phase-note"></p>
+      <p class="filter-kicker" id="pillar-kicker">五支小隊</p>
       <div class="choices pills" id="pillar-buttons"></div>
-      <p class="note" id="pillar-note">可複選。沒有選取時，十四座島都留下。</p>
+      <p class="note" id="pillar-note">可以選好幾隊。都不選，就看全部 14 座島。</p>
     </div>
     <div class="compass" title="北方">
       <div id="compass-rose"><b>北</b><i></i></div>
@@ -102,7 +104,7 @@
       </div>
     </div>
   </div>
-  <div class="veil" id="veil"><p id="veil-text">正在把計畫排成島嶼…</p></div>
+  <div class="veil" id="veil"><p id="veil-text">琵琵隊長正在巡島，馬上就好…</p></div>
   <pre id="diag" hidden></pre>
   <script type="module" src="/src/main.js"></script>
 </body>

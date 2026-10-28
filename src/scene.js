@@ -703,7 +703,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const pinBadge = pinButton.querySelector("b");
     pinBadge.addEventListener("animationend", () => pinBadge.classList.remove("pop"));
     pinButton.querySelector("b").style.setProperty("--c", island.accent);
-    pinButton.setAttribute("aria-label", island.name);
+    pinButton.setAttribute("aria-label", island.nick);
     pinButton.addEventListener("pointerenter", () => {
       pinHover = island.id;
       hoverItem = null;
@@ -752,7 +752,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (child.userData.kind === "island" && !pickables.includes(child)) pickables.push(child);
     });
 
-    const hay = [island.name, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ");
+    const hay = [island.name, island.nick, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ");
     for (const item of island.items) item._hay = [item.name, item.text, ...(item.keywords ?? [])].join(" ");
 
     views.set(island.id, {
@@ -836,7 +836,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     line.raycast = () => {};
     line.renderOrder = 3;
     scene.add(line);
-    flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
+    flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name, views.get(flow.a).island.nick, views.get(flow.b).island.nick].join(" ");
     return {
       flow,
       start,
@@ -3558,13 +3558,13 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         const nameEl = view.pinEl.querySelector("em");
         if (nameEl) nameEl.textContent = island.pin;
         const badge = view.pinEl.querySelector("button");
-        if (badge) badge.setAttribute("aria-label", island.name);
-        view.hay = [island.name, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ");
+        if (badge) badge.setAttribute("aria-label", island.nick);
+        view.hay = [island.name, island.nick, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ");
         for (const item of island.items) item._hay = [item.name, item.text, ...(item.keywords ?? [])].join(" ");
       }
       for (const route of flowViews) {
         const flow = route.flow;
-        flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name].join(" ");
+        flow._hay = [flow.title, flow.text, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name, views.get(flow.a).island.nick, views.get(flow.b).island.nick].join(" ");
       }
       for (const mark of crewMarks) mark.el.textContent = t(mark.key);
       for (const mark of plateMarks) mark.el.textContent = t(mark.key);

@@ -342,7 +342,7 @@ export function mount({ scene, islands, flows }) {
   function buildFilters() {
     $("phase-buttons").innerHTML = phases.map((phase) => {
       const on = phase.id === state.phase;
-      return `<button type="button" class="btn ${on ? "on" : ""}" data-phase="${phase.id}" aria-pressed="${on}">${esc(phase.label)}<span class="dim">・${esc(phase.years)}</span></button>`;
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-phase="${phase.id}" aria-pressed="${on}">${esc(phase.label)}</button>`;
     }).join("");
     const allOn = state.pillars.size === 0;
     $("pillar-buttons").innerHTML = `<button type="button" class="btn ${allOn ? "on" : ""}" data-pillar="all" aria-pressed="${allOn}">${esc(t("allPillars"))}</button>` + pillars.map((pillar) => {
@@ -377,7 +377,7 @@ export function mount({ scene, islands, flows }) {
     const picked = selectedIslandId();
     $("rail").innerHTML = ordered.map((island) => {
       const on = picked === island.id;
-      return `<button type="button" class="btn ${on ? "on" : ""}" data-rail="${island.id}" data-name="${esc(island.name)}" style="--c:${island.accent}" aria-pressed="${on}" aria-label="${esc(island.name)}">${esc(island.no)}</button>`;
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-rail="${island.id}" data-name="${esc(island.nick)}" style="--c:${island.accent}" aria-pressed="${on}" aria-label="${esc(island.nick)}">${esc(island.no)}</button>`;
     }).join("");
   }
 
@@ -428,6 +428,12 @@ export function mount({ scene, islands, flows }) {
     $("filter").textContent = t("filter");
     day.setAttribute("aria-label", t("dayLabel"));
     $("pillar-note").textContent = t("pillarNote");
+    const phaseKicker = $("phase-kicker");
+    if (phaseKicker) phaseKicker.textContent = t("panelPhase");
+    const pillarKicker = $("pillar-kicker");
+    if (pillarKicker) pillarKicker.textContent = t("panelPillar");
+    $("rail")?.setAttribute("aria-label", t("tabIslands"));
+    $("ledger")?.setAttribute("aria-label", t("ledgerTitle"));
     document.querySelector(".tools")?.setAttribute("aria-label", t("mapLabel"));
     $("view-btn")?.setAttribute("aria-label", t("viewMenu"));
     const veilText = $("veil-text");
@@ -492,10 +498,10 @@ export function mount({ scene, islands, flows }) {
   function renderList() {
     const q = state.query.trim().toLowerCase().replace(/\s+/g, "");
     if (state.tab === "flows") {
-      const rows = flows.filter((flow) => !q || [flow.title, flow.text, flow.carried, flow._alias, byId.get(flow.a).name, byId.get(flow.b).name].join(" ").toLowerCase().replace(/\s+/g, "").includes(q));
+      const rows = flows.filter((flow) => !q || [flow.title, flow.text, flow.carried, flow._alias, byId.get(flow.a).name, byId.get(flow.b).name, byId.get(flow.a).nick, byId.get(flow.b).nick].join(" ").toLowerCase().replace(/\s+/g, "").includes(q));
       tree.innerHTML = rows.length ? rows.map((flow) => {
         const on = state.selected?.type === "flow" && state.selected.id === flow.id;
-        return `<button type="button" class="btn flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.title)}</b><span>${esc(byId.get(flow.a).name)} → ${esc(byId.get(flow.b).name)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
+        return `<button type="button" class="btn flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.title)}</b><span>${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
       }).join("") : `<p class="empty">${esc(t("emptyFlow"))}</p>`;
       return;
     }
@@ -507,7 +513,7 @@ export function mount({ scene, islands, flows }) {
     }
     const cards = ordered.filter((island) => {
       if (!q) return true;
-      const blob = [island.name, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
+      const blob = [island.name, island.nick, island.pin, island.blurb, island.source, ...island.items.flatMap((item) => [item.name, item.text, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
       return blob.includes(q);
     });
     tree.innerHTML = cards.length ? cards.map((island) => {
@@ -516,7 +522,7 @@ export function mount({ scene, islands, flows }) {
         const on = state.selected?.type === "item" && state.selected.itemId === item.id;
         return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
       }).join("");
-      return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.name)}</b><small>${esc(island.pin)}</small></span></button><div class="subs">${items}</div></section>`;
+      return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
     }).join("") : `<p class="empty">${esc(t("emptyIsland"))}</p>`;
   }
 
@@ -620,7 +626,7 @@ export function mount({ scene, islands, flows }) {
     sheet.hidden = false;
     if (selected.type === "flow") {
       const flow = selected.flow;
-      sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.title)}</h2><p class="route">${esc(byId.get(flow.a).name)} → ${esc(byId.get(flow.b).name)}</p><p>${esc(flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p>`;
+      sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.title)}</h2><p class="route">${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</p><p>${esc(flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p>`;
       return;
     }
     const island = byId.get(selected.type === "item" ? selected.islandId : selected.id);
@@ -637,7 +643,7 @@ export function mount({ scene, islands, flows }) {
     const say = island.say
       ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`
       : "";
-    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.name)}</h2>${say}<p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
+    sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<p>${esc(island.blurb)}</p><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p><div class="detail-items">${items}</div><h3>${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p class="source">${esc(island.source)}</p></details>`;
     if (fresh) {
       stampFreshId = null;
       sheet.classList.remove("bump");
@@ -946,7 +952,7 @@ export function mount({ scene, islands, flows }) {
         advanceMissions();
       }
     }
-    const text = t("handoff", { from: byId.get(event.from).name, what: event.carried, to: byId.get(event.to).name });
+    const text = t("handoff", { from: byId.get(event.from).nick, what: event.carried, to: byId.get(event.to).nick });
     state.log.unshift({ time: fmt(state.minutes), text });
     if (state.log.length > 12) state.log.length = 12;
     if (state.tab === "log") renderList();
@@ -1316,7 +1322,9 @@ export function mount({ scene, islands, flows }) {
     titleCard.classList.add("gone");
     window.setTimeout(() => { titleCard.hidden = true; }, 700);
   }
-  window.setTimeout(dismissTitle, 3000);
+  document.addEventListener("cdc-revealed", () => {
+    window.setTimeout(dismissTitle, 3200);
+  }, { once: true });
   document.addEventListener("pointerdown", dismissTitle, { once: true });
 
   let dragY = null;

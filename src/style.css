@@ -330,6 +330,14 @@ body.intro .title-card { opacity: 0; }
   background: transparent;
 }
 .island .head b, .flow b { display: block; font: 700 var(--fs-md)/1.4 var(--sans); }
+.island .head small.official,
+.sheet .official {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  font-weight: 400;
+}
+.sheet .official { margin: -4px 0 10px; }
 .island .head small, .flow span, .flow small, .sub small, .source, .jump, #status {
   font-size: var(--fs-sm);
   line-height: 1.6;
@@ -699,6 +707,11 @@ body.detail .dial { left: 412px; right: 400px; width: auto; max-width: 480px; ma
   z-index: 4;
 }
 .filter-pop[hidden] { display: none; }
+.filter-kicker {
+  margin: 0;
+  font: 700 12px/1.4 var(--sans);
+  color: var(--muted);
+}
 .choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .choices .btn { background: var(--field); }
 .choices .btn.on, .choices .btn[aria-pressed="true"] { background: var(--teal); color: var(--on-accent); }
@@ -811,6 +824,7 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   display: none; font-style: normal;
   background: var(--paper-solid); color: var(--ink);
   border-radius: 999px; padding: 2px 7px; font-size: var(--fs-xs); font-weight: 700;
+  white-space: nowrap;
 }
 .pin.named em { display: block; }
 .pin.dim { opacity: 0.38; }
@@ -981,9 +995,11 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
 }
 .seals { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .seal {
-  width: 52px;
+  width: auto;
+  min-width: 52px;
   height: 52px;
-  border-radius: 50%;
+  padding: 4px 8px;
+  border-radius: 999px;
   border: 3px solid var(--c);
   color: var(--c);
   display: grid;
@@ -1044,7 +1060,15 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
 
 @media (max-width: 980px) {
   :root { --sheet-peek: calc(148px + env(safe-area-inset-bottom)); --toggle-lane: 132px; }
-  .crew-label, .rail, .compass, .title-card { display: none; }
+  .crew-label, .rail, .compass { display: none; }
+  .title-card {
+    display: block;
+    left: 16px;
+    right: 16px;
+    top: calc(104px + env(safe-area-inset-top));
+    bottom: auto;
+    max-width: none;
+  }
   .brand {
     top: calc(8px + env(safe-area-inset-top));
     left: calc(8px + env(safe-area-inset-left));

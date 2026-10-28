@@ -765,13 +765,13 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
         flowId: flow.id,
         flowTitle: flow.title,
         carried: flow.carried,
-        fromName: from.name,
-        toName: to.name,
+        fromName: from.nick,
+        toName: to.nick,
         fromAccent: from.accent,
         toAccent: to.accent,
         handing,
         ambient: false,
-        placeName: views.get(placeId).island.name,
+        placeName: views.get(placeId).island.nick,
         progress: person.path.length > 0 ? person.dist / person.path.length : 0,
       };
     }
@@ -785,13 +785,13 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
       flowTitle: island.pin,
       carried: "",
       carryKey: person.carryKey || "carrySit",
-      fromName: island.name,
-      toName: island.name,
+      fromName: island.nick,
+      toName: island.nick,
       fromAccent: island.accent,
       toAccent: island.accent,
       handing: false,
       ambient: true,
-      placeName: island.name,
+      placeName: island.nick,
       progress,
     };
   }

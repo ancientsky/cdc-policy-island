@@ -154,6 +154,7 @@ function failWebgl(error) {
     if (typeof fn === "function") fn.apply(impl, args);
   }
   veil?.remove();
+  document.dispatchEvent(new CustomEvent("cdc-revealed"));
   const note = document.querySelector("#hero-lead");
   if (note) note.textContent = t("fallback");
   writeDiag();
@@ -162,6 +163,7 @@ function failWebgl(error) {
 function revealVeil() {
   const startIntro = () => {
     if (veil?.isConnected) veil.remove();
+    document.dispatchEvent(new CustomEvent("cdc-revealed"));
     impl.playIntro();
   };
   requestAnimationFrame(() => {
