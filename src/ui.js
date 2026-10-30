@@ -40,10 +40,15 @@ function fmt(minutes) {
   return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
 }
 
+function toneStyle(swatch) {
+  const accent = swatch.accent || swatch.color;
+  return `--c:${accent};--c-ink:${swatch.accentInk};--c-on-dark:${swatch.accentOnDark}`;
+}
+
 function pillarChips(ids) {
   return ids.map((id) => {
     const pillar = pillars.find((item) => item.id === id);
-    return `<i class="chip" style="--c:${pillar.color}">${esc(pillar.mark)} ${esc(pillar.name)}</i>`;
+    return `<i class="chip" style="${toneStyle(pillar)}">${esc(pillar.mark)} ${esc(pillar.name)}</i>`;
   }).join("");
 }
 
@@ -296,7 +301,7 @@ export function mount({ scene, islands, flows }) {
     modal.dataset.mode = "grad";
     $("modal-kicker").textContent = t("guideName");
     $("modal-title").textContent = t("gradTitle");
-    const seals = ordered.map((island) => `<i class="seal" style="--c:${island.accent}">${esc(island.pin)}</i>`).join("");
+    const seals = ordered.map((island) => `<i class="seal" style="${toneStyle(island)}">${esc(island.pin)}</i>`).join("");
     $("modal-body").innerHTML = `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(t("gradBody"))}</p></div><div class="seals">${seals}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
     $("modal-next").textContent = t("gradAgain");
     $("modal-skip").hidden = false;
@@ -370,7 +375,7 @@ export function mount({ scene, islands, flows }) {
     const allOn = state.pillars.size === 0;
     $("pillar-buttons").innerHTML = `<button type="button" class="btn ${allOn ? "on" : ""}" data-pillar="all" aria-pressed="${allOn}">${esc(t("allPillars"))}</button>` + pillars.map((pillar) => {
       const on = state.pillars.has(pillar.id);
-      return `<button type="button" class="btn ${on ? "on" : ""}" data-pillar="${pillar.id}" aria-pressed="${on}" style="--c:${pillar.color}"><b>${esc(pillar.mark)}</b>${esc(pillar.name)}</button>`;
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-pillar="${pillar.id}" aria-pressed="${on}" style="${toneStyle(pillar)}"><b>${esc(pillar.mark)}</b>${esc(pillar.name)}</button>`;
     }).join("");
   }
 
@@ -400,7 +405,7 @@ export function mount({ scene, islands, flows }) {
     const picked = selectedIslandId();
     $("rail").innerHTML = ordered.map((island) => {
       const on = picked === island.id;
-      return `<button type="button" class="btn ${on ? "on" : ""}" data-rail="${island.id}" data-name="${esc(island.nick)}" style="--c:${island.accent}" aria-pressed="${on}" aria-label="${esc(island.nick)}">${esc(island.no)}</button>`;
+      return `<button type="button" class="btn ${on ? "on" : ""}" data-rail="${island.id}" data-name="${esc(island.nick)}" style="${toneStyle(island)}" aria-pressed="${on}" aria-label="${esc(island.nick)}">${esc(island.no)}</button>`;
     }).join("");
   }
 
@@ -586,7 +591,7 @@ export function mount({ scene, islands, flows }) {
       const on = state.selected?.type === "item" && state.selected.itemId === item.id;
       return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
     }).join("");
-    return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
+    return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="${toneStyle(island)}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
   }
 
   function emptySearch() {
@@ -718,7 +723,7 @@ export function mount({ scene, islands, flows }) {
     const adultItems = island.items.map((item) => `<p><b>${esc(item.name)}</b><small>${esc(phaseLabel[item.phase])}</small><br>${esc(item.detail)}</p>`).join("");
     const fresh = stampFreshId === island.id;
     const seal = book.islands[island.id]
-      ? `<i class="stamp${fresh ? " fresh" : ""}" style="--c:${island.accent}">${esc(t("stampLabel"))}</i>`
+      ? `<i class="stamp${fresh ? " fresh" : ""}" style="${toneStyle(island)}">${esc(t("stampLabel"))}</i>`
       : "";
     const say = island.say
       ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`

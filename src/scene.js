@@ -702,7 +702,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const pinButton = pinEl.querySelector("button");
     const pinBadge = pinButton.querySelector("b");
     pinBadge.addEventListener("animationend", () => pinBadge.classList.remove("pop"));
-    pinButton.querySelector("b").style.setProperty("--c", island.accent);
+    pinBadge.style.setProperty("--c", island.accent);
+    pinBadge.style.setProperty("--c-ink", island.accentInk);
+    pinBadge.style.setProperty("--c-on-dark", island.accentOnDark);
     pinButton.setAttribute("aria-label", island.nick);
     pinButton.addEventListener("pointerenter", () => {
       pinHover = island.id;

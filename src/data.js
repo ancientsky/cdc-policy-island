@@ -430,6 +430,63 @@ export const flows = [
 
 applyPlain(islands, flows, plain.zh);
 
+function channel(hex) {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function hexOf(rgb) {
+  return `#${rgb.map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function linear(value) {
+  const c = value / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+function luminance(hex) {
+  const [r, g, b] = channel(hex);
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+
+function contrast(a, b) {
+  const hi = Math.max(luminance(a), luminance(b));
+  const lo = Math.min(luminance(a), luminance(b));
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function mixHex(hex, toward, t) {
+  const from = channel(hex);
+  const to = channel(toward);
+  return hexOf(from.map((value, index) => value + (to[index] - value) * t));
+}
+
+function fitInk(hex, paper, toward, alsoWhite) {
+  const ok = (color) => contrast(color, paper) >= 4.8 && (!alsoWhite || contrast("#ffffff", color) >= 4.8);
+  if (ok(hex)) return hex;
+  let lo = 0;
+  let hi = 1;
+  let best = toward;
+  for (let i = 0; i < 28; i += 1) {
+    const mid = (lo + hi) / 2;
+    const color = mixHex(hex, toward, mid);
+    if (ok(color)) {
+      best = color;
+      hi = mid;
+    } else lo = mid;
+  }
+  return best;
+}
+
+for (const island of islands) {
+  island.accentInk = fitInk(island.accent, "#fffaf2", "#120e0a", true);
+  island.accentOnDark = fitInk(island.accent, "#2a203a", "#f6f3ee", false);
+}
+for (const pillar of pillars) {
+  pillar.accentInk = fitInk(pillar.color, "#fffaf2", "#120e0a", true);
+  pillar.accentOnDark = fitInk(pillar.color, "#2a203a", "#f6f3ee", false);
+}
+
 export function hourCovers(spans, hour) {
   return spans.some(([a, b]) => (a <= b ? hour >= a && hour < b : hour >= a || hour < b));
 }
