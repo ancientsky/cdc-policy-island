@@ -200,13 +200,15 @@ h1, h2, h3 { text-wrap: balance; }
 .disclaimer-short {
   position: absolute;
   left: 22px;
-  top: 108px;
+  top: calc(16px + 48px + 4px);
   margin: 0;
   font-size: var(--fs-xs);
+  line-height: 1.2;
   color: #fff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   opacity: 0.85;
   pointer-events: none;
+  white-space: nowrap;
 }
 .disclaimer-peek { display: none; }
 
@@ -260,7 +262,8 @@ body.intro .title-card { opacity: 0; }
   font-size: var(--fs-xs);
   white-space: nowrap;
 }
-.hud:has(.ledger.open) .rail { display: none; }
+.hud:has(.ledger.open) .rail,
+.hud:has(.ledger.open) .compass { display: none; }
 
 .ledger {
   position: absolute;
@@ -294,7 +297,8 @@ body.intro .title-card { opacity: 0; }
   flex-shrink: 0;
 }
 .legal span { overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.legal a { color: var(--teal); flex-shrink: 0; font-size: var(--fs-sm); }
+.legal a { color: var(--teal); flex-shrink: 0; }
+.legal .btn--sm { height: 28px; min-height: 0; flex-shrink: 0; }
 .eyebrow { margin: 0 0 4px; color: var(--teal); font: 700 var(--fs-xs)/1.4 var(--sans); letter-spacing: 0.12em; }
 .eyebrow:empty { display: none; }
 #search {
@@ -466,7 +470,7 @@ body.intro .title-card { opacity: 0; }
 .asof { color: var(--muted); font-size: var(--fs-xs); margin: 8px 0 4px; }
 .adult { margin-top: 8px; }
 .adult summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 700; }
-.about-lines { margin: 0; padding-left: 1.2em; font: 400 var(--fs-md)/1.75 var(--sans); color: #24312c; }
+.about-lines { margin: 0; padding-left: 1.2em; font: 400 14px/1.75 var(--sans); color: #24312c; }
 .chip { font-style: normal; border: 1px solid var(--c); color: var(--c); border-radius: 999px; padding: 1px 7px; font-size: var(--fs-xs); letter-spacing: 0; }
 .sheet .eyebrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .detail-items { display: grid; gap: 4px; margin: 4px 0 8px; }
@@ -1238,7 +1242,8 @@ html[data-theme="evening"] .about-lines, html[data-theme="night"] .about-lines {
   .tabs .btn { flex: none; }
   .ledger:not(.half):not(.open) #search { display: none; }
   .ledger-scroll { background: transparent; }
-  .legal { position: static; }
+  .tree { flex: none; overflow: visible; }
+  .legal { position: static; margin-top: 0; }
   .sheet {
     background: color-mix(in srgb, var(--paper-solid) 96%, transparent);
   }
