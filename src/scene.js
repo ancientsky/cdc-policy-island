@@ -15,6 +15,7 @@ import { play as playSfx } from "./sfx.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 // Meeple front is local -z: the nose sits at z < 0, the pack sits at z > 0.
 // rotation.y = atan2(-dir.x, -dir.z) turns that -z axis onto dir.
@@ -110,14 +111,15 @@ function groundMap(island) {
 
 // Time-of-day anchors. Colors are 0x numbers so this file stays free of #rrggbb.
 // h:24 matches h:0. Knots at 05:45 and 16:00 are inserted below.
+// hemiI is 70% of the earlier sky fill so the room environment does not stack a second full hemisphere.
 const LOOKS = [
-  { h: 0, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.80, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
-  { h: 5, top: 0x2a2440, hor: 0xc98a8a, bot: 0x1a2232, haze: 0x6a5a78, deep: 0x1a2f45, shallow: 0x4a6a80, foam: 0xb8a0b0, sun: 0xffb59a, hemi: 0x6a5a7a, ground: 0x2a2026, fill: 0x7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.40, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
-  { h: 8.33, top: 0x9fc8e6, hor: 0xfbe3c8, bot: 0xa9d3cf, haze: 0xf6e2c8, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, sun: 0xffd7a8, hemi: 0xfde8d0, ground: 0x8a7a5c, fill: 0x9cc4e8, key: 2.40, fillI: 0.35, hemiI: 0.65, exposure: 1.00, sunPos: new THREE.Vector3(22, 10, 14), stars: 0, night: 0 },
-  { h: 12.5, top: 0x5fb0e0, hor: 0xdff3f6, bot: 0xbfe6e2, haze: 0xd8eef0, deep: 0x2a86a0, shallow: 0x86e3d4, foam: 0xffffff, sun: 0xffffff, hemi: 0xe6f4ff, ground: 0xb0a07c, fill: 0xcfe8f5, key: 2.80, fillI: 0.25, hemiI: 1.00, exposure: 0.95, sunPos: new THREE.Vector3(6, 30, 8), stars: 0, night: 0 },
-  { h: 18.67, top: 0x3b2a5c, hor: 0xf39a6b, bot: 0x2a2f4a, haze: 0xe9a07e, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, sun: 0xff9a5c, hemi: 0xd8c8e4, ground: 0x3a2a3a, fill: 0x7a68c0, key: 1.15, fillI: 0.70, hemiI: 0.90, exposure: 1.00, sunPos: new THREE.Vector3(-24, 6, 6), stars: 0.2, night: 0.3 },
-  { h: 22, top: 0x2a3f70, hor: 0x1e3050, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.80, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 0.95, night: 1 },
-  { h: 24, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.80, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
+  { h: 0, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
+  { h: 5, top: 0x2a2440, hor: 0xc98a8a, bot: 0x1a2232, haze: 0x6a5a78, deep: 0x1a2f45, shallow: 0x4a6a80, foam: 0xb8a0b0, sun: 0xffb59a, hemi: 0x6a5a7a, ground: 0x2a2026, fill: 0x7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.28, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
+  { h: 8.33, top: 0x9fc8e6, hor: 0xfbe3c8, bot: 0xa9d3cf, haze: 0xf6e2c8, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, sun: 0xffd7a8, hemi: 0xfde8d0, ground: 0x8a7a5c, fill: 0x9cc4e8, key: 2.40, fillI: 0.35, hemiI: 0.455, exposure: 1.00, sunPos: new THREE.Vector3(22, 10, 14), stars: 0, night: 0 },
+  { h: 12.5, top: 0x5fb0e0, hor: 0xdff3f6, bot: 0xbfe6e2, haze: 0xd8eef0, deep: 0x2a86a0, shallow: 0x86e3d4, foam: 0xffffff, sun: 0xffffff, hemi: 0xe6f4ff, ground: 0xb0a07c, fill: 0xcfe8f5, key: 2.80, fillI: 0.25, hemiI: 0.70, exposure: 0.95, sunPos: new THREE.Vector3(6, 30, 8), stars: 0, night: 0 },
+  { h: 18.67, top: 0x3b2a5c, hor: 0xf39a6b, bot: 0x2a2f4a, haze: 0xe9a07e, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, sun: 0xff9a5c, hemi: 0xd8c8e4, ground: 0x3a2a3a, fill: 0x7a68c0, key: 1.15, fillI: 0.70, hemiI: 0.63, exposure: 1.00, sunPos: new THREE.Vector3(-24, 6, 6), stars: 0.2, night: 0.3 },
+  { h: 22, top: 0x2a3f70, hor: 0x1e3050, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 0.95, night: 1 },
+  { h: 24, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
 ];
 
 function spliceLookKnot(hour) {
@@ -219,7 +221,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let pixelCap = Math.min(window.devicePixelRatio || 1, narrowScreen() ? 1.5 : 2);
   renderer.setPixelRatio(pixelCap);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // Noon starts on Neutral. applyClock multiplies LOOKS exposure by toneScale so the table itself stays unchanged.
+  let toneName = "neutral";
+  let toneScale = 0.9;
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -229,6 +234,18 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(P.cf7e6cf);
   scene.fog = new THREE.FogExp2(0xd8eef0, 0.013);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const room = new RoomEnvironment();
+  scene.environment = pmrem.fromScene(room, 0.04).texture;
+  scene.environmentIntensity = 0.35;
+  room.dispose();
+  pmrem.dispose();
+
+  let post = null;
+  let drawPost = true;
+  const tier = reduced
+    ? "reduced"
+    : ((navigator.hardwareConcurrency || 8) <= 4 || narrowScreen() ? "lite" : "full");
 
   const skySunDir = new THREE.Vector3(0.45, 0.7, 0.3);
   const skyMat = new THREE.ShaderMaterial({
@@ -686,12 +703,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         color: island.accent,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.96,
+        opacity: 0.6,
         depthWrite: false,
       }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.5;
+    ring.position.y = 0.02;
     ring.visible = false;
     group.add(ring);
 
@@ -875,9 +892,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       positions[i * 3 + 2] = pts[i].z;
       const t = i / FLOW_SPLIT;
       const color = t >= 0.92 ? route.tip : route.softA.clone().lerp(route.softB, t);
-      colors[i * 3] = Math.min(1, color.r * flowBright);
-      colors[i * 3 + 1] = Math.min(1, color.g * flowBright);
-      colors[i * 3 + 2] = Math.min(1, color.b * flowBright);
+      const open = flowBright > 1.5;
+      colors[i * 3] = open ? color.r * flowBright : Math.min(1, color.r * flowBright);
+      colors[i * 3 + 1] = open ? color.g * flowBright : Math.min(1, color.g * flowBright);
+      colors[i * 3 + 2] = open ? color.b * flowBright : Math.min(1, color.b * flowBright);
     }
     const drawn = Number.isFinite(route.geo.instanceCount) ? route.geo.instanceCount : 0;
     route.geo.setPositions(positions);
@@ -1860,8 +1878,34 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (view.flashT != null) return;
     const picked = selected.has(view.island.id);
     view.ring.visible = picked || view.hover > 0.04;
-    view.ring.material.opacity = picked ? 0.96 : view.hover * 0.55;
+    view.ring.material.opacity = 0.6;
     view.ring.scale.setScalar(1);
+  }
+
+  function poseGrade() {
+    if (!post) return;
+    const ids = [...selected];
+    if (ids.length) {
+      const id = hoverId && selected.has(hoverId) ? hoverId : ids[0];
+      const view = views.get(id);
+      const groups = [];
+      for (const item of ids) {
+        const entry = views.get(item);
+        if (entry) groups.push(entry.group);
+      }
+      post.setOutline(groups, { selected: true, accent: view?.island.accent || "#ffffff" });
+    } else if (hoverId && views.get(hoverId)) {
+      post.setOutline([views.get(hoverId).group], { selected: false });
+    } else {
+      post.setOutline([], { selected: false });
+    }
+    let focus = 0.45;
+    if (ids.length === 1 || (hoverId && selected.has(hoverId))) {
+      const id = ids.length === 1 ? ids[0] : hoverId;
+      const p = views.get(id).base.clone().project(camera);
+      if (p.z < 1) focus = THREE.MathUtils.clamp(p.y * 0.5 + 0.5, 0.08, 0.92);
+    }
+    post.setFocus(focus);
   }
 
   function refresh() {
@@ -1990,7 +2034,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     skyMat.uniforms.bottom.value.copy(look.bot);
     scene.background.copy(look.haze);
     scene.fog.color.copy(look.haze);
-    renderer.toneMappingExposure = look.exposure;
+    renderer.toneMappingExposure = look.exposure * toneScale;
+    scene.environmentIntensity = look.night > 0.75 ? 0.12 : 0.35;
     hemi.color.copy(look.hemi);
     hemi.groundColor.copy(look.ground);
     hemi.intensity = look.hemiI;
@@ -2020,13 +2065,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     waterMat.uniforms.sunColor.value.copy(skyMat.uniforms.sunColor.value);
     waterMat.uniforms.sunAmt.value = skyMat.uniforms.sunAmt.value;
     stars.material.opacity = night * 0.9;
-    const nextBright = look.stars > 0.5 ? 1.15 : 1;
+    const nextBright = look.stars > 0.8 ? 1.8 : (look.stars > 0.5 ? 1.15 : 1);
     if (nextBright !== flowBright) {
       flowBright = nextBright;
       for (const route of flowViews) layoutRoute(route);
       refresh();
     }
     paintGlow();
+    if (post) post.setBloom(look.stars);
     renderer.shadowMap.needsUpdate = true;
   }
 
@@ -2081,6 +2127,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       renderer.shadowMap.needsUpdate = true;
     }
     renderer.setSize(W, H, false);
+    if (post) post.resize(W, H, pixelCap);
     labels.setSize(W, H);
     for (const route of flowViews) route.mat.resolution.set(W, H);
     applyFit();
@@ -2413,7 +2460,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
       view.landMat.color.setRGB(1, 1, 1);
       if (!view.awake) mixHex(view.landMat.color, ASLEEP, 0.3, view.landMat.color);
-      view.landMat.color.lerp(view.accent, view.hover * 0.12);
       poseRing(view);
       if (view.pulseT != null && view.pulseRing) {
         islandBusy = true;
@@ -2661,7 +2707,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       frameMs.length = 0;
       if (avg > 22 && pixelCap > 1 && elapsed > 2) {
         pixelCap = Math.max(1, pixelCap - 0.25);
-        renderer.setPixelRatio(pixelCap);
+        resize();
       }
     }
     const draw = (!reduced && !frozen) || moving || holdRender > 0;
@@ -2669,7 +2715,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (!draw) return;
     poseBlobs();
     kit.sync();
-    renderer.render(scene, camera);
+    poseGrade();
+    if (post && drawPost) post.composer.render(step);
+    else renderer.render(scene, camera);
     if (!labelsStill()) {
       labels.render(scene, camera);
       shadePins();
@@ -3449,8 +3497,63 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           }),
         };
       },
+      postInfo() {
+        const info = post
+          ? post.info()
+          : { tier, kinds: [], passes: 0, bloom: null, outline: null, vignette: null, focus: null, samples: 0 };
+        return {
+          ...info,
+          tone: toneName,
+          toneScale,
+          draw: Boolean(post) && drawPost,
+          exposure: renderer.toneMappingExposure,
+          environmentIntensity: scene.environmentIntensity,
+          pixelRatio: renderer.getPixelRatio(),
+        };
+      },
+      setPostDraw(on) { drawPost = Boolean(on); },
+      setVignette(on) { if (post) post.setVignette(on); },
+      setTone(name) {
+        const aces = name === "aces";
+        toneName = aces ? "aces" : "neutral";
+        toneScale = aces ? 1 : 0.9;
+        renderer.toneMapping = aces ? THREE.ACESFilmicToneMapping : THREE.NeutralToneMapping;
+        applyClock();
+      },
+      focus(id) { focusIslands(id ? [id] : []); },
+      gradeSpots(id) {
+        const view = views.get(id);
+        if (!view) return null;
+        const { W, H } = viewSize();
+        const project = (x, y, z) => {
+          _proj.set(x, y, z).project(camera);
+          return {
+            x: (_proj.x * 0.5 + 0.5) * W,
+            y: (-_proj.y * 0.5 + 0.5) * H,
+            behind: _proj.z > 1,
+          };
+        };
+        const at = new THREE.Vector3();
+        view.buildings[0].group.getWorldPosition(at);
+        return {
+          land: project(view.base.x + 1.05, 0.48, view.base.z - 0.15),
+          wall: project(at.x, at.y + 0.35, at.z),
+          base: project(view.base.x, view.base.y, view.base.z),
+        };
+      },
     });
   }
+
+  import("./post.js")
+    .then((mod) => mod.mountPost({ renderer, scene, camera, tier }))
+    .then((api) => {
+      post = api;
+      resize();
+      applyClock();
+    })
+    .catch(() => {
+      post = null;
+    });
 
   function clearRibbon() {
     if (!ribbon) return;
@@ -3873,6 +3976,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const envInfo = environment.info();
       if (envInfo.draws > 12) errors.push(`environment draws ${envInfo.draws}`);
       if (envInfo.trees < 3000) errors.push(`environment trees ${envInfo.trees}`);
+      if (!scene.environment || scene.environment.isTexture !== true) errors.push("scene.environment is not a texture");
+      if (sun.shadow.normalBias !== 0.02) errors.push(`sun normalBias ${sun.shadow.normalBias}`);
 
       // Sample offsets around the quarantine island, not a heading frame.
       const shore = border.base;
