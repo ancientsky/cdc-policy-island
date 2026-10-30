@@ -1,4 +1,4 @@
-import { DATA_AS_OF, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, SOURCE_INDEX } from "./data.js";
+import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, save as savePassport, stampIsland } from "./passport.js";
@@ -8,6 +8,26 @@ const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="t
 const SOUND_OFF = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M16 9.2l5 5.6M21 9.2l-5 5.6"/></svg>`;
 const ICON_CHECK = `<svg class="act-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 8.2 6.4 12 13 4.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const ICON_PHONE = `<svg class="act-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3.2 2.6h2.1l1 2.4-1.3.9a8.2 8.2 0 0 0 3.7 3.7l.9-1.3 2.4 1v2.1c0 .6-.5 1.1-1.1 1.1C6.4 12.5 3.5 9.6 3.5 3.7c0-.6.5-1.1 1.1-1.1z"/></svg>`;
+const SCENARIO_ICON = {
+  syringe: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M14 4l6 6M8 10l6 6M5 15l4 4M9 9l6 6"/></svg>`,
+  plane: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M3 13.2 21 4.5l-6.2 15.2-2.6-5.2L3 13.2z"/></svg>`,
+  child: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="7" r="2.4" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 20v-3.2a4 4 0 0 1 8 0V20"/></svg>`,
+  elder: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="9" cy="7" r="2.3" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M5.5 20v-2.8a3.5 3.5 0 0 1 7 0V20M16 8.5v10M16 8.5c1.6 0 2.5-1.2 2.5-2.6"/></svg>`,
+  mosquito: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><ellipse cx="12" cy="13" rx="2.2" ry="4" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M12 9V4M8 12c-3-2-4-5-4-5M16 12c3-2 4-5 4-5M9 16l-3 4M15 16l3 4"/></svg>`,
+  mask: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M5 9.5c2.2 1.2 4.4 1.8 7 1.8s4.8-.6 7-1.8v5.2c0 2.4-3.1 4.3-7 4.3s-7-1.9-7-4.3V9.5z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 12.2h8"/></svg>`,
+  ribbon: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 11c-2.2 0-4-1.7-4-3.8S9.2 4 12 8.2C14.8 4 16 5.1 16 7.2S14.2 11 12 11z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M9.2 10.6 7 20M14.8 10.6 17 20"/></svg>`,
+  pill: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4" transform="rotate(-28 12 12)" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 6.2v11.6"/></svg>`,
+};
+const SCENARIO_KEY = {
+  shot: "scenarioShot",
+  travel: "scenarioTravel",
+  kid: "scenarioKid",
+  elder: "scenarioElder",
+  mosq: "scenarioMosq",
+  cough: "scenarioCough",
+  sex: "scenarioSex",
+  drug: "scenarioDrug",
+};
 
 const INTRO_KEY = "cdc-policy-island-intro-v1";
 
@@ -34,7 +54,8 @@ export function mount({ scene, islands, flows }) {
     phase: "all",
     pillars: new Set(),
     query: "",
-    tab: "islands",
+    tab: "life",
+    scenario: null,
     selected: null,
     minutes: 8 * 60 + 20,
     playing: false,
@@ -421,7 +442,8 @@ export function mount({ scene, islands, flows }) {
     $("hero-lead").innerHTML = esc(t("heroLead")).replaceAll("\n", "<br>");
     search.placeholder = t("search");
     search.setAttribute("aria-label", t("searchLabel"));
-    $("tab-islands").textContent = t("tabIslands");
+    $("tab-life").textContent = t("tabLife");
+    $("tab-islands").textContent = t("tabAll");
     $("tab-flows").textContent = t("tabFlows", { n: flows.length });
     $("tab-log").textContent = t("tabLog");
     $("tab-phase").textContent = t("tabPhase");
@@ -541,19 +563,38 @@ export function mount({ scene, islands, flows }) {
         : `<p class="empty">${esc(t("emptyLog"))}</p>`;
       return;
     }
+    if (state.tab === "life" && !q) {
+      const buttons = scenarios.map((scenario) => {
+        const on = state.scenario === scenario.id;
+        return `<button type="button" class="scenario${on ? " on" : ""}" data-scenario="${scenario.id}">${SCENARIO_ICON[scenario.icon] ?? ""}<span>${esc(t(SCENARIO_KEY[scenario.id]))}</span></button>`;
+      }).join("");
+      const behind = backstageIds.map((id) => islandCard(byId.get(id))).join("");
+      tree.innerHTML = `<p class="scenario-lead">${esc(t("scenarioLead"))}</p><div class="scenarios">${buttons}</div><h3 class="backstage-title">${esc(t("backstage"))}</h3>${behind}`;
+      return;
+    }
     const cards = ordered.filter((island) => {
       if (!q) return true;
       const blob = [island.name, island.nick, island.pin, island.blurb, island.blurbKid, island.source, ...island.items.flatMap((item) => [item.name, item.detail, item.kid, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
       return blob.includes(q);
     });
-    tree.innerHTML = cards.length ? cards.map((island) => {
-      const open = state.selected && ((state.selected.type === "island" && state.selected.id === island.id) || (state.selected.type === "item" && state.selected.islandId === island.id) || (state.selected.type === "flow" && (state.selected.flow.a === island.id || state.selected.flow.b === island.id)));
-      const items = island.items.map((item) => {
-        const on = state.selected?.type === "item" && state.selected.itemId === item.id;
-        return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
-      }).join("");
-      return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
-    }).join("") : `<p class="empty">${esc(t("emptyIsland"))}</p>`;
+    tree.innerHTML = cards.length ? cards.map((island) => islandCard(island)).join("") : emptySearch();
+  }
+
+  function islandCard(island) {
+    const open = state.selected && ((state.selected.type === "island" && state.selected.id === island.id) || (state.selected.type === "item" && state.selected.islandId === island.id) || (state.selected.type === "flow" && (state.selected.flow.a === island.id || state.selected.flow.b === island.id)));
+    const items = island.items.map((item) => {
+      const on = state.selected?.type === "item" && state.selected.itemId === item.id;
+      return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
+    }).join("");
+    return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="--c:${island.accent}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
+  }
+
+  function emptySearch() {
+    const tries = ["mosq", "travel", "shot"].map((id) => {
+      const scenario = scenarios.find((item) => item.id === id);
+      return `<button type="button" class="scenario" data-scenario="${id}">${SCENARIO_ICON[scenario.icon] ?? ""}<span>${esc(t(SCENARIO_KEY[id]))}</span></button>`;
+    }).join("");
+    return `<div class="empty-search"><p class="empty">${esc(t("emptyTry"))}</p><div class="scenarios">${tries}</div></div>`;
   }
 
   let personTimer = 0;
@@ -696,8 +737,29 @@ export function mount({ scene, islands, flows }) {
     measureSafe();
   }
 
+  function selectScenario(id) {
+    const scenario = scenarios.find((item) => item.id === id);
+    if (!scenario) return;
+    const first = scenario.islands[0];
+    playSfx("select");
+    dismissPerson();
+    closeGerm();
+    state.scenario = id;
+    state.selected = { type: "island", id: first };
+    scene.focusIslands(scenario.islands);
+    scene.setSpotlight(scenario.islands);
+    scene.setHotItem(null);
+    writeHash();
+    renderList();
+    renderSheet();
+    paintRail();
+    armStamp(first);
+    advanceMissions();
+  }
+
   function selectIsland(id) {
     if (!byId.has(id)) return;
+    state.scenario = null;
     playSfx("select");
     dismissPerson();
     closeGerm();
@@ -715,6 +777,7 @@ export function mount({ scene, islands, flows }) {
   function selectItem(islandId, itemId) {
     const island = byId.get(islandId);
     if (!island?.items.some((item) => item.id === itemId)) return;
+    state.scenario = null;
     playSfx("item");
     dismissPerson();
     closeGerm();
@@ -734,6 +797,7 @@ export function mount({ scene, islands, flows }) {
   function selectFlow(id) {
     const flow = flows.find((item) => item.id === id);
     if (!flow) return;
+    state.scenario = null;
     dismissPerson();
     closeGerm();
     cancelStamp();
@@ -752,6 +816,7 @@ export function mount({ scene, islands, flows }) {
     dismissPerson();
     closeGerm();
     cancelStamp();
+    state.scenario = null;
     state.selected = null;
     scene.overview();
     scene.setHotItem(null);
@@ -1000,6 +1065,11 @@ export function mount({ scene, islands, flows }) {
   });
 
   tree.addEventListener("click", (event) => {
+    const scenario = event.target.closest("[data-scenario]");
+    if (scenario) {
+      selectScenario(scenario.dataset.scenario);
+      return;
+    }
     const item = event.target.closest("[data-item]");
     if (item) {
       selectItem(item.dataset.island, item.dataset.item);

@@ -84,7 +84,7 @@ export const islands = [
     hrefLabel: "疾管署首頁（查詢邊境檢疫）",
     items: [
       { id: "border-port", name: "航空港口檢疫", phase: "now", hours: [[5, 23]], keywords: ["機場", "港口", "檢疫", "體溫"], detail: "對入境旅客、機組與船舶做檢疫詢問和症狀評估。異常就分流、採檢，不讓隊伍本身變成風險。" },
-      { id: "border-travel", name: "旅遊史與症狀", phase: "now", hours: [[5, 23]], keywords: ["旅遊史", "入境", "發燒"], detail: "發熱、呼吸道症狀和蚊媒疫區旅遊史，當天要變成疫情中心看得到的名單。" },
+      { id: "border-travel", name: "旅遊史與症狀", phase: "now", hours: [[5, 23]], keywords: ["旅遊史", "入境", "發燒", "出國", "旅遊"], detail: "發熱、呼吸道症狀和蚊媒疫區旅遊史，當天要變成疫情中心看得到的名單。" },
       { id: "border-surge", name: "檢疫量能", phase: "near", hours: [[8, 18]], keywords: ["隔離", "人力", "大流行"], detail: "動線、隔離空間和輪班人力平時就留得住，新型病原或流感大流行時才放得大。這項在 2022 至 2027 的整備計畫裡。計畫寫明這段是爆發前的準備，不是應變動員。" },
       { id: "border-vector", name: "交通工具病媒", phase: "now", hours: [[0, 24]], keywords: ["船舶", "航空器", "病媒", "登革熱"], detail: "航空器與船舶的病媒和環境衛生要查。登革熱不必等社區出現病例，才發現蚊子先下了船。" },
     ],
@@ -127,7 +127,7 @@ export const islands = [
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢疫苗）",
     items: [
-      { id: "vax-routine", name: "常規公費疫苗", phase: "now", hours: [[8, 17]], keywords: ["公費", "麻疹", "日本腦炎", "幼兒"], detail: "幼兒與既有對象的常規時程要維持。麻疹、日本腦炎這類已控制的疾病，是靠每一個出生世代繼續打。" },
+      { id: "vax-routine", name: "常規公費疫苗", phase: "now", hours: [[8, 17]], keywords: ["公費", "麻疹", "日本腦炎", "幼兒", "打針", "疫苗", "小孩打針"], detail: "幼兒與既有對象的常規時程要維持。麻疹、日本腦炎這類已控制的疾病，是靠每一個出生世代繼續打。" },
       { id: "vax-season", name: "季節流感與新冠", phase: "now", hours: [[8, 20]], keywords: ["流感疫苗", "新冠", "長者", "高風險"], detail: "每季開打，高風險與長者優先，為了減少重症和死亡。開打日不是終點，庫存和接種率才是。" },
       { id: "vax-cold", name: "冷鏈與調撥", phase: "now", hours: [[6, 18]], keywords: ["冷鏈", "封緘", "衛生局", "庫存"], detail: "從封緘、冷儲到縣市衛生局，溫度和庫存要看得到，縣市之間調得動。" },
       { id: "vax-fund", name: "基金長得住", phase: "far", hours: [[9, 17]], keywords: ["疫苗基金", "財源", "緊急採購"], detail: "第四期的正式名稱是充實國家疫苗基金及促進國民免疫力計畫，收到 2028。長期要留下的是財源和緊急採購。這一條是買、送、打，和產業計畫不是同一份。" },
@@ -150,7 +150,7 @@ export const islands = [
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢流感）",
     items: [
-      { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別"], detail: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
+      { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別", "感冒", "發燒", "咳嗽"], detail: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
       { id: "flu-drug", name: "抗病毒藥物", phase: "now", hours: [[9, 17]], keywords: ["抗病毒", "合約醫院", "庫存"], detail: "合約醫院的藥劑存量和效期要在流行期調得動。藥和疫苗是兩條補給線，不能互相替代。" },
       { id: "flu-cluster", name: "機構群聚", phase: "now", hours: [[9, 18]], keywords: ["護理之家", "群聚", "學校"], detail: "護理之家、學校和矯正機關出現群聚時，給採檢、給藥和隔離建議，並回報監測。" },
       { id: "flu-novel", name: "新型呼吸道腳本", phase: "near", hours: [[9, 17]], keywords: ["大流行", "新興", "腳本"], detail: "為流感大流行或新的呼吸道病毒預留監視、藥品和溝通腳本。整備計畫收到 2027，腳本要在那之前寫得能演練。" },
@@ -172,7 +172,7 @@ export const islands = [
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢腸病毒）",
     items: [
-      { id: "entero-sign", name: "重症前兆衛教", phase: "now", hours: [[7, 20]], keywords: ["嗜睡", "肌躍", "嘔吐", "家長"], detail: "提醒家長辨識嗜睡、肌躍型抽搐、持續嘔吐等重症前兆，儘速就醫。衛教要在流行上升前就在，而不是上新聞以後。" },
+      { id: "entero-sign", name: "重症前兆衛教", phase: "now", hours: [[7, 20]], keywords: ["嗜睡", "肌躍", "嘔吐", "家長", "小孩", "手足口", "口腔潰瘍"], detail: "提醒家長辨識嗜睡、肌躍型抽搐、持續嘔吐等重症前兆，儘速就醫。衛教要在流行上升前就在，而不是上新聞以後。" },
       { id: "entero-school", name: "教托育監視", phase: "now", hours: [[7, 16]], keywords: ["幼兒園", "停課", "缺勤"], detail: "幼兒園與國小的缺勤、停課和群聚回報衛生單位。這是監測的前段，不是學校自己的內部統計。" },
       { id: "entero-hand", name: "手部與環境", phase: "now", hours: [[7, 16]], keywords: ["洗手", "消毒", "肥皂"], detail: "肥皂洗手，玩具和常用表面要消毒。腸病毒靠這一套，比靠停課通知可靠。" },
       { id: "entero-term", name: "開學季聯合防護", phase: "now", hours: [[7, 16]], keywords: ["開學", "流感", "新冠"], detail: "開學前後把腸病毒、流感和蚊媒防護收成學校做得到的一套動作，避免三份公文各講各的。" },
@@ -194,7 +194,7 @@ export const islands = [
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢登革熱）",
     items: [
-      { id: "dengue-source", name: "孳生源清除", phase: "now", hours: [[6, 10], [15, 18]], keywords: ["積水", "容器", "花盆"], detail: "容器、花盆和積水處要巡、要清。雨後的空窗比藥劑的庫存更常決定下一週的指數。" },
+      { id: "dengue-source", name: "孳生源清除", phase: "now", hours: [[6, 10], [15, 18]], keywords: ["積水", "容器", "花盆", "蚊子", "被叮", "發燒", "出疹"], detail: "容器、花盆和積水處要巡、要清。雨後的空窗比藥劑的庫存更常決定下一週的指數。" },
       { id: "dengue-index", name: "病媒蚊密度", phase: "now", hours: [[7, 17]], keywords: ["誘卵", "指數", "成蚊"], detail: "用密度看這一區的風險。指數上升而還沒有本土病例時，就該先清，不等確診。" },
       { id: "dengue-crew", name: "社區動員", phase: "now", hours: [[7, 11]], keywords: ["里", "環保", "衛生局"], detail: "里、環保和衛生單位一起清。單靠化學防治撐不住下一場雨。" },
       { id: "dengue-routine", name: "日常化，而不是緊急動員", phase: "far", hours: [[9, 17]], keywords: ["制度化", "市政"], detail: "長期要留下的是清積水變成日常市政。緊急噴藥和醫療整備是疫情升高時的加開，不是常態本身。" },
@@ -216,7 +216,7 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/ListPage/2fbGet7KwqEwnjGAy-Zbyg",
     hrefLabel: "看結核病防治專區",
     items: [
-      { id: "tb-find", name: "主動發現", phase: "now", hours: [[9, 17]], keywords: ["接觸者", "篩檢", "高風險"], detail: "在接觸者和高風險族群裡找出發病的人，不等症狀自己走到門診。" },
+      { id: "tb-find", name: "主動發現", phase: "now", hours: [[9, 17]], keywords: ["接觸者", "篩檢", "高風險", "咳嗽兩週", "肺結核"], detail: "在接觸者和高風險族群裡找出發病的人，不等症狀自己走到門診。" },
       { id: "tb-dots", name: "都治與完成治療", phase: "now", hours: [[9, 17]], keywords: ["都治", "DOTS", "完成率"], detail: "直接觀察治療和關懷，是為了完成率，不是為了打卡。沒吃完的療程會把抗藥性留在社區。" },
       { id: "tb-ltbi", name: "潛伏結核治療", phase: "near", hours: [[9, 17]], keywords: ["潛伏", "LTBI", "接觸者"], detail: "對接觸者提供潛伏感染治療，減少日後發病。這是第三期要推進的工作，不是已經做完的例行公事。" },
       { id: "tb-2035", name: "守到消除門檻", phase: "far", hours: [[9, 17]], keywords: ["2035", "發生率", "抗藥性"], detail: "2030 的計畫結束後，2035 仍要有人看發生率和抗藥性結核。分子快速檢測縮短的是診斷空窗，不能取代後續追蹤。" },
@@ -238,7 +238,7 @@ export const islands = [
     href: CDC_HOME,
     hrefLabel: "疾管署首頁（查詢愛滋）",
     items: [
-      { id: "hiv-test", name: "擴大篩檢", phase: "now", hours: [[12, 20]], keywords: ["匿名", "自我篩檢", "篩檢"], detail: "匿名篩檢、自我篩檢，以及就醫時提供的檢驗，是為了找出還不知道自己感染的人。" },
+      { id: "hiv-test", name: "擴大篩檢", phase: "now", hours: [[12, 20]], keywords: ["匿名", "自我篩檢", "篩檢", "保險套", "PrEP"], detail: "匿名篩檢、自我篩檢，以及就醫時提供的檢驗，是為了找出還不知道自己感染的人。" },
       { id: "hiv-prep", name: "暴露前預防", phase: "now", hours: [[9, 17]], keywords: ["PrEP", "暴露前"], detail: "對有感染風險的人提供 PrEP 和定期追蹤。它是治療以外的預防，不是取代保險套或篩檢。" },
       { id: "hiv-treat", name: "治療即預防", phase: "now", hours: [[9, 17]], keywords: ["U=U", "病毒量", "治療"], detail: "確診後儘速治療、病毒量測不到，才能降低再傳染。慢下來的那一截通常不是藥物，是銜接。" },
       { id: "hiv-2030", name: "2030 之前的覆蓋", phase: "mid", hours: [[9, 17]], keywords: ["2030", "污名", "覆蓋率"], detail: "第一期在 2026 年結束，2030 仍是目標，不是已經消除。114 年的檢討仍寫著有人不知道自己感染、延遲診斷還在。污名若還在，最需要進來的人不會出現在統計裡。" },
@@ -304,7 +304,7 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
     hrefLabel: "看抗藥性監視專頁",
     items: [
-      { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院"], detail: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
+      { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院", "消炎藥"], detail: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
       { id: "amr-watch", name: "抗藥性監視", phase: "now", hours: [[9, 18]], keywords: ["抗藥性", "菌株", "THAS"], detail: "臨床分離株的抗藥性比例，按菌種回饋給醫院。沒有持續上傳的藥物敏感性，行動計畫只剩百分比的空格。" },
       { id: "amr-animal", name: "動物與環境", phase: "near", hours: [[9, 17]], keywords: ["One Health", "動物", "環境"], detail: "與農業、環境部門對齊動物用藥和環境中的抗藥性。近期要做的是把人醫以外的資料接進來。" },
       { id: "amr-joint", name: "同一張跨部會的桌子", phase: "mid", hours: [[9, 17]], keywords: ["政策會報", "聯合行動", "2029", "自評"], detail: "行政院於 114 年 4 月 30 日核定國家防疫一體政策會報。聯合行動方案涵蓋 115 年至 119 年，把人醫、動物、食品和環境放在同一張桌子，範圍比抗藥性大。抗藥性行動計畫是其中的抗藥性切片，收到 2029，115 年 3 月修訂過。核心能力仍是對照國際工具做自評或外部評核。" },
@@ -349,13 +349,26 @@ export const islands = [
     href: "https://www.cdc.gov.tw/Category/Page/pLGVAwA60glWsIoMUWKNYA",
     hrefLabel: "看國際衛生條例對口頁",
     items: [
-      { id: "global-intel", name: "國際疫情交換", phase: "now", hours: [[9, 21]], keywords: ["情資", "鄰近", "交換"], detail: "合作國家和鄰近地區的事件，要進到疫情中心的值勤，而不是停在一份轉寄的電子報。" },
+      { id: "global-intel", name: "國際疫情交換", phase: "now", hours: [[9, 21]], keywords: ["情資", "鄰近", "交換", "出國", "旅遊", "入境"], detail: "合作國家和鄰近地區的事件，要進到疫情中心的值勤，而不是停在一份轉寄的電子報。" },
       { id: "global-ihr", name: "核心能力檢視", phase: "now", hours: [[9, 17]], keywords: ["IHR", "核心能力", "對口"], detail: "依國際衛生條例的核心能力自我檢視：偵測、通報、應變和邊境。聯合行動方案寫的也是對照國際工具做自評或外部評核。對口要有名字和班表，不能只有一個信箱。" },
       { id: "global-people", name: "人才與技術合作", phase: "near", hours: [[9, 17]], keywords: ["培訓", "FETP", "技術"], detail: "防疫訓練和技術合作是近期要維持的管道。人的網絡比臨時的視訊會議耐用。" },
       { id: "global-say", name: "對內說明與對外同步", phase: "now", hours: [[10, 21]], keywords: ["風險溝通", "記者會", "說明"], detail: "對公眾的說明和對合作對象的通報要是同一套事實。兩個版本的數字，會先在國內被發現。" },
     ],
   },
 ];
+
+export const scenarios = [
+  { id: "shot", icon: "syringe", islands: ["vax", "flu", "hepa"] },
+  { id: "travel", icon: "plane", islands: ["border", "global", "dengue"] },
+  { id: "kid", icon: "child", islands: ["entero", "vax", "flu"] },
+  { id: "elder", icon: "elder", islands: ["flu", "vax", "ipc"] },
+  { id: "mosq", icon: "mosquito", islands: ["dengue"] },
+  { id: "cough", icon: "mask", islands: ["tb", "flu"] },
+  { id: "sex", icon: "ribbon", islands: ["hiv", "hepa"] },
+  { id: "drug", icon: "pill", islands: ["amr"] },
+];
+
+export const backstageIds = ["watch", "lab", "ready"];
 
 const NICK = {
   watch: "瞭望塔島",
@@ -461,6 +474,19 @@ export function validate() {
     if (!flow.kidTitle || !flow.kid) errors.push(`flow ${flow.id} missing kid`);
   }
   if (islands.length !== 14) errors.push("expected 14 islands");
+  const inScenario = new Set();
+  if (scenarios.length !== 8) errors.push("expected 8 scenarios");
+  for (const scenario of scenarios) {
+    if (!scenario.islands.length) errors.push(`${scenario.id} empty`);
+    for (const id of scenario.islands) {
+      if (!ids.has(id)) errors.push(`${scenario.id} missing ${id}`);
+      inScenario.add(id);
+    }
+  }
+  for (const id of backstageIds) {
+    if (!ids.has(id)) errors.push(`backstage ${id}`);
+    if (inScenario.has(id)) errors.push(`backstage ${id} is in a scenario`);
+  }
   if (errors.length) throw new Error(errors.join("; "));
   return { islands: islands.length, items: itemCount(), flows: flows.length, pillars: pillarName };
 }

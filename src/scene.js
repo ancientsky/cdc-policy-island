@@ -920,6 +920,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let hoverItem = null;
   let hotItem = null;
   let selected = new Set();
+  let spotlight = null;
   let elapsed = 0;
   const threats = [];
   const threatHits = [];
@@ -1868,6 +1869,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       view.lit = on;
       view.group.userData.lit = on;
       view.fadeTarget = on ? 1 : 0.14;
+      if (on && spotlight && !spotlight.has(view.island.id)) view.fadeTarget = 0.25;
       if (view.fadeTarget < 1 || view.fade < 0.999) {
         for (const mat of [view.coastMat, view.landMat, view.skirtMat]) {
           mat.transparent = true;
@@ -1885,6 +1887,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         child.visible = on;
       });
       view.pinEl.classList.toggle("dim", !on);
+      view.pinEl.classList.toggle("spot", Boolean(on && spotlight && !spotlight.has(view.island.id)));
       view.pinEl.classList.toggle("hot", hoverId === view.island.id || selected.has(view.island.id));
       view.pinEl.classList.toggle("named", namesOn || hoverId === view.island.id || selected.has(view.island.id));
     }
@@ -3064,6 +3067,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   function focusIslands(ids) {
     noteInput();
+    spotlight = null;
     selected = new Set(ids);
     personFocus = -1;
     stopCoast();
@@ -3576,6 +3580,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     setPillars(value) { pillarSet = value; refresh(); },
     setQuery(value) { query = norm(value); refresh(); },
     focusIslands,
+    setSpotlight(ids) {
+      spotlight = ids && ids.length ? new Set(ids) : null;
+      refresh();
+    },
     focusPerson,
     clearPersonFocus() {
       personFocus = -1;
