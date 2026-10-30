@@ -1410,6 +1410,18 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   body.detail .guide, body.detail .mission { left: 412px; }
   body.detail .mile { left: 412px; top: auto; bottom: 190px; }
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .veil, .title-card, .ledger, .modal-card, .caption, .breathe, .pin b, .chapter, .wake-label { transition: none; animation: none; }
   .pin.ping b::before, .stamp.fresh, .passport-count.pop, .sheet.bump { animation: none; }

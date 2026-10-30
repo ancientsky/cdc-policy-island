@@ -411,7 +411,9 @@ export function mount({ scene, islands, flows }) {
 
   function syncDrawerButton() {
     const open = ledger.classList.contains("open") || ledger.classList.contains("half");
-    $("list").setAttribute("aria-expanded", String(open));
+    const button = $("list");
+    button.setAttribute("aria-controls", "ledger");
+    button.setAttribute("aria-expanded", String(open));
   }
 
   function paintSound() {
@@ -469,7 +471,9 @@ export function mount({ scene, islands, flows }) {
     if (veilText) veilText.textContent = t("veil");
     paintScore();
     if (toastInfo && !toast.hidden) showToast(toastInfo);
+    $("c")?.setAttribute("role", "img");
     $("c")?.setAttribute("aria-label", t("canvas"));
+    document.querySelector(".tabs")?.setAttribute("aria-label", t("tabsLabel"));
     paintLangButton();
     for (const button of document.querySelectorAll("[data-toggle]")) {
       const key = toggleKey[button.dataset.toggle];
@@ -485,6 +489,7 @@ export function mount({ scene, islands, flows }) {
     paintGuideCopy();
     paintMission();
     syncDrawerButton();
+    markTabs(activeTabMark());
     armFactLine();
   }
 
@@ -552,7 +557,88 @@ export function mount({ scene, islands, flows }) {
     advanceMissions();
   }
 
+  let lastTrigger = null;
+
+  function rememberTrigger(node) {
+    const button = node?.closest?.("button");
+    if (!button) return;
+    if (tree.contains(button)) {
+      if (button.dataset.item) lastTrigger = { root: "tree", selector: `[data-item="${CSS.escape(button.dataset.item)}"]` };
+      else if (button.dataset.flow) lastTrigger = { root: "tree", selector: `[data-flow="${CSS.escape(button.dataset.flow)}"]` };
+      else if (button.classList.contains("head") && button.dataset.island) lastTrigger = { root: "tree", selector: `.head[data-island="${CSS.escape(button.dataset.island)}"]` };
+      else if (button.dataset.scenario) lastTrigger = { root: "tree", selector: `[data-scenario="${CSS.escape(button.dataset.scenario)}"]` };
+      return;
+    }
+    if (button.dataset.rail && $("rail")?.contains(button)) {
+      lastTrigger = { root: "rail", selector: `[data-rail="${CSS.escape(button.dataset.rail)}"]` };
+    }
+  }
+
+  function listFocusKey() {
+    const current = document.activeElement;
+    if (!current || !tree.contains(current)) return null;
+    if (current.dataset.item) return `[data-item="${CSS.escape(current.dataset.item)}"]`;
+    if (current.dataset.flow) return `[data-flow="${CSS.escape(current.dataset.flow)}"]`;
+    if (current.classList.contains("head") && current.dataset.island) return `.head[data-island="${CSS.escape(current.dataset.island)}"]`;
+    if (current.dataset.scenario) return `[data-scenario="${CSS.escape(current.dataset.scenario)}"]`;
+    return null;
+  }
+
+  function restoreListFocus(key) {
+    if (!key) return;
+    tree.querySelector(key)?.focus({ preventScroll: true });
+  }
+
+  function sayStatus(text) {
+    const el = $("sr-status");
+    if (!el) return;
+    const next = text || "";
+    if (el.textContent === next) {
+      el.textContent = "";
+      requestAnimationFrame(() => { el.textContent = next; });
+      return;
+    }
+    el.textContent = next;
+  }
+
+  function selectedLabel() {
+    const selected = state.selected;
+    if (!selected) return "";
+    if (selected.type === "flow") return selected.flow.kidTitle || selected.flow.title;
+    const id = selected.type === "item" ? selected.islandId : selected.id;
+    return byId.get(id)?.nick || "";
+  }
+
+  function announceSelection() {
+    const name = selectedLabel();
+    if (name) sayStatus(t("selectedName", { name }));
+  }
+
+  function announceSearch() {
+    const query = state.query.trim();
+    if (!query || state.tab === "log") {
+      sayStatus("");
+      return;
+    }
+    if (state.tab === "flows") {
+      sayStatus(t("foundFlows", { n: tree.querySelectorAll("[data-flow]").length }));
+      return;
+    }
+    sayStatus(t("foundIslands", { n: tree.querySelectorAll(".island").length }));
+  }
+
+  function focusSheetIfNeeded(event) {
+    const keyboard = !!event && event.detail === 0;
+    const covered = window.matchMedia("(max-width: 980px)").matches;
+    if (!keyboard && !covered) return;
+    const title = sheet.querySelector("h2");
+    if (!title) return;
+    title.tabIndex = -1;
+    title.focus({ preventScroll: true });
+  }
+
   function renderList() {
+    const focusKey = listFocusKey();
     const q = state.query.trim().toLowerCase().replace(/\s+/g, "");
     if (state.tab === "flows") {
       const rows = flows.filter((flow) => !q || [flow.title, flow.kidTitle, flow.text, flow.kid, flow.carried, flow._alias, byId.get(flow.a).name, byId.get(flow.b).name, byId.get(flow.a).nick, byId.get(flow.b).nick].join(" ").toLowerCase().replace(/\s+/g, "").includes(q));
@@ -560,12 +646,14 @@ export function mount({ scene, islands, flows }) {
         const on = state.selected?.type === "flow" && state.selected.id === flow.id;
         return `<button type="button" class="btn flow ${on ? "on" : ""}" data-flow="${flow.id}"><b>${esc(flow.kidTitle || flow.title)}</b><span>${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</span><small>${esc(t("carry", { what: flow.carried }))}</small></button>`;
       }).join("") : `<p class="empty">${esc(t("emptyFlow"))}</p>`;
+      restoreListFocus(focusKey);
       return;
     }
     if (state.tab === "log") {
       tree.innerHTML = state.log.length
         ? `<ol class="loglist">${state.log.map((row) => `<li><time>${esc(row.time)}</time>${esc(row.text)}</li>`).join("")}</ol>`
         : `<p class="empty">${esc(t("emptyLog"))}</p>`;
+      restoreListFocus(focusKey);
       return;
     }
     if (state.tab === "life" && !q) {
@@ -575,6 +663,7 @@ export function mount({ scene, islands, flows }) {
       }).join("");
       const behind = backstageIds.map((id) => islandCard(byId.get(id))).join("");
       tree.innerHTML = `<p class="scenario-lead">${esc(t("scenarioLead"))}</p><div class="scenarios">${buttons}</div><h3 class="backstage-title">${esc(t("backstage"))}</h3>${behind}`;
+      restoreListFocus(focusKey);
       return;
     }
     const cards = ordered.filter((island) => {
@@ -583,6 +672,7 @@ export function mount({ scene, islands, flows }) {
       return blob.includes(q);
     });
     tree.innerHTML = cards.length ? cards.map((island) => islandCard(island)).join("") : emptySearch();
+    restoreListFocus(focusKey);
   }
 
   function islandCard(island) {
@@ -591,7 +681,7 @@ export function mount({ scene, islands, flows }) {
       const on = state.selected?.type === "item" && state.selected.itemId === item.id;
       return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
     }).join("");
-    return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}"><i style="${toneStyle(island)}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
+    return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}" aria-expanded="${open ? "true" : "false"}"><i style="${toneStyle(island)}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
   }
 
   function emptySearch() {
@@ -742,7 +832,7 @@ export function mount({ scene, islands, flows }) {
     measureSafe();
   }
 
-  function selectScenario(id) {
+  function selectScenario(id, event) {
     const scenario = scenarios.find((item) => item.id === id);
     if (!scenario) return;
     const first = scenario.islands[0];
@@ -760,9 +850,11 @@ export function mount({ scene, islands, flows }) {
     paintRail();
     armStamp(first);
     advanceMissions();
+    focusSheetIfNeeded(event);
+    announceSelection();
   }
 
-  function selectIsland(id) {
+  function selectIsland(id, event) {
     if (!byId.has(id)) return;
     state.scenario = null;
     playSfx("select");
@@ -777,9 +869,11 @@ export function mount({ scene, islands, flows }) {
     paintRail();
     armStamp(id);
     advanceMissions();
+    focusSheetIfNeeded(event);
+    announceSelection();
   }
 
-  function selectItem(islandId, itemId) {
+  function selectItem(islandId, itemId, event) {
     const island = byId.get(islandId);
     if (!island?.items.some((item) => item.id === itemId)) return;
     state.scenario = null;
@@ -797,9 +891,11 @@ export function mount({ scene, islands, flows }) {
     renderSheet();
     paintRail();
     advanceMissions();
+    focusSheetIfNeeded(event);
+    announceSelection();
   }
 
-  function selectFlow(id) {
+  function selectFlow(id, event) {
     const flow = flows.find((item) => item.id === id);
     if (!flow) return;
     state.scenario = null;
@@ -815,9 +911,13 @@ export function mount({ scene, islands, flows }) {
     renderSheet();
     paintRail();
     advanceMissions();
+    focusSheetIfNeeded(event);
+    announceSelection();
   }
 
   function clearSelection() {
+    const active = document.activeElement;
+    const returnFocus = !active || active === document.body || active === document.documentElement || sheet.contains(active);
     dismissPerson();
     closeGerm();
     cancelStamp();
@@ -829,6 +929,9 @@ export function mount({ scene, islands, flows }) {
     renderList();
     renderSheet();
     paintRail();
+    if (!returnFocus || !lastTrigger) return;
+    const root = lastTrigger.root === "rail" ? $("rail") : tree;
+    root?.querySelector(lastTrigger.selector)?.focus({ preventScroll: true });
   }
 
   function paintTicks() {
@@ -1070,23 +1173,24 @@ export function mount({ scene, islands, flows }) {
   });
 
   tree.addEventListener("click", (event) => {
+    rememberTrigger(event.target);
     const scenario = event.target.closest("[data-scenario]");
     if (scenario) {
-      selectScenario(scenario.dataset.scenario);
+      selectScenario(scenario.dataset.scenario, event);
       return;
     }
     const item = event.target.closest("[data-item]");
     if (item) {
-      selectItem(item.dataset.island, item.dataset.item);
+      selectItem(item.dataset.island, item.dataset.item, event);
       return;
     }
     const flow = event.target.closest("[data-flow]");
     if (flow) {
-      selectFlow(flow.dataset.flow);
+      selectFlow(flow.dataset.flow, event);
       return;
     }
     const island = event.target.closest("[data-island]");
-    if (island) selectIsland(island.dataset.island);
+    if (island) selectIsland(island.dataset.island, event);
   });
   sheet.addEventListener("click", (event) => {
     if (event.target.closest("[data-close]")) {
@@ -1096,11 +1200,11 @@ export function mount({ scene, islands, flows }) {
     }
     const item = event.target.closest("[data-item]");
     if (item) {
-      selectItem(item.dataset.island, item.dataset.item);
+      selectItem(item.dataset.island, item.dataset.item, event);
       return;
     }
     const flow = event.target.closest("[data-flow]");
-    if (flow) selectFlow(flow.dataset.flow);
+    if (flow) selectFlow(flow.dataset.flow, event);
   });
   germ.addEventListener("click", (event) => {
     if (event.target.closest("[data-germ-close]")) closeGerm();
@@ -1116,11 +1220,30 @@ export function mount({ scene, islands, flows }) {
       setPane(tab);
     });
   }
+  document.querySelector(".tabs")?.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const current = event.target.closest?.("[role=tab]");
+    if (!current || !current.closest(".tabs")) return;
+    const tabs = visibleTabs();
+    const index = tabs.indexOf(current);
+    if (index < 0 || !tabs.length) return;
+    event.preventDefault();
+    let next = current;
+    if (event.key === "Home") next = tabs[0];
+    else if (event.key === "End") next = tabs[tabs.length - 1];
+    else if (event.key === "ArrowRight") next = tabs[(index + 1) % tabs.length];
+    else next = tabs[(index - 1 + tabs.length) % tabs.length];
+    if (next.dataset.tab === "phase" || next.dataset.tab === "pillar") showFilter(next.dataset.tab, { force: true });
+    else setPane(next.dataset.tab);
+    next.focus();
+  });
   search.addEventListener("input", () => {
     state.query = search.value;
     noteMosquito(search.value);
     scene.setQuery(search.value);
     renderList();
+    announceSearch();
     advanceMissions();
   });
   $("phase-buttons").addEventListener("click", (event) => {
@@ -1185,9 +1308,9 @@ export function mount({ scene, islands, flows }) {
   }
   $("home").addEventListener("click", clearSelection);
   factMedia.addEventListener("change", armFactLine);
-  $("fact-tick").addEventListener("click", () => {
+  $("fact-tick").addEventListener("click", (event) => {
     const id = $("fact-tick").dataset.island;
-    if (id) selectIsland(id);
+    if (id) selectIsland(id, event);
   });
   $("list").addEventListener("click", () => {
     if (ledger.classList.contains("open")) {
@@ -1202,7 +1325,10 @@ export function mount({ scene, islands, flows }) {
   });
   $("rail").addEventListener("click", (event) => {
     const button = event.target.closest("[data-rail]");
-    if (button) selectIsland(button.dataset.rail);
+    if (button) {
+      rememberTrigger(button);
+      selectIsland(button.dataset.rail, event);
+    }
   });
   $("filter").addEventListener("click", (event) => {
     event.stopPropagation();
@@ -1385,31 +1511,66 @@ export function mount({ scene, islands, flows }) {
     });
   }
 
+  function activeTabMark() {
+    const pop = $("filter-pop");
+    const from = pop?.dataset.from;
+    if (pop && !pop.hidden && (from === "phase" || from === "pillar")) return from;
+    return state.tab;
+  }
+
+  function visibleTabs() {
+    return [...document.querySelectorAll(".tabs [role=tab]")].filter((button) => {
+      if (button.hidden || button.closest("[hidden]")) return false;
+      const style = getComputedStyle(button);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
+  }
+
+  function markTabs(active) {
+    for (const item of document.querySelectorAll(".tabs button")) {
+      const on = item.dataset.tab === active;
+      item.setAttribute("role", "tab");
+      const controls = item.dataset.tab === "phase" || item.dataset.tab === "pillar" ? "filter-pop" : "tree";
+      item.setAttribute("aria-controls", controls);
+      item.setAttribute("aria-selected", String(on));
+      item.tabIndex = on ? 0 : -1;
+      item.classList.toggle("on", on);
+    }
+    const content = active === "phase" || active === "pillar" ? state.tab : active;
+    tree.setAttribute("role", "tabpanel");
+    tree.setAttribute("aria-labelledby", `tab-${content}`);
+    const pop = $("filter-pop");
+    if (!pop) return;
+    if (active === "phase" || active === "pillar") {
+      pop.setAttribute("role", "tabpanel");
+      pop.setAttribute("aria-labelledby", `tab-${active}`);
+    } else {
+      pop.removeAttribute("role");
+      pop.removeAttribute("aria-labelledby");
+      pop.setAttribute("aria-label", t("filter"));
+    }
+  }
+
   function setPane(tab) {
     state.tab = tab;
     ledger.dataset.pane = tab;
-    $("filter-pop").hidden = true;
+    const pop = $("filter-pop");
+    pop.hidden = true;
+    pop.dataset.from = "";
     $("filter").setAttribute("aria-expanded", "false");
-    for (const item of document.querySelectorAll(".tabs button")) {
-      const on = item.dataset.tab === tab;
-      item.classList.toggle("on", on);
-      item.setAttribute("aria-selected", String(on));
-    }
+    markTabs(tab);
     renderList();
   }
 
-  function showFilter(from) {
+  function showFilter(from, options = {}) {
     const pop = $("filter-pop");
     const same = !pop.hidden && pop.dataset.from === from;
-    pop.hidden = same;
-    pop.dataset.from = same ? "" : from;
+    const close = options.force ? false : same;
+    pop.hidden = close;
+    pop.dataset.from = close ? "" : from;
     $("filter").setAttribute("aria-expanded", String(!pop.hidden));
-    for (const item of document.querySelectorAll(".tabs button")) {
-      const kind = item.dataset.tab;
-      const on = kind === "phase" || kind === "pillar" ? !pop.hidden && kind === from : kind === state.tab;
-      item.classList.toggle("on", on);
-      item.setAttribute("aria-selected", String(on));
-    }
+    const tab = !pop.hidden && (from === "phase" || from === "pillar") ? from : state.tab;
+    markTabs(tab);
   }
 
   let captionTimer = 0;

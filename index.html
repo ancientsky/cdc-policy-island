@@ -11,7 +11,7 @@
 </head>
 <body>
   <div id="view">
-    <canvas id="c" aria-label="十四座島排成臺灣的形狀。完整說明在清單裡。"></canvas>
+    <canvas id="c" role="img" aria-label="十四座島排成臺灣的形狀。完整說明在清單裡。"></canvas>
   </div>
   <div class="hud">
     <header class="brand">
@@ -20,7 +20,7 @@
       <nav class="tools" aria-label="地圖">
         <button id="home" type="button" class="btn">看全島</button>
         <button id="bird" type="button" class="btn btn--icon" data-toggle="bird" aria-pressed="false" aria-label="鳥瞰"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 12c2.4-4 5.2-6 9-6s6.6 2 9 6c-2.4 4-5.2 6-9 6s-6.6-2-9-6z"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/></svg></button>
-        <button id="list" type="button" class="btn" aria-expanded="false">清單</button>
+        <button id="list" type="button" class="btn" aria-controls="ledger" aria-expanded="false">清單</button>
         <button id="sound" type="button" class="btn btn--icon" aria-pressed="true" aria-label="音效"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg></button>
         <button id="help" type="button" class="btn btn--icon" aria-label="操作說明">?</button>
         <button id="view-btn" type="button" class="btn btn--icon" aria-expanded="false" aria-haspopup="true" aria-label="顯示"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 3.2v2.2M12 18.6v2.2M3.2 12h2.2M18.6 12h2.2M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6"/></svg></button>
@@ -49,18 +49,18 @@
         <p id="disclaimer-peek" class="disclaimer-peek">非官方網站・依疾管署公開資料整理</p>
         <p class="stats" id="stats"></p>
         <input id="search" type="search" placeholder="搜尋：蚊子、疫苗、洗手…" aria-label="搜尋島、蚊子、疫苗、洗手">
-        <div class="tabs" role="tablist">
-          <button type="button" class="btn on" data-tab="life" id="tab-life" aria-selected="true">我想知道…</button>
-          <button type="button" class="btn" data-tab="islands" id="tab-islands" aria-selected="false">全部的島</button>
-          <button type="button" class="btn" data-tab="flows" id="tab-flows" aria-selected="false">運送路線 18</button>
-          <button type="button" class="btn" data-tab="log" id="tab-log" aria-selected="false">送貨紀錄</button>
-          <button type="button" class="btn only-narrow" data-tab="phase" id="tab-phase" aria-selected="false">時間</button>
-          <button type="button" class="btn only-narrow" data-tab="pillar" id="tab-pillar" aria-selected="false">小隊</button>
+        <div class="tabs" role="tablist" aria-label="清單分頁">
+          <button type="button" class="btn on" role="tab" data-tab="life" id="tab-life" aria-selected="true" aria-controls="tree" tabindex="0">我想知道…</button>
+          <button type="button" class="btn" role="tab" data-tab="islands" id="tab-islands" aria-selected="false" aria-controls="tree" tabindex="-1">全部的島</button>
+          <button type="button" class="btn" role="tab" data-tab="flows" id="tab-flows" aria-selected="false" aria-controls="tree" tabindex="-1">運送路線 18</button>
+          <button type="button" class="btn" role="tab" data-tab="log" id="tab-log" aria-selected="false" aria-controls="tree" tabindex="-1">送貨紀錄</button>
+          <button type="button" class="btn only-narrow" role="tab" data-tab="phase" id="tab-phase" aria-selected="false" aria-controls="filter-pop" tabindex="-1">時間</button>
+          <button type="button" class="btn only-narrow" role="tab" data-tab="pillar" id="tab-pillar" aria-selected="false" aria-controls="filter-pop" tabindex="-1">小隊</button>
         </div>
         <button type="button" id="fact-tick" class="fact-tick"><b></b><span></span></button>
       </div>
       <div class="ledger-scroll">
-        <div id="tree" class="tree"></div>
+        <div id="tree" class="tree" role="tabpanel" aria-labelledby="tab-life"></div>
         <footer class="legal">
           <span id="data-as-of">資料截至 2026-10</span>
           <button type="button" class="btn btn--sm" id="about">關於這張地圖</button>
@@ -68,7 +68,8 @@
         </footer>
       </div>
     </aside>
-    <article class="sheet" id="sheet" hidden aria-live="polite"></article>
+    <article class="sheet" id="sheet" hidden></article>
+    <p id="sr-status" class="sr-only" aria-live="polite"></p>
     <p class="caption" id="caption"><i class="caption-face" id="caption-face" aria-hidden="true"></i><span class="caption-text"><span id="day-note"></span> <span id="status" aria-live="polite"></span></span></p>
     <section class="dial" aria-label="時間與篩選">
       <button id="play" type="button" class="btn btn--icon btn--solid" aria-pressed="false" aria-label="快轉一天">▶</button>
@@ -80,7 +81,7 @@
       <button id="route" type="button" class="btn" data-toggle="flows" aria-pressed="false">運送路線</button>
       <button id="filter" type="button" class="btn" aria-expanded="false" aria-haspopup="true">篩選</button>
     </section>
-    <div id="filter-pop" class="pop filter-pop" hidden>
+    <div id="filter-pop" class="pop filter-pop" aria-label="篩選" hidden>
       <p class="filter-kicker" id="phase-kicker">從現在到 2035</p>
       <div class="choices" id="phase-buttons"></div>
       <p class="note" id="phase-note"></p>
