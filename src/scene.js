@@ -1613,6 +1613,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let rush = 0;
   let overviewRadius = 28;
   let maxR = Math.max(48, overviewRadius * 1.25);
+  let badgeNudge = 0;
   const cam = { theta: 0.18, phi: 1.02, radius: overviewRadius, target: overviewTarget.clone() };
   const goal = { theta: cam.theta, radius: overviewRadius };
   let userPhi = cam.phi;
@@ -1645,8 +1646,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const { W, H } = viewSize();
     const cx = (safeNow.left + safeNow.right) / 2;
     const cy = (safeNow.top + safeNow.bottom) / 2;
+    const pan = !focusHalf && !zoomed ? badgeNudge : 0;
     camera.aspect = W / H;
-    camera.setViewOffset(W, H, -(cx - W / 2), -(cy - H / 2), W, H);
+    camera.setViewOffset(W, H, -(cx - W / 2) + pan, -(cy - H / 2), W, H);
   }
 
   function fitDistance(halfX, halfZ) {
@@ -2835,6 +2837,29 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         if (Math.hypot(pins[i].cx - pins[j].cx, pins[i].cy - pins[j].cy) < 26) pins[j].el.classList.add("crowded");
       }
     }
+    // Oblique overview projection spills the near-side badges past the screen.
+    // Pan in pixels until every badge center sits inside the safe rect. A focused
+    // or pinched camera keeps its own framing and ignores this overview nudge.
+    if (!narrow) {
+      if (badgeNudge !== 0) {
+        badgeNudge = 0;
+        applyViewOffset();
+      }
+      return;
+    }
+    if (flight || focusHalf || zoomed || safeT < 1 || !pins.length) return;
+    const { W } = viewSize();
+    const leftLimit = Math.min(W - 40, Math.max(16, safeNow.left + 16));
+    const rightLimit = Math.max(leftLimit + 40, Math.min(W - 16, safeNow.right - 16));
+    const minX = Math.min(...pins.map((pin) => pin.cx));
+    const maxX = Math.max(...pins.map((pin) => pin.cx));
+    const leftOverflow = leftLimit - minX;
+    const rightOverflow = maxX - rightLimit;
+    if (leftOverflow > 1 && rightOverflow > 1) return;
+    const error = rightOverflow > 1 ? rightOverflow : (leftOverflow > 1 ? -leftOverflow : 0);
+    if (!error) return;
+    badgeNudge = Math.max(-80, Math.min(80, badgeNudge + error));
+    applyViewOffset();
   }
 
   function nearestPin(event) {
