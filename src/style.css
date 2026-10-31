@@ -467,7 +467,8 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
 }
 .sheet p, .detail-item em { line-height: 1.75; }
 .sheet .route, .carried { color: var(--deep); }
-.source { color: var(--ink); opacity: 0.7; }
+.source { color: var(--ink); opacity: 0.7; font-size: 14px; }
+.source a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .jump a { color: var(--teal); }
 .asof { color: var(--muted); font-size: var(--fs-xs); margin: 8px 0 4px; }
 .adult { margin-top: 8px; }

@@ -9,6 +9,98 @@ export const SOURCE_INDEX = "https://www.cdc.gov.tw/Category/MPage/kVzFWokFW3l9_
 export const DATA_AS_OF = "2026-10";
 const CDC_HOME = "https://www.cdc.gov.tw/";
 
+// Plan files opened from the major-policy list on 2026-10-30.
+// A phrase is included only when that list had a plan file or a real section page.
+const PLAN = {
+  acute: "https://www.cdc.gov.tw/File/Get/SaNOgR-Gf63j60e_KBlVlQ",
+  border: "https://www.cdc.gov.tw/File/Get/yDD8uIpaYg_SA6Ny-ui4Iw",
+  labNet: "https://www.cdc.gov.tw/File/Get/faNV4Aa56B0tGo3JWQjGGA",
+  labBuild: "https://www.cdc.gov.tw/File/Get/bO-JtNx81G1HcoTHNJXxYQ",
+  vaxFund: "https://www.cdc.gov.tw/File/Get/49hL5LtBFgHHJgYn6gEmhg",
+  vaxIndustry: "https://www.cdc.gov.tw/File/Get/B2gFapBOitsbiAW3TynGOw",
+  tb: "https://www.cdc.gov.tw/File/Get/XyCQw9EJVs826DYC1UQ0oQ",
+  hiv: "https://www.cdc.gov.tw/File/Get/vIH3uczKNbeUW34GsAc_sg",
+  amr: "https://www.cdc.gov.tw/Category/MPage/eqQgfRWQjc8c5ya8eog2iw",
+  info: "https://www.cdc.gov.tw/File/Get/ksJ3IexC05fIaM2JfVDB9w",
+};
+const PHRASE = {
+  acute: {
+    zh: "急性傳染病流行風險監控與管理第四期計畫",
+    en: "Phase IV of acute infectious-disease risk monitoring and management",
+    ja: "急性感染症の流行リスクを見て管理する第4期",
+  },
+  acuteLower: {
+    en: "phase IV of acute infectious-disease risk monitoring and management",
+  },
+  border: {
+    zh: "新興傳染病暨流感大流行應變整備及邊境檢疫計畫",
+    en: "Preparedness and border quarantine for emerging infections and an influenza pandemic",
+    ja: "新しい感染症とインフルエンザ大流行への対応と備え、および水際検疫の計画",
+  },
+  labNet: {
+    zh: "後新冠疫情時代傳染病檢驗網絡計畫",
+    en: "Post-COVID laboratory testing network",
+    ja: "新型コロナのあとの感染症検査網計画",
+  },
+  labBuild: {
+    zh: "衛生福利部防疫中心興建工程",
+    en: "Ministry of Health and Welfare prevention-center construction",
+    ja: "衛生福利部のぼうえき本部の建設",
+  },
+  vaxFund: {
+    zh: "充實國家疫苗基金及促進國民免疫力第四期計畫",
+    en: "Phase IV of the national vaccine fund and population-immunity program",
+    ja: "国家ワクチン基金を満たし、国民の免疫を高める第4期",
+  },
+  vaxIndustry: {
+    zh: "國家疫苗產業韌性深耕計畫",
+    en: "national vaccine-industry resilience program",
+    ja: "国家ワクチン産業の強靭性計画",
+  },
+  tb: {
+    zh: "我國加入 WHO 2035 消除結核第三期計畫",
+    en: "Phase III of the plan aimed at the 2035 end-TB goal",
+    ja: "2035年の結核終息の目標に向ける第3期計画",
+  },
+  hiv: {
+    zh: "2030年消除愛滋第一期計畫",
+    en: "Phase I of the 2030 HIV-elimination program",
+    ja: "2030年にHIVをなくす第1期計画",
+  },
+  amr: {
+    zh: "國家級防疫一體抗生素抗藥性管理行動計畫",
+    en: "National One Health antimicrobial-resistance action plan",
+    ja: "国のワンヘルスによる抗菌薬耐性の管理行動計画",
+  },
+  info: {
+    zh: "韌性防疫安全網資訊基盤計畫",
+    en: "resilient public-health information base",
+    ja: "折れにくいぼうえきの情報基盤計画",
+  },
+};
+
+function planLink(href, phrase, langs = ["zh", "en", "ja"]) {
+  const row = { href };
+  for (const lang of langs) if (phrase[lang]) row[lang] = phrase[lang];
+  return row;
+}
+
+export const SOURCE_LINKS = {
+  watch: [planLink(PLAN.acute, PHRASE.acute)],
+  border: [planLink(PLAN.border, PHRASE.border)],
+  lab: [planLink(PLAN.labNet, PHRASE.labNet), planLink(PLAN.labBuild, PHRASE.labBuild)],
+  // The fund entry is the ministry approval file. The list has no separate full plan PDF.
+  vax: [planLink(PLAN.vaxFund, PHRASE.vaxFund), planLink(PLAN.vaxIndustry, PHRASE.vaxIndustry)],
+  // English shortens this plan, so only the Chinese and Japanese titles are linked.
+  flu: [planLink(PLAN.border, PHRASE.border, ["zh", "ja"])],
+  entero: [planLink(PLAN.acute, { ...PHRASE.acute, en: PHRASE.acuteLower.en })],
+  dengue: [planLink(PLAN.acute, { ...PHRASE.acute, en: PHRASE.acuteLower.en })],
+  tb: [planLink(PLAN.tb, PHRASE.tb)],
+  hiv: [planLink(PLAN.hiv, PHRASE.hiv)],
+  amr: [planLink(PLAN.amr, PHRASE.amr)],
+  ready: [planLink(PLAN.border, PHRASE.border), planLink(PLAN.info, PHRASE.info)],
+};
+
 export const pillars = [
   { id: "sentinel", mark: "哨", name: "偵察隊", color: "#5c81bc" },
   { id: "gate", mark: "門", name: "守門隊", color: "#5cbcb5" },

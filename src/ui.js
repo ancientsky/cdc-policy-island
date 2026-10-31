@@ -1,4 +1,4 @@
-import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX } from "./data.js";
+import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX, SOURCE_LINKS } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, save as savePassport, stampIsland } from "./passport.js";
@@ -33,6 +33,26 @@ const INTRO_KEY = "cdc-policy-island-intro-v1";
 
 function esc(value) {
   return String(value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+function replaceOutsideAnchors(html, needle, replacement) {
+  return html.split(/(<a\b[^>]*>[\s\S]*?<\/a>)/).map((part) => (
+    part.startsWith("<a") ? part : part.split(needle).join(replacement)
+  )).join("");
+}
+
+function linkedSource(island) {
+  const lang = getLang();
+  let html = esc(island.source);
+  const rows = (SOURCE_LINKS[island.id] ?? [])
+    .filter((row) => row[lang])
+    .sort((a, b) => b[lang].length - a[lang].length);
+  for (const row of rows) {
+    const needle = esc(row[lang]);
+    const anchor = `<a href="${esc(row.href)}" target="_blank" rel="noopener noreferrer">${needle}</a>`;
+    html = replaceOutsideAnchors(html, needle, anchor);
+  }
+  return html;
 }
 
 function fmt(minutes) {
@@ -819,7 +839,7 @@ export function mount({ scene, islands, flows }) {
       ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`
       : "";
     sheet.style.setProperty("--c", island.accent);
-    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${esc(island.source)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;
