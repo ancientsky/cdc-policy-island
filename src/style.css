@@ -1194,7 +1194,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 }
 
 @media (max-width: 980px) {
-  :root { --sheet-peek: calc(148px + env(safe-area-inset-bottom)); --toggle-lane: 132px; }
+  :root { --sheet-peek: calc(108px + env(safe-area-inset-bottom)); --toggle-lane: 132px; }
   .crew-label, .rail, .compass { display: none; }
   .title-card {
     display: block;
@@ -1256,12 +1256,20 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   }
   .ledger.half { height: 52vh; height: 52dvh; }
   .ledger.open { height: calc(100vh - 72px); height: calc(100dvh - 72px - env(safe-area-inset-top)); transform: none; }
-  .ledger-head { padding: 0 12px 4px; }
-  .ledger::before { margin: 4px auto 0; }
-  .disclaimer-peek { margin: 0; line-height: 1.3; }
+  .ledger-head { padding: 0 12px 2px; }
+  .ledger::before { margin: 2px auto 0; height: 4px; }
+  .disclaimer-peek { margin: 0; line-height: 1.15; }
   .stats { font-size: var(--fs-sm); line-height: 1.3; margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .tabs .btn { flex: none; }
+  .ledger:not(.half):not(.open) .scenario-lead,
+  .ledger:not(.half):not(.open) .stats,
+  .ledger:not(.half):not(.open) .backstage-title,
+  .ledger:not(.half):not(.open) .passport-hud { display: none; }
+  .ledger:not(.half):not(.open) .tree { padding: 0 8px; }
+  .ledger:not(.half):not(.open) .scenarios { gap: 0; }
+  .ledger:not(.half):not(.open) .scenario { min-height: 44px; padding: 4px 10px; }
+  .ledger:not(.half):not(.open) .tabs .btn { height: 28px; padding: 0 10px; font-size: var(--fs-sm); }
   .ledger:not(.half):not(.open) #search { display: none; }
   .ledger-scroll { background: transparent; }
   .tree { flex: none; overflow: visible; }
@@ -1345,8 +1353,10 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   .badge { display: none; }
 }
 @media (max-width: 980px) and (pointer: coarse) {
-  .dial { height: 64px; }
-  .toggles { height: 44px; bottom: calc(var(--sheet-peek) + 18px); }
+  :root { --sheet-peek: calc(114px + env(safe-area-inset-bottom)); }
+  .dial { height: 52px; padding-block: 4px; }
+  .toggles { height: 44px; bottom: calc(var(--sheet-peek) + 8px); }
+  .ledger:not(.half):not(.open) .tabs .btn { height: 44px; }
 }
 
 @media (min-width: 768px) and (max-width: 980px) {
@@ -1363,6 +1373,10 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     transform: none;
   }
   .ledger.half, .ledger.open { height: auto; }
+  .ledger:not(.half):not(.open) .scenario-lead,
+  .ledger:not(.half):not(.open) .stats,
+  .ledger:not(.half):not(.open) .backstage-title,
+  .ledger:not(.half):not(.open) .passport-hud { display: block; }
   .ledger:not(.half):not(.open) #search { display: initial; }
   .dial {
     display: flex;
