@@ -679,7 +679,7 @@ export function mount({ scene, islands, flows }) {
     if (state.tab === "life" && !q) {
       const buttons = scenarios.map((scenario) => {
         const on = state.scenario === scenario.id;
-        return `<button type="button" class="scenario${on ? " on" : ""}" data-scenario="${scenario.id}">${SCENARIO_ICON[scenario.icon] ?? ""}<span>${esc(t(SCENARIO_KEY[scenario.id]))}</span></button>`;
+        return `<button type="button" class="btn scenario${on ? " on" : ""}" data-scenario="${scenario.id}">${SCENARIO_ICON[scenario.icon] ?? ""}<span>${esc(t(SCENARIO_KEY[scenario.id]))}</span></button>`;
       }).join("");
       const behind = backstageIds.map((id) => islandCard(byId.get(id))).join("");
       tree.innerHTML = `<p class="scenario-lead">${esc(t("scenarioLead"))}</p><div class="scenarios">${buttons}</div><h3 class="backstage-title">${esc(t("backstage"))}</h3>${behind}`;
@@ -707,7 +707,7 @@ export function mount({ scene, islands, flows }) {
   function emptySearch() {
     const tries = ["mosq", "travel", "shot"].map((id) => {
       const scenario = scenarios.find((item) => item.id === id);
-      return `<button type="button" class="scenario" data-scenario="${id}">${SCENARIO_ICON[scenario.icon] ?? ""}<span>${esc(t(SCENARIO_KEY[id]))}</span></button>`;
+      return `<button type="button" class="btn scenario" data-scenario="${id}">${SCENARIO_ICON[scenario.icon] ?? ""}<span>${esc(t(SCENARIO_KEY[id]))}</span></button>`;
     }).join("");
     return `<div class="empty-search"><p class="empty">${esc(t("emptyTry"))}</p><div class="scenarios">${tries}</div></div>`;
   }
@@ -958,7 +958,7 @@ export function mount({ scene, islands, flows }) {
     const host = $("chapter-ticks");
     if (!host) return;
     if (host.childElementCount !== dayNotes.length) {
-      host.innerHTML = dayNotes.map((_note, index) => `<button type="button" class="tick" data-chapter="${index}"></button>`).join("");
+      host.innerHTML = dayNotes.map((_note, index) => `<button type="button" class="btn tick" data-chapter="${index}"></button>`).join("");
     }
     const current = dayNote(state.minutes);
     dayNotes.forEach((note, index) => {
