@@ -1901,13 +1901,6 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     } else {
       post.setOutline([], { selected: false });
     }
-    let focus = 0.45;
-    if (ids.length === 1 || (hoverId && selected.has(hoverId))) {
-      const id = ids.length === 1 ? ids[0] : hoverId;
-      const p = views.get(id).base.clone().project(camera);
-      if (p.z < 1) focus = THREE.MathUtils.clamp(p.y * 0.5 + 0.5, 0.08, 0.92);
-    }
-    post.setFocus(focus);
   }
 
   function refresh() {

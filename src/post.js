@@ -29,8 +29,6 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   let gtao = null;
   let outline = null;
   let bloom = null;
-  let hTilt = null;
-  let vTilt = null;
   let vignette = null;
 
   if (tier === "full") {
@@ -57,20 +55,7 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     composer.addPass(bloom);
     kinds.push("bloom");
 
-    if (tier === "full") {
-      const [{ HorizontalTiltShiftShader }, { VerticalTiltShiftShader }] = await Promise.all([
-        import("three/addons/shaders/HorizontalTiltShiftShader.js"),
-        import("three/addons/shaders/VerticalTiltShiftShader.js"),
-      ]);
-      hTilt = new ShaderPass(HorizontalTiltShiftShader);
-      vTilt = new ShaderPass(VerticalTiltShiftShader);
-      hTilt.uniforms.r.value = 0.45;
-      vTilt.uniforms.r.value = 0.45;
-      composer.addPass(hTilt);
-      composer.addPass(vTilt);
-      kinds.push("tilt-h", "tilt-v");
-    }
-
+    // Tilt-shift stayed out. A focus band on the selected island blurred the whole map.
     vignette = new ShaderPass(VignetteShader);
     vignette.uniforms.offset.value = VIGNETTE_OFFSET;
     vignette.uniforms.darkness.value = VIGNETTE_DARKNESS;
@@ -84,10 +69,6 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   function resize(cssW, cssH, pixelRatio) {
     composer.setPixelRatio(pixelRatio);
     composer.setSize(cssW, cssH);
-    const bufW = Math.max(1, cssW * pixelRatio);
-    const bufH = Math.max(1, cssH * pixelRatio);
-    if (hTilt) hTilt.uniforms.h.value = 1.6 / bufW;
-    if (vTilt) vTilt.uniforms.v.value = 1.6 / bufH;
   }
 
   function setBloom(stars) {
@@ -129,11 +110,6 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     }
   }
 
-  function setFocus(r) {
-    if (hTilt) hTilt.uniforms.r.value = r;
-    if (vTilt) vTilt.uniforms.r.value = r;
-  }
-
   function setVignette(on) {
     if (vignette) vignette.enabled = Boolean(on);
   }
@@ -162,7 +138,7 @@ export async function mountPost({ renderer, scene, camera, tier }) {
           enabled: vignette.enabled !== false,
         }
         : null,
-      focus: hTilt ? hTilt.uniforms.r.value : null,
+      focus: null,
     };
   }
 
@@ -170,5 +146,5 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   renderer.getSize(size);
   resize(size.x, size.y, renderer.getPixelRatio());
 
-  return { composer, resize, setBloom, setOutline, setFocus, setVignette, info, kinds };
+  return { composer, resize, setBloom, setOutline, setVignette, info, kinds };
 }
