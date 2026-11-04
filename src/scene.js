@@ -16,6 +16,7 @@ import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 // Meeple front is local -z: the nose sits at z < 0, the pack sits at z > 0.
 // rotation.y = atan2(-dir.x, -dir.z) turns that -z axis onto dir.
@@ -1372,25 +1373,50 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     body.rotation.x = Math.PI / 2;
     group.add(body);
     const tailMat = new THREE.MeshStandardMaterial({ color: P.ce7f0cf, roughness: 0.45 });
+    const tails = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.005, 0.003, 0.26, 4), tailMat, 4);
+    const tailDummy = new THREE.Object3D();
     for (let i = 0; i < 4; i += 1) {
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.003, 0.26, 4), tailMat);
-      tail.rotation.x = Math.PI / 2;
-      tail.position.set((i - 1.5) * 0.028, -0.015, 0.3);
-      tail.rotation.z = (i - 1.5) * 0.35;
-      group.add(tail);
+      tailDummy.position.set((i - 1.5) * 0.028, -0.015, 0.3);
+      tailDummy.rotation.set(Math.PI / 2, 0, (i - 1.5) * 0.35);
+      tailDummy.updateMatrix();
+      tails.setMatrixAt(i, tailDummy.matrix);
     }
+    tails.instanceMatrix.needsUpdate = true;
+    tails.castShadow = false;
+    tails.receiveShadow = false;
+    group.add(tails);
     return { group, ...markFront(group) };
+  }
+
+  function mergeLocal(parts, material) {
+    const originals = new Set();
+    const geos = parts.map((mesh) => {
+      mesh.updateMatrix();
+      originals.add(mesh.geometry);
+      const geo = mesh.geometry.clone();
+      geo.applyMatrix4(mesh.matrix);
+      return geo;
+    });
+    const merged = mergeGeometries(geos, false);
+    for (const geo of geos) geo.dispose();
+    for (const geo of originals) geo.dispose();
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    return mesh;
   }
 
   function makeMosquito() {
     const group = new THREE.Group();
     const dark = new THREE.MeshStandardMaterial({ color: 0x2a2630, roughness: 0.62, flatShading: true });
     const pale = new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.55, flatShading: true });
+    const darkParts = [];
+    const paleParts = [];
     for (let i = 0; i < 5; i += 1) {
       const seg = new THREE.Mesh(new THREE.SphereGeometry(0.05 - i * 0.005, 8, 6), i % 2 ? pale : dark);
       seg.scale.set(1, 0.7, 1.2);
       seg.position.z = 0.02 + i * 0.07;
-      group.add(seg);
+      (i % 2 ? paleParts : darkParts).push(seg);
     }
     const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), dark);
     thorax.position.z = -0.07;
@@ -1399,6 +1425,17 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const beak = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 5), dark);
     beak.rotation.x = Math.PI / 2;
     beak.position.set(0, -0.012, -0.28);
+    darkParts.push(thorax, head, beak);
+    const legGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.22, 5);
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i += 1) {
+        const leg = new THREE.Mesh(legGeo, dark);
+        leg.position.set(side * 0.07, -0.05, -0.08 + i * 0.06);
+        leg.rotation.z = side * 1.05;
+        leg.rotation.x = -0.35 + i * 0.28;
+        darkParts.push(leg);
+      }
+    }
     const wingMat = new THREE.MeshStandardMaterial({
       color: 0xdff3ff,
       transparent: true,
@@ -1416,17 +1453,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     wingR.position.x = 0.16;
     wingR.rotation.z = -0.4;
     wingR.rotation.y = -0.25;
-    const legGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.22, 5);
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 3; i += 1) {
-        const leg = new THREE.Mesh(legGeo, dark);
-        leg.position.set(side * 0.07, -0.05, -0.08 + i * 0.06);
-        leg.rotation.z = side * 1.05;
-        leg.rotation.x = -0.35 + i * 0.28;
-        group.add(leg);
-      }
-    }
-    group.add(thorax, head, beak, wingL, wingR);
+    group.add(mergeLocal(darkParts, dark), mergeLocal(paleParts, pale), mergeLocal([wingL, wingR], wingMat));
     const marks = markFront(group);
     marks.nose.position.set(0, -0.01, -0.4);
     return { group, ...marks };

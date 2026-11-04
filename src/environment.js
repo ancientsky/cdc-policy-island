@@ -385,6 +385,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     lamps.setMatrixAt(index, lampDummy.matrix);
   });
   lamps.instanceMatrix.needsUpdate = true;
+  lamps.visible = false;
   scene.add(lamps);
   meshes.push(lamps);
 
@@ -396,6 +397,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
       if (night > 0) mat.color.lerp(nightTint, night * 0.45);
     });
     lampMat.opacity = night;
+    lamps.visible = night > 0.02;
     cloudMat.color.copy(cloudBase).lerp(haze, 0.18);
     cloudMat.opacity = 1 - night * 0.65;
   }

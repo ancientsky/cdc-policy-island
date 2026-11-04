@@ -181,11 +181,12 @@ export function createLife(scene, { motion, reduced }) {
     mesh.rotation.x = Math.PI / 2;
     mesh.raycast = () => {};
     mesh.frustumCulled = false;
+    mesh.visible = false;
     const pivot = new Group();
     pivot.position.set(x, y, z);
     pivot.add(mesh);
     group.add(pivot);
-    beam = { pivot, mat };
+    beam = { pivot, mat, mesh };
   }
 
   function addChimney(group, x, y, z) {
@@ -501,6 +502,7 @@ export function createLife(scene, { motion, reduced }) {
     port.shipRig.scale.setScalar(port.group.scale.x || 1);
     const speed = Math.hypot(shipNext.x - shipHere.x, shipNext.z - shipHere.z) / 0.4;
     port.shipWake.material.opacity = speed > 0.12 ? 0.4 : 0;
+    port.shipWake.visible = port.shipWake.material.opacity > 0.02;
   }
 
   function scrubPort(time) {
@@ -512,6 +514,7 @@ export function createLife(scene, { motion, reduced }) {
     if (beam) {
       if (live) beam.pivot.rotation.y += dt * 0.9;
       beam.mat.opacity = 0.18 * night;
+      beam.mesh.visible = beam.mat.opacity > 0.02;
     }
     if (wings) wings.visible = night < 0.5;
     if (!live) return;

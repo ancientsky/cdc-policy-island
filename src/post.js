@@ -17,9 +17,11 @@ const VIGNETTE_OFFSET = 0.7;
 const VIGNETTE_DARKNESS = 1;
 
 export async function mountPost({ renderer, scene, camera, tier }) {
+  // The color pass fills this depth. Desktop GTAO reads it instead of redrawing every mesh.
   const rt = new THREE.WebGLRenderTarget(1, 1, {
     type: THREE.HalfFloatType,
     samples: 4,
+    depthTexture: new THREE.DepthTexture(1, 1),
   });
   const composer = new EffectComposer(renderer, rt);
   const kinds = ["render"];
@@ -36,6 +38,19 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     gtao = new GTAOPass(scene, camera, 1, 1);
     gtao.blendIntensity = 0.6;
     gtao.updateGtaoMaterial({ radius: 0.35, distanceFallOff: 1, thickness: 0.6 });
+    // Normals come from the color-pass depth. A second scene render blew the 150-draw budget.
+    gtao._renderGBuffer = false;
+    gtao.gtaoMaterial.defines.NORMAL_VECTOR_TYPE = 0;
+    gtao.gtaoMaterial.needsUpdate = true;
+    gtao.pdMaterial.defines.NORMAL_VECTOR_TYPE = 0;
+    gtao.pdMaterial.needsUpdate = true;
+    const drawGtao = gtao.render.bind(gtao);
+    gtao.render = (renderer, writeBuffer, readBuffer, deltaTime, maskActive) => {
+      const depth = readBuffer.depthTexture;
+      gtao.gtaoMaterial.uniforms.tDepth.value = depth;
+      gtao.pdMaterial.uniforms.tDepth.value = depth;
+      drawGtao(renderer, writeBuffer, readBuffer, deltaTime, maskActive);
+    };
     composer.addPass(gtao);
     kinds.push("gtao");
   }
