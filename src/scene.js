@@ -817,7 +817,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   });
 
   const FLOW_SPLIT = 63;
-  const flowPaper = new THREE.Color("#fff7ea");
+  const flowPaper = new THREE.Color(P.flowPaper);
   let flowBright = 1;
   const flowViews = data.flows.map((flow, index) => {
     const a = views.get(flow.a).base;
@@ -1922,7 +1922,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         const entry = views.get(item);
         if (entry) groups.push(entry.group);
       }
-      post.setOutline(groups, { selected: true, accent: view?.island.accent || "#ffffff" });
+      post.setOutline(groups, { selected: true, accent: view?.island.accent || P.pureWhite });
     } else if (hoverId && views.get(hoverId)) {
       post.setOutline([views.get(hoverId).group], { selected: false });
     } else {

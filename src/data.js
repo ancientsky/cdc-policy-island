@@ -571,11 +571,11 @@ function fitInk(hex, paper, toward, alsoWhite) {
 }
 
 for (const island of islands) {
-  island.accentInk = fitInk(island.accent, "#fffaf2", "#120e0a", true);
+  island.accentInk = fitInk(island.accent, "#fffaf2", "#55422f", true);
   island.accentOnDark = fitInk(island.accent, "#2a203a", "#f6f3ee", false);
 }
 for (const pillar of pillars) {
-  pillar.accentInk = fitInk(pillar.color, "#fffaf2", "#120e0a", true);
+  pillar.accentInk = fitInk(pillar.color, "#fffaf2", "#55422f", true);
   pillar.accentOnDark = fitInk(pillar.color, "#2a203a", "#f6f3ee", false);
 }
 
