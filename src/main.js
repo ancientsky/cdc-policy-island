@@ -126,11 +126,26 @@ function startLoop() {
   requestAnimationFrame(loop);
 }
 
+function canvasInView() {
+  const rect = canvas.getBoundingClientRect();
+  const viewH = window.innerHeight || 0;
+  const viewW = window.innerWidth || 0;
+  return rect.width > 2 && rect.height > 2
+    && rect.bottom > 0 && rect.right > 0
+    && rect.top < viewH && rect.left < viewW;
+}
+
 const screenWatch = new IntersectionObserver((entries) => {
-  onScreen = entries.some((entry) => entry.isIntersecting);
+  const hit = entries.some((entry) => entry.isIntersecting);
+  onScreen = hit || canvasInView();
   if (onScreen) startLoop();
 });
 screenWatch.observe(canvas);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !canvasInView()) return;
+  onScreen = true;
+  startLoop();
+});
 startLoop();
 
 function writeDiag() {

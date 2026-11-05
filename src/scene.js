@@ -2738,8 +2738,21 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     poseBlobs();
     kit.sync();
     poseGrade();
-    if (post && drawPost) post.composer.render(step);
-    else renderer.render(scene, camera);
+    if (post && drawPost) {
+      try {
+        post.composer.render(step);
+      } catch (err) {
+        drawPost = false;
+        renderer.render(scene, camera);
+      }
+      if (drawPost && presentWatch < 3) {
+        presentWatch += 1;
+        if (presentWatch === 3 && presentedBlank()) {
+          drawPost = false;
+          renderer.render(scene, camera);
+        }
+      }
+    } else renderer.render(scene, camera);
     if (!labelsStill()) {
       labels.render(scene, camera);
       shadePins();
@@ -2751,6 +2764,25 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let hoverTick = 0;
   let paintedMinutes = null;
   let holdRender = 0.4;
+  let presentWatch = 0;
+
+  function presentedBlank() {
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    if (w < 2 || h < 2) return false;
+    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const pix = new Uint8Array(4);
+    const spots = [[0.5, 0.45], [0.25, 0.55], [0.75, 0.4], [0.5, 0.7]];
+    let max = 0;
+    for (const [u, v] of spots) {
+      gl.readPixels((u * (w - 1)) | 0, (v * (h - 1)) | 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pix);
+      max = Math.max(max, pix[0], pix[1], pix[2]);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prev);
+    return max < 8;
+  }
   let shadowWarm = true;
   const frameMs = [];
   let occTick = 0;

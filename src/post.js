@@ -16,12 +16,50 @@ const HIDDEN = new THREE.Color(0x1a3c48);
 const VIGNETTE_OFFSET = 0.7;
 const VIGNETTE_DARKNESS = 1;
 
+function colorTargetOk(gl, { samples, half }) {
+  const fb = gl.createFramebuffer();
+  const rb = gl.createRenderbuffer();
+  if (!fb || !rb) return false;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+  const format = half ? gl.RGBA16F : gl.RGBA8;
+  let ok = false;
+  gl.getError();
+  try {
+    if (samples > 0) gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, format, 4, 4);
+    else gl.renderbufferStorage(gl.RENDERBUFFER, format, 4, 4);
+    if (gl.getError() === gl.NO_ERROR) {
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, rb);
+      ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    }
+  } catch (err) {
+    ok = false;
+  }
+  gl.deleteFramebuffer(fb);
+  gl.deleteRenderbuffer(rb);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+  gl.getError();
+  return ok;
+}
+
 export async function mountPost({ renderer, scene, camera, tier }) {
-  // The color pass fills this depth. Desktop GTAO reads it instead of redrawing every mesh.
+  // Phones often cannot multisample a half-float target. An incomplete buffer
+  // leaves the canvas black, so the narrow tier skips MSAA and drops to bytes
+  // when half-float itself is missing. Desktop GTAO still reads the color-pass depth.
+  const gl = renderer.getContext();
+  const full = tier === "full";
+  let samples = full ? 4 : 0;
+  let half = true;
+  if (!colorTargetOk(gl, { samples, half: true })) {
+    samples = 0;
+    half = colorTargetOk(gl, { samples: 0, half: true });
+  }
+  renderer.state.reset();
   const rt = new THREE.WebGLRenderTarget(1, 1, {
-    type: THREE.HalfFloatType,
-    samples: 4,
-    depthTexture: new THREE.DepthTexture(1, 1),
+    type: half ? THREE.HalfFloatType : THREE.UnsignedByteType,
+    samples,
+    ...(full ? { depthTexture: new THREE.DepthTexture(1, 1) } : {}),
   });
   const composer = new EffectComposer(renderer, rt);
   const kinds = ["render"];
@@ -135,6 +173,7 @@ export async function mountPost({ renderer, scene, camera, tier }) {
       kinds: kinds.slice(),
       passes: composer.passes.length,
       samples: composer.renderTarget1.samples,
+      half: half,
       bloom: bloom
         ? { strength: bloom.strength, threshold: bloom.threshold, radius: bloom.radius }
         : null,
