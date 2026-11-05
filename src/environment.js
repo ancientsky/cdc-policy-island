@@ -9,6 +9,8 @@ import { bindSway } from "./kit.js";
 // so north is the top of the frame. The northern quarantine island sits
 // near z -7. Its shore stays open water: Taiwan meets no other country
 // by land. Hills and ridge ribbons begin only after that strait.
+// This camera is 38° at radius about 24, so a ring of radius 50 sits
+// above the frame. The three ribbons are the north skyline instead.
 
 const BANDS = [
   { t: 0, color: 0xb7a888 },
@@ -63,18 +65,20 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
 
   function heightAt(x, z) {
     const shaped = fbm(x, z) * 0.5 + 0.5;
-    // North hills (top of the default view), a west dune, a low east
-    // headland, and side reefs south of the chain. The island basin stays
-    // at the seabed, including the quarantine island near z -7.
-    // Climb only after the strait, then drop back for the ridge ribbons.
-    const north = smoothstep(-21.5, -25.5, z) * (1 - smoothstep(-26.5, -33.0, z));
+    // North hills sit just past the strait, low enough that the ridge
+    // ribbons behind them stay inside the frame. West dune, east
+    // headland, and south side reefs stay. The basin, including the
+    // quarantine island near z -7, remains seabed.
+    const north = smoothstep(-18.0, -19.8, z) * (1 - smoothstep(-21.2, -23.4, z));
     const westGate = 1 - smoothstep(11, 18, Math.abs(z - 5));
     const west = smoothstep(-7.8, -15, x) * westGate;
     const eastGate = 1 - smoothstep(9, 16, Math.abs(z - 7));
     const east = smoothstep(13.5, 22, x) * 0.65 * eastGate;
     const southSide = smoothstep(19.2, 27, z) * smoothstep(5, 12, Math.abs(x - 4));
     const rise = Math.max(north, west * 0.92, east, southSide * 0.55);
-    const crest = 0.42 + shaped * (0.62 + north * 0.85) + west * 0.5;
+    // The north shore stays low. Taller ground puts the canopy over the
+    // ridge ribbons and the overview shows one hill instead of three.
+    const crest = (1 - north) * (0.35 + shaped * 0.45 + west * 0.5) + north * (0.48 + shaped * 0.28);
     const height = -1.6 * (1 - rise) + rise * crest;
     // +z (toward the default camera) is damped so the near side stays open.
     const towardCamera = Math.max(0, Math.cos(Math.atan2(x, z)));
@@ -156,11 +160,12 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
 
   const spots = [];
   for (let x = -26; x <= 36; x += 0.52) {
-    for (const z of [-24.6, -25.2]) {
+    for (const z of [-19.5, -20.2]) {
       if (inClearing(x, z)) continue;
       const y = heightAt(x, z);
       if (y < 0.32) continue;
-      spots.push({ x, y, z, scale: 0.78, pine: ((x * 10) & 1) === 0 });
+      const westSmall = x < -8 ? 0.2 : 0.26;
+      spots.push({ x, y, z, scale: westSmall, pine: ((x * 10) & 1) === 0 });
     }
   }
   let guard = 0;
@@ -171,7 +176,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     const roll = rng();
     if (roll < 0.78) {
       x = -26 + rng() * 58;
-      z = -24.0 - rng() * 1.6;
+      z = -19.1 - rng() * 1.6;
     } else if (roll < 0.92) {
       x = -8.5 - rng() * 12;
       z = -2 + rng() * 16;
@@ -184,7 +189,9 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     const y = heightAt(x, z);
     if (y < 0.5 || y > 12) continue;
     if (noise.noise3d(x * 0.28, z * 0.28, 2.4) > 0.42) continue;
-    spots.push({ x, y, z, scale: 0.72 + rng() * 0.4, pine: rng() < 0.55 });
+    const northTree = z < -14;
+    const northScale = (x < -8 ? 0.2 : 0.26) + rng() * 0.06;
+    spots.push({ x, y, z, scale: northTree ? northScale : 0.72 + rng() * 0.4, pine: rng() < 0.55 });
   }
 
   function plant(geo, list, color, sway) {
@@ -220,34 +227,44 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   const ridgeMats = [];
   const haze = new THREE.Color();
   const nightTint = new THREE.Color(0x24344c);
-  // Three ribbons on the far side of the strait, not against the
-  // quarantine shore. A circle at radius 50 sits above this camera.
+  // Three skyline ribbons behind the forest. A flat tall wall leaves
+  // this 38° frame, and equal heights collapse into one edge. Each
+  // crest rises toward the east so the layers stay stacked in the
+  // overview. Mixes 0.3 / 0.55 / 0.78 still fade toward the horizon.
+  const ridgeShade = [
+    [0.62, 0.82, 0.58],
+    [0.55, 0.68, 0.82],
+    [0.9, 0.95, 0.98],
+  ];
   const ridgeLayers = [
-    { z0: -26.2, bow: 0.2, base: 0.35, crest: 2.8 },
-    { z0: -28.0, bow: 0.2, base: 0.3, crest: 3.15 },
-    { z0: -29.8, bow: 0.2, base: 0.25, crest: 3.4 },
+    { z0: -21.0, bow: 0.1, west: 0.12, rise: 0.7, base: -1.6, edge0: -10, edge1: 16 },
+    { z0: -23.4, bow: 0.1, west: 0.2, rise: 1.75, base: -1.6, edge0: -14, edge1: 14 },
+    { z0: -27.6, bow: 0.1, west: 0.28, rise: 1.85, base: -1.6, edge0: -14, edge1: 14 },
   ];
   ridgeLayers.forEach((layer, index) => {
-    const steps = 48;
+    const steps = 64;
     const geo = new THREE.BufferGeometry();
     const verts = [];
+    const cols = [];
     const ids = [];
+    const shade = ridgeShade[index];
     for (let i = 0; i <= steps; i += 1) {
       const u = i / steps;
-      const x = -28 + u * 62;
+      const x = -36 + u * 76;
       const z = layer.z0 - Math.sin(u * Math.PI) * layer.bow;
-      const sky = 0.55 + 0.45 * Math.sin(u * 11 + index);
-      const crest = layer.base + sky * layer.crest;
+      const crest = layer.west + smoothstep(layer.edge0, layer.edge1, x) * layer.rise + Math.sin(x * 0.31 + index) * 0.03;
       verts.push(x, layer.base, z, x, crest, z);
+      cols.push(shade[0] * 0.85, shade[1] * 0.85, shade[2] * 0.85, shade[0], shade[1], shade[2]);
       if (i < steps) {
         const a = i * 2;
         ids.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
       }
     }
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
     geo.setIndex(ids);
     geo.computeVertexNormals();
-    const mat = new THREE.MeshBasicMaterial({ color: ridgeBase[index], fog: false, side: THREE.DoubleSide });
+    const mat = new THREE.MeshBasicMaterial({ color: ridgeBase[index], fog: false, vertexColors: true, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.userData.kind = "ridge";
     mesh.raycast = () => {};
@@ -271,8 +288,8 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     const yaw = rng() * Math.PI * 2;
     clouds.push({
       x: -16 + rng() * 38,
-      y: 2.55 + rng() * 0.65,
-      z: -9.8 - rng() * 1.6,
+      y: 1.72 + rng() * 0.5,
+      z: -8.8 - rng() * 2.4,
       yaw,
       speed: 0.55 + rng() * 0.35,
       len: 4.2 + rng() * 2.4,
@@ -351,24 +368,26 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   meshes.push(shadowMesh);
 
   const lampSpots = [];
-  let lampGuard = 0;
-  while (lampSpots.length < 36 && lampGuard < 200) {
-    lampGuard += 1;
-    const x = -18 + rng() * 42;
-    const z = -24.4 - rng() * 1.3;
-    if (inClearing(x, z)) continue;
-    const y = heightAt(x, z);
-    if (y < 0.35) continue;
-    const n = 4 + Math.floor(rng() * 3);
-    for (let k = 0; k < n; k += 1) {
-      lampSpots.push({
-        x: x + (rng() - 0.5) * 1.8,
-        y: y + 0.28,
-        z: z + (rng() - 0.5) * 1.4,
-      });
+  const hamlets = [
+    { x: -10, z: -19.7, n: 10 },
+    { x: 1, z: -20.0, n: 12 },
+    { x: 13, z: -19.6, n: 10 },
+    { x: -16, z: 3.5, n: 8 },
+    { x: 18, z: 6, n: 8 },
+  ];
+  for (const hamlet of hamlets) {
+    const ground = heightAt(hamlet.x, hamlet.z);
+    if (ground < 0.18) continue;
+    for (let k = 0; k < hamlet.n; k += 1) {
+      const x = hamlet.x + (rng() - 0.5) * 2.4;
+      const z = hamlet.z + (rng() - 0.5) * 1.6;
+      if (inClearing(x, z)) continue;
+      const y = heightAt(x, z);
+      if (y < 0.16) continue;
+      lampSpots.push({ x, y: y + 0.22, z });
     }
   }
-  const lampGeo = new THREE.SphereGeometry(0.12, 6, 5);
+  const lampGeo = new THREE.SphereGeometry(0.16, 6, 5);
   const lampMat = new THREE.MeshBasicMaterial({
     color: 0xffc27a,
     transparent: true,
