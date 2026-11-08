@@ -739,22 +739,39 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
 #play { width: 40px; height: 40px; border-radius: 50%; padding: 0; }
 #clock { font: 700 var(--fs-lg)/1 var(--sans); min-width: 52px; }
 #route { height: 36px; padding: 0 12px; font-size: var(--fs-sm); }
-.track { position: relative; height: 28px; display: grid; align-items: center; min-width: 0; }
-#day { width: 100%; accent-color: var(--teal); position: relative; z-index: 1; margin: 0; }
-.ticks { position: absolute; left: 8px; right: 8px; top: 0; bottom: 0; z-index: 2; pointer-events: none; }
+.track {
+  position: relative;
+  height: auto;
+  display: grid;
+  grid-template-rows: 20px 16px;
+  align-items: center;
+  min-width: 0;
+}
+#day { grid-row: 1; width: 100%; height: 20px; accent-color: var(--teal); position: relative; z-index: 2; margin: 0; }
+.ticks {
+  grid-row: 2;
+  position: relative;
+  height: 16px;
+  margin: 0 8px;
+  z-index: 1;
+  pointer-events: none;
+}
 .tick {
   position: absolute;
-  top: 50%;
+  top: 0;
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   margin: 0;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   background: transparent;
   pointer-events: auto;
 }
+.tick:hover, .tick:active { background: transparent; transform: translateX(-50%); }
 .tick::before {
   content: "";
   position: absolute;
@@ -772,7 +789,7 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
   position: absolute;
   top: 92px;
   left: 50%;
-  z-index: 5;
+  z-index: 7;
   width: min(460px, calc(100vw - 24px));
   display: grid;
   grid-template-columns: 48px 1fr;
@@ -1245,7 +1262,9 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   .tools .btn { height: 40px; }
   #home, #list, #lang-btn { width: auto; min-width: 40px; padding: 0 8px; }
   #help, #sound, #bird, #view-btn { width: 40px; padding: 0; }
-  .chapter { top: calc(64px + env(safe-area-inset-top)); }
+  .chapter { top: calc(108px + env(safe-area-inset-top)); }
+  .track { grid-template-rows: 28px 16px; }
+  .tick { width: 16px; min-width: 16px; height: 16px; min-height: 16px; }
   .view-menu { top: calc(64px + env(safe-area-inset-top)); right: 8px; }
   .disclaimer-short { display: none; }
   body.intro .disclaimer-short {
@@ -1474,17 +1493,17 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 
 @media (pointer: coarse) {
   .btn, .tools button, .tabs button, .toggles button, .modal-actions button,
-  .choices button, #play, .sub, .related button, .pin button, .tick {
+  .choices button, #play, .sub, .related button, .pin button {
     min-height: 44px;
     min-width: 44px;
   }
   .sheet .x, .germ .x { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: var(--fs-xl); }
   .pin button { width: 60px; height: 60px; min-width: 60px; min-height: 60px; padding: 0; }
   .pin b { width: 30px; min-width: 30px; height: 30px; }
-  .track { height: 44px; }
-  .tick { width: 44px; height: 44px; }
+  .track { height: auto; grid-template-rows: 28px 16px; }
+  .tick { width: 16px; height: 16px; min-width: 16px; min-height: 16px; top: 0; transform: translateX(-50%); }
   #day {
-    height: 44px;
+    height: 28px;
     appearance: none;
     background: transparent;
   }

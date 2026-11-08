@@ -36,6 +36,8 @@ const _proj = new THREE.Vector3();
 const mixA = new THREE.Color();
 const mixB = new THREE.Color();
 const ASLEEP = new THREE.Color(0x8a8f93);
+const ASLEEP_NIGHT = new THREE.Color(0x8a8f93);
+ASLEEP_NIGHT.offsetHSL(0, -1, -0.12);
 const lookTop = new THREE.Color();
 const lookHor = new THREE.Color();
 const lookBot = new THREE.Color();
@@ -669,6 +671,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const skirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, vertexColors: true });
     const coastMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, vertexColors: true });
     const landMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, map: groundMap(island) });
+    const asleepUniform = { value: 0 };
+    landMat.userData.asleep = asleepUniform;
+    landMat.customProgramCacheKey = () => "asleep-land";
+    landMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uAsleep = asleepUniform;
+      shader.fragmentShader = `uniform float uAsleep;\n${shader.fragmentShader.replace(
+        "#include <map_fragment>",
+        "#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722))), uAsleep);",
+      )}`;
+    };
     const skirt = new THREE.Mesh(layerGeo(skirtGeo, P.skirtSoil, P.skirtSoil), skirtMat);
     skirt.position.y = 0.04;
     const coast = new THREE.Mesh(layerGeo(coastGeo, P.cliff, P.beach), coastMat);
@@ -2508,6 +2520,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const clock = introClock();
     let islandBusy = false;
     let glowPulse = false;
+    const nightNow = lookAtHour(minutes / 60).night;
     stepWakes(step);
     if (liveWakes.length || wakeQueue.length) islandBusy = true;
     for (const view of views.values()) {
@@ -2551,7 +2564,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         }
       }
       view.landMat.color.setRGB(1, 1, 1);
-      if (!view.awake) mixHex(view.landMat.color, ASLEEP, 0.3, view.landMat.color);
+      const asleepUniform = view.landMat.userData.asleep;
+      if (!view.awake && nightNow > 0.5) {
+        mixHex(view.landMat.color, ASLEEP_NIGHT, 0.55, view.landMat.color);
+        asleepUniform.value = 1;
+      } else if (!view.awake) {
+        mixHex(view.landMat.color, ASLEEP, 0.3, view.landMat.color);
+        asleepUniform.value = 0;
+      } else asleepUniform.value = 0;
       poseRing(view);
       if (view.pulseT != null && view.pulseRing) {
         islandBusy = true;
@@ -3865,6 +3885,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           pop: view.pinEl.querySelector("b")?.classList.contains("pop") || false,
           fade: view.fade,
           awake: Boolean(view.awake),
+          asleep: view.landMat.userData.asleep ? view.landMat.userData.asleep.value : 0,
           land: view.landMat.color.getHexString(),
           bx: view.base.x,
           bz: view.base.z,
