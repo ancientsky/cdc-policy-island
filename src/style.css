@@ -945,6 +945,10 @@ html[data-theme="evening"] .rail .btn,
 html[data-theme="night"] .rail .btn { color: var(--c-on-dark, var(--c-ink, var(--c))); }
 .modal-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; }
 .modal-buttons { display: flex; gap: 4px; }
+.modal-card.mode-grad .modal-buttons { flex-wrap: wrap; justify-content: flex-end; }
+.modal-card.mode-grad #modal-next { order: 1; }
+.modal-card.mode-grad #modal-skip { order: 2; }
+.modal-card.mode-grad #modal-reset { order: 3; }
 .dots { display: flex; gap: 6px; align-items: center; }
 .dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--line); display: block; }
 .dots i.on { width: 18px; border-radius: 999px; background: var(--teal); }
@@ -1044,7 +1048,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 .passport-hud {
   position: absolute;
   left: 22px;
-  top: 72px;
+  top: 88px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1312,8 +1316,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   .tabs .btn { flex: none; }
   .ledger:not(.half):not(.open) .scenario-lead,
   .ledger:not(.half):not(.open) .stats,
-  .ledger:not(.half):not(.open) .backstage-title,
-  .ledger:not(.half):not(.open) .passport-hud { display: none; }
+  .ledger:not(.half):not(.open) .backstage-title { display: none; }
   .ledger:not(.half):not(.open) .tree { padding: 0 8px; }
   .ledger:not(.half):not(.open) .scenarios { gap: 0; }
   .ledger:not(.half):not(.open) .scenario { min-height: 44px; padding: 4px 10px; }
@@ -1395,6 +1398,30 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   body.detail .sheet:has(.hotline) { padding-bottom: 0; }
   .ledger:not(.half):not(.open) .fact-tick { display: none; }
   .scenarios { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 980px) and (orientation: portrait) {
+  .ledger:not(.half):not(.open) .ledger-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+  }
+  .ledger:not(.half):not(.open) .passport-hud {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+  }
+  .ledger:not(.half):not(.open) .disclaimer-peek {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .ledger:not(.half):not(.open) .tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 520px) {

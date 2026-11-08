@@ -1,7 +1,7 @@
 import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, importRoutes, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX, SOURCE_LINKS } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
-import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, save as savePassport, stampIsland } from "./passport.js";
+import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
 import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
@@ -326,6 +326,8 @@ export function mount({ scene, islands, flows }) {
     $("modal-next").textContent = t("gradAgain");
     $("modal-skip").hidden = false;
     $("modal-skip").textContent = t("home");
+    $("modal-reset").hidden = false;
+    $("modal-reset").textContent = t("gradReset");
     $("modal-dots").hidden = true;
     placeCoach(0);
     openModal();
@@ -1082,6 +1084,7 @@ export function mount({ scene, islands, flows }) {
     $("modal-next").textContent = index === steps.length - 1 ? t("guideGo") : t("next");
     $("modal-skip").textContent = t("skip");
     $("modal-skip").hidden = index === steps.length - 1;
+    $("modal-reset").hidden = true;
     paintDots(index, steps.length);
     placeCoach(index);
     openModal();
@@ -1101,6 +1104,7 @@ export function mount({ scene, islands, flows }) {
     $("modal-body").innerHTML = `<ul class="about-lines"><li>${esc(t("about1"))}</li><li>${esc(t("about2"))}</li><li>${esc(t("about3"))}</li></ul>`;
     $("modal-next").textContent = t("gotIt");
     $("modal-skip").hidden = true;
+    $("modal-reset").hidden = true;
     placeCoach(0);
     openModal();
   }
@@ -1109,6 +1113,7 @@ export function mount({ scene, islands, flows }) {
     const wasIntro = document.body.classList.contains("intro");
     modal.hidden = true;
     modal.dataset.mode = "";
+    $("modal-reset").hidden = true;
     document.body.classList.remove("intro");
     document.querySelectorAll(".head.pulse").forEach((el) => el.classList.remove("pulse"));
     if (wasIntro) {
@@ -1129,6 +1134,7 @@ export function mount({ scene, islands, flows }) {
       $("modal-body").innerHTML = helpHtml();
       $("modal-next").textContent = t("gotIt");
       $("modal-skip").hidden = true;
+      $("modal-reset").hidden = true;
       placeCoach(0);
       return;
     }
@@ -1392,6 +1398,7 @@ export function mount({ scene, islands, flows }) {
     $("modal-body").innerHTML = helpHtml();
     $("modal-next").textContent = t("gotIt");
     $("modal-skip").hidden = true;
+    $("modal-reset").hidden = true;
     placeCoach(0);
     openModal();
   });
@@ -1404,6 +1411,18 @@ export function mount({ scene, islands, flows }) {
       return;
     }
     closeModal();
+  });
+  $("modal-reset").addEventListener("click", () => {
+    if (modal.dataset.mode !== "grad") return;
+    if (!window.confirm(t("gradResetAsk"))) return;
+    resetPassport(book);
+    stampFreshId = null;
+    cancelStamp();
+    closeModal();
+    clearSelection();
+    paintPassport(false);
+    paintPins();
+    paintMission();
   });
   modal.querySelector(".modal-card").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && event.target.tagName !== "BUTTON") {
