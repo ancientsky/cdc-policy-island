@@ -647,14 +647,18 @@ export function mount({ scene, islands, flows }) {
     sayStatus(t("foundIslands", { n: tree.querySelectorAll(".island").length }));
   }
 
-  function focusSheetIfNeeded(event) {
-    const keyboard = !!event && event.detail === 0;
-    const covered = window.matchMedia("(max-width: 980px)").matches;
-    if (!keyboard && !covered) return;
+  function focusSheetHeading() {
     const title = sheet.querySelector("h2");
     if (!title) return;
     title.tabIndex = -1;
     title.focus({ preventScroll: true });
+  }
+
+  function focusSheetIfNeeded(event) {
+    const keyboard = !!event && event.detail === 0;
+    const covered = window.matchMedia("(max-width: 980px)").matches;
+    if (!keyboard && !covered) return;
+    focusSheetHeading();
   }
 
   function renderList() {
@@ -795,10 +799,12 @@ export function mount({ scene, islands, flows }) {
   }
 
   function renderSheet() {
+    const keep = sheet.contains(document.activeElement);
     if (state.person) {
       const info = scene.personInfo(state.person.index) || state.person;
       state.person = info;
       renderPerson(info);
+      if (keep) focusSheetHeading();
       return;
     }
     const selected = state.selected;
@@ -813,6 +819,7 @@ export function mount({ scene, islands, flows }) {
     if (selected.type === "flow") {
       const flow = selected.flow;
       sheet.innerHTML = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button><p class="eyebrow">${esc(t("flowEyebrow"))}</p><h2>${esc(flow.kidTitle || flow.title)}</h2><p class="route">${esc(byId.get(flow.a).nick)} → ${esc(byId.get(flow.b).nick)}</p><p>${esc(flow.kid || flow.text)}</p><p class="carried">${esc(t("carried", { what: flow.carried }))}</p><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p><b>${esc(flow.title)}</b></p><p>${esc(flow.text)}</p></details>`;
+      if (keep) focusSheetHeading();
       return;
     }
     const island = byId.get(selected.type === "item" ? selected.islandId : selected.id);
@@ -852,6 +859,7 @@ export function mount({ scene, islands, flows }) {
     }
     const current = sheet.querySelector(".detail-item.on");
     current?.scrollIntoView({ block: "nearest" });
+    if (keep) focusSheetHeading();
     measureSafe();
   }
 
