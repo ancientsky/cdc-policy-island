@@ -3255,7 +3255,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       radius: endRadius,
       target,
     }, {
-      duration: THREE.MathUtils.clamp(dist * 90, 700, 1400),
+      duration: THREE.MathUtils.clamp(dist * 90, 700, 1200),
       distance: dist,
       arc: true,
       person: true,
@@ -3747,6 +3747,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           walkers: people.counts().walkers,
           ambient: people.counts().ambient,
           peopleDraws: people.counts().draws,
+          peopleBounds: people.bounds(),
         };
       },
       personProbe: (index) => {
@@ -3839,6 +3840,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         ty: cam.target.y,
         tz: cam.target.z,
         flight: Boolean(flight),
+        flightMs: flight ? Math.round(flight.dur) : 0,
         intro: Boolean(flight?.intro),
         celebrate: Boolean(flight?.celebrate),
         coast: coasting,

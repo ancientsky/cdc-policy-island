@@ -690,6 +690,7 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
       writePerson(person, cam, hold);
     }
     for (const mesh of Object.values(channels)) mesh.instanceMatrix.needsUpdate = true;
+    for (const mesh of pickMeshes) mesh.computeBoundingSphere();
     poseDecks();
     placeRing();
   }
@@ -738,6 +739,7 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
   }
 
   function pick(raycaster) {
+    for (const mesh of pickMeshes) mesh.computeBoundingSphere();
     const hits = raycaster.intersectObjects(pickMeshes, false);
     for (const hit of hits) {
       const owner = hit.object.userData.owners?.[hit.instanceId];
@@ -875,6 +877,12 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
     setSelected(index) { selectedIndex = index; },
     portrait(index) { return portrait(list[index]); },
     counts,
+    bounds() {
+      return pickMeshes.map((mesh) => ({
+        name: mesh.name,
+        radius: mesh.boundingSphere ? Number(mesh.boundingSphere.radius.toFixed(2)) : null,
+      }));
+    },
     proveMotion,
     relabel() {},
   };
