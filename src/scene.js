@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { CSS2DObject, CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
 import { MESH_R, offsetToWorld } from "./hex.js";
-import { hourCovers } from "./data.js";
+import { hourCovers, importRoutes, importWidth } from "./data.js";
 import { t } from "./i18n.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createKit } from "./kit.js";
@@ -23,6 +23,9 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 // Check: dir (1, 0, 0) => rotation.y = -π/2 => local -z lands on world +x.
 
 const _threatDir = new THREE.Vector3();
+const _laneA = new THREE.Vector3();
+const _laneB = new THREE.Vector3();
+const _laneSide = new THREE.Vector3();
 const _crewDir = new THREE.Vector3();
 const _crewFace = new THREE.Vector3();
 const _crewAt = new THREE.Vector3();
@@ -945,6 +948,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let elapsed = 0;
   const threats = [];
   const threatHits = [];
+  const importLanes = [];
+  let birdU = 0.42;
+  let birdDir = 1;
   const plateMarks = [];
   let platesDirty = false;
   const crews = [];
@@ -952,15 +958,67 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const handoffPops = [];
   const handoffAt = new Map();
 
+  function writeLane(out, points, u) {
+    const n = points.length - 1;
+    const x = Math.min(0.999, Math.max(0, u)) * n;
+    const i = Math.min(n - 1, Math.floor(x));
+    out.copy(points[i]).lerp(points[i + 1], x - i);
+    return out;
+  }
+
   function poseThreat(threat) {
-    threat.mesh.position.lerpVectors(threat.home, threat.halt, threat.u);
     const bob = actorsLive() ? Math.sin(elapsed * 1.15 + threat.phase) * 0.06 : 0;
-    threat.mesh.position.y = threat.hover + bob;
-    _threatDir.subVectors(threat.halt, threat.home);
-    _threatDir.y = 0;
-    if (_threatDir.lengthSq() > 1e-8) threat.mesh.rotation.y = Math.atan2(-_threatDir.x, -_threatDir.z);
+    if (threat.lane) {
+      writeLane(_laneA, threat.lane, threat.u);
+      writeLane(_laneB, threat.lane, Math.min(1, threat.u + 0.04));
+      _threatDir.subVectors(_laneB, _laneA);
+      _threatDir.y = 0;
+      _laneSide.set(-_threatDir.z, 0, _threatDir.x);
+      if (_laneSide.lengthSq() > 1e-8) _laneSide.normalize();
+      else _laneSide.set(1, 0, 0);
+      threat.mesh.position.copy(_laneA).addScaledVector(_laneSide, threat.side || 0);
+      threat.mesh.position.y = threat.hover + bob;
+      if (_threatDir.lengthSq() > 1e-8) {
+        const yaw = Math.atan2(-_threatDir.x, -_threatDir.z);
+        threat.mesh.rotation.y = yaw;
+        if (threat.craft) {
+          threat.craft.position.copy(_laneA);
+          threat.craft.position.y = threat.craftY;
+          threat.craft.rotation.y = yaw;
+          threat.craft.visible = threat.mesh.visible;
+          threat.craft.updateMatrixWorld(true);
+        }
+      }
+    } else {
+      threat.mesh.position.lerpVectors(threat.home, threat.halt, threat.u);
+      threat.mesh.position.y = threat.hover + bob;
+      _threatDir.subVectors(threat.halt, threat.home);
+      _threatDir.y = 0;
+      if (_threatDir.lengthSq() > 1e-8) threat.mesh.rotation.y = Math.atan2(-_threatDir.x, -_threatDir.z);
+    }
     threat.mesh.updateWorldMatrix(true, true);
     platesDirty = true;
+  }
+
+  function poseBirds() {
+    const lane = importLanes.find((item) => item.id === "north-birds");
+    if (!lane?.craft) return;
+    writeLane(_laneA, lane.points, birdU);
+    writeLane(_laneB, lane.points, Math.min(1, birdU + 0.04));
+    _threatDir.subVectors(_laneB, _laneA);
+    _threatDir.y = 0;
+    _laneSide.set(-_threatDir.z, 0, _threatDir.x);
+    if (_laneSide.lengthSq() > 1e-8) _laneSide.normalize();
+    else _laneSide.set(1, 0, 0);
+    const yaw = _threatDir.lengthSq() > 1e-8 ? Math.atan2(-_threatDir.x, -_threatDir.z) : 0;
+    lane.craft.position.copy(_laneA);
+    lane.craft.position.y = 1.45;
+    lane.craft.rotation.y = yaw;
+    lane.germ.position.copy(_laneA).addScaledVector(_laneSide, 0.55);
+    lane.germ.position.y = 1.45;
+    lane.germ.rotation.y = yaw;
+    lane.craft.updateMatrixWorld(true);
+    lane.germ.updateMatrixWorld(true);
   }
 
   function poseCrew(crew, from, to, alpha) {
@@ -2152,6 +2210,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (post) post.resize(W, H, pixelCap);
     labels.setSize(W, H);
     for (const route of flowViews) route.mat.resolution.set(W, H);
+    for (const lane of importLanes) lane.mat.resolution.set(W, H);
     applyFit();
   }
 
@@ -2354,6 +2413,17 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (!reduced) {
       for (const crew of crews) stepCrew(crew, step);
     }
+    if (!reduced && actorsLive()) {
+      birdU += step * 0.04 * birdDir;
+      if (birdU >= 0.7) {
+        birdU = 0.7;
+        birdDir = -1;
+      } else if (birdU <= 0.28) {
+        birdU = 0.28;
+        birdDir = 1;
+      }
+    }
+    poseBirds();
     placeTip();
   }
 
@@ -3353,6 +3423,244 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     holdRender = Math.max(holdRender, 0.85);
   }
 
+  function placeImportLanes() {
+    const border = views.get("border").base;
+    const geom = {
+      "west-air": { aim: [-1, -0.45], bias: { west: true, z: -0.5 }, seats: [{ id: "flu", side: 0.4, hover: 1.62, craft: "plane", craftY: 1.62 }] },
+      "west-sea": { aim: [-1, 0.2], bias: { west: true, z: 0.45 }, seats: [{ id: "border", side: 0.38, hover: 0.55, craft: "ship", craftY: 0.28 }, { id: "tb", side: -0.38, hover: 0.72 }] },
+      "south-dengue": { aim: [0.6, 1], bias: { x: 0.5 }, seats: [{ id: "dengue", side: 0.35, hover: 0.7 }] },
+      "sw-measles": { aim: [-0.35, 1], bias: { x: -0.45 }, seats: [{ id: "entero", side: 0.35, hover: 0.7 }] },
+      "north-birds": { aim: [0.05, -1], bias: { z: -0.85 }, seats: [], birds: true },
+    };
+    function outside(x, z) {
+      if (environment.heightAt(x, z) >= -1) return false;
+      for (const view of views.values()) {
+        if (Math.hypot(x - view.base.x, z - view.base.z) < 2.75) return false;
+      }
+      for (let dx = -3; dx <= 3; dx += 1.5) {
+        for (let dz = -3; dz <= 3; dz += 1.5) {
+          if (dx * dx + dz * dz > 9.01) continue;
+          if (environment.heightAt(x + dx, z + dz) > 0) return false;
+        }
+      }
+      return true;
+    }
+    function seaGrid() {
+      const found = [];
+      for (let x = -22; x <= 12.6; x += 1.05) {
+        for (let z = -15.6; z <= 12.4; z += 1.05) {
+          if (outside(x, z)) found.push(new THREE.Vector3(x, 0, z));
+        }
+      }
+      return found;
+    }
+    function islandsClear(a, b) {
+      for (let i = 0; i <= 10; i += 1) {
+        const t = i / 10;
+        const x = a.x + (b.x - a.x) * t;
+        const z = a.z + (b.z - a.z) * t;
+        for (const view of views.values()) {
+          if (Math.hypot(x - view.base.x, z - view.base.z) < 2.75) return false;
+        }
+      }
+      return true;
+    }
+    const grid = seaGrid();
+    const near = [];
+    const far = [];
+    for (const point of grid) {
+      const dist = Math.hypot(point.x - border.x, point.z - border.z);
+      if (dist >= 6.2) far.push(point);
+      else if (dist >= 2.8 && dist <= 8) near.push(point);
+    }
+    const used = [];
+    function separated(a, b, gap) {
+      const mx = (a.x + b.x) * 0.5;
+      const mz = (a.z + b.z) * 0.5;
+      for (const seg of used) {
+        if (Math.hypot(mx - (seg[0].x + seg[1].x) * 0.5, mz - (seg[0].z + seg[1].z) * 0.5) < gap) return false;
+        if (Math.hypot(a.x - seg[0].x, a.z - seg[0].z) < 3.2) return false;
+        if (Math.hypot(b.x - seg[1].x, b.z - seg[1].z) < 1.8) return false;
+      }
+      return true;
+    }
+    function findLane(aim, bias, gap) {
+      const alen = Math.hypot(aim[0], aim[1]) || 1;
+      const ax = aim[0] / alen;
+      const az = aim[1] / alen;
+      const ranked = [];
+      for (const start of far) {
+        const sx = start.x - border.x;
+        const sz = start.z - border.z;
+        const sl = Math.hypot(sx, sz);
+        const dot = (sx / sl) * ax + (sz / sl) * az;
+        if (dot < 0.4) continue;
+        for (const end of near) {
+          const tx = end.x - start.x;
+          const tz = end.z - start.z;
+          const span = Math.hypot(tx, tz);
+          if (span < 5) continue;
+          const el = Math.hypot(end.x - border.x, end.z - border.z);
+          if (el > sl - 2.5) continue;
+          const inbound = ((border.x - start.x) * tx + (border.z - start.z) * tz) / (sl * span);
+          if (inbound < 0.7) continue;
+          if (!separated(start, end, gap)) continue;
+          if (!islandsClear(start, end)) continue;
+          let score = span * 0.2 + dot * 4 + inbound * 2 - el * 0.35;
+          if (bias.west) score += (border.x - start.x) * 0.16;
+          if (bias.z) score += start.z * bias.z;
+          if (bias.x) score += start.x * bias.x;
+          ranked.push({ start, end, score });
+        }
+      }
+      ranked.sort((a, b) => b.score - a.score);
+      for (let i = 0; i < ranked.length && i < 40; i += 1) {
+        const pair = ranked[i];
+        if (!segmentOk(pair.start, pair.end)) continue;
+        const chosen = [pair.start.clone(), pair.end.clone()];
+        used.push(chosen);
+        return chosen;
+      }
+      return null;
+    }
+    function farPoint(dx, dz) {
+      const len = Math.hypot(dx, dz) || 1;
+      let found = null;
+      for (let d = 2.8; d <= 18; d += 0.35) {
+        const px = border.x + (dx / len) * d;
+        const pz = border.z + (dz / len) * d;
+        if (outside(px, pz)) found = new THREE.Vector3(px, 0, pz);
+      }
+      return found;
+    }
+    function nearPoint(dx, dz) {
+      const len = Math.hypot(dx, dz) || 1;
+      for (let d = 2.8; d <= 8; d += 0.25) {
+        const px = border.x + (dx / len) * d;
+        const pz = border.z + (dz / len) * d;
+        if (outside(px, pz)) return new THREE.Vector3(px, 0, pz);
+      }
+      return null;
+    }
+    function segmentOk(a, b) {
+      for (let i = 0; i <= 12; i += 1) {
+        const t = i / 12;
+        if (!outside(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t)) return false;
+      }
+      return true;
+    }
+    function makeHull(kind) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: kind === "plane" ? 0xc5d0d4 : 0xb7c3be,
+        roughness: 0.62,
+        flatShading: true,
+      });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(kind === "plane" ? 0.12 : 0.22, kind === "plane" ? 0.08 : 0.1, 0.72));
+      body.position.set(0, kind === "plane" ? 0 : 0.08, -0.06);
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(kind === "plane" ? 0.72 : 0.16, kind === "plane" ? 0.03 : 0.1, kind === "plane" ? 0.14 : 0.22));
+      wing.position.set(0, kind === "plane" ? 0.02 : 0.16, kind === "plane" ? 0.02 : 0.1);
+      const tail = kind === "plane" ? new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.03, 0.08)) : null;
+      if (tail) tail.position.set(0, 0.05, 0.26);
+      const mesh = mergeLocal(tail ? [body, wing, tail] : [body, wing], mat);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.kind = "craft";
+      return mesh;
+    }
+    function makeFlock() {
+      const geo = new THREE.ConeGeometry(0.045, 0.18, 5);
+      geo.rotateX(Math.PI / 2);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xe4dcc8, roughness: 0.7, flatShading: true });
+      const flock = new THREE.InstancedMesh(geo, mat, 7);
+      const dummy = new THREE.Object3D();
+      const spots = [[0, 0, 0], [-0.16, 0.02, 0.18], [0.16, 0.02, 0.18], [-0.3, 0, 0.36], [0.3, 0, 0.36], [-0.12, 0.05, 0.34], [0.12, -0.02, 0.32]];
+      for (let i = 0; i < spots.length; i += 1) {
+        dummy.position.set(spots[i][0], spots[i][1], spots[i][2]);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        flock.setMatrixAt(i, dummy.matrix);
+      }
+      flock.instanceMatrix.needsUpdate = true;
+      flock.computeBoundingSphere();
+      flock.castShadow = false;
+      flock.receiveShadow = false;
+      flock.frustumCulled = false;
+      flock.userData.kind = "craft";
+      return flock;
+    }
+    for (const route of importRoutes) {
+      const spec = geom[route.id];
+      if (!spec) continue;
+      let points = findLane(spec.aim, spec.bias || {}, 1.8) || findLane(spec.aim, spec.bias || {}, 0.55);
+      if (!points) {
+        const fallbackEnd = nearPoint(spec.aim[0], spec.aim[1]);
+        const fallbackStart = fallbackEnd && farPoint(spec.aim[0], spec.aim[1]);
+        if (fallbackStart && fallbackStart.distanceTo(fallbackEnd) > 1 && segmentOk(fallbackStart, fallbackEnd)) {
+          points = [fallbackStart, fallbackEnd];
+        }
+      }
+      if (!points) continue;
+      const start = points[0];
+      const end = points[points.length - 1];
+      const positions = [];
+      for (const point of points) positions.push(point.x, 0.08, point.z);
+      const geo = new LineGeometry();
+      geo.setPositions(positions);
+      const mat = new LineMaterial({
+        color: 0x8d9a96,
+        linewidth: importWidth(route.cases),
+        worldUnits: false,
+        dashed: true,
+        dashSize: 0.22,
+        gapSize: 0.16,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+      });
+      const line = new Line2(geo, mat);
+      line.computeLineDistances();
+      line.frustumCulled = false;
+      line.raycast = () => {};
+      line.renderOrder = 2;
+      line.userData.kind = "import";
+      scene.add(line);
+      const lane = { ...route, points, line, mat, craft: null, germ: null };
+      let craft = null;
+      for (const seat of spec.seats) {
+        const threat = threats.find((item) => item.islandId === seat.id);
+        if (!threat) continue;
+        threat.lane = points;
+        threat.home = start;
+        threat.halt = end;
+        threat.side = seat.side;
+        threat.hover = seat.hover;
+        if (seat.craft && !craft) {
+          craft = makeHull(seat.craft);
+          scene.add(craft);
+          threat.craft = craft;
+          threat.craftY = seat.craftY;
+          lane.craft = craft;
+        }
+        poseThreat(threat);
+      }
+      if (spec.birds) {
+        lane.craft = makeFlock();
+        lane.germ = makeVirus(0xb7a07a).group;
+        lane.germ.userData.kind = "import-germ";
+        scene.add(lane.craft, lane.germ);
+      }
+      importLanes.push(lane);
+    }
+    for (const crew of crews) {
+      if (!crew.gate) continue;
+      const halt = crew.threat.halt;
+      const home = crew.threat.home;
+      crew.gate.position.set(halt.x, 0.7, halt.z);
+      crew.gate.rotation.y = Math.atan2(home.x - halt.x, home.z - halt.z);
+    }
+    poseBirds();
+  }
+
   addSeaDecor(scene, kit, placed, lamps);
   const sea = seaState();
   life.mount(sea.boatGroups, [
@@ -3365,6 +3673,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
     motion,
   });
+  placeImportLanes();
   if (!reduced) {
     for (const view of views.values()) {
       for (const rec of view.treeRecs) rec.scaleMul = 0;
@@ -3426,6 +3735,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           flowWidth: flowViews[0]?.mat.linewidth ?? -1,
           flowRes: flowViews[0]?.mat.resolution.toArray() ?? [],
           flowPeak: flowViews.reduce((peak, route) => Math.max(peak, route.curve.getPoint(0.5).y), 0),
+          imports: importLanes.map((lane) => ({
+            id: lane.id,
+            dir: lane.dir,
+            cases: lane.cases,
+            width: lane.mat.linewidth,
+            craft: Boolean(lane.craft),
+            points: lane.points.map((p) => [Number(p.x.toFixed(2)), Number(p.z.toFixed(2))]),
+          })),
           lit: [...views.values()].filter((view) => view.lit).map((view) => view.island.id),
           walkers: people.counts().walkers,
           ambient: people.counts().ambient,
@@ -4057,7 +4374,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       if (sun.shadow.normalBias !== 0.02) errors.push(`sun normalBias ${sun.shadow.normalBias}`);
 
       // Sample offsets around the quarantine island, not a heading frame.
-      const shore = border.base;
+      const coast = border.base;
       const around = [
         [2.1, 0], [-2.1, 0], [0, 2.1], [0, -2.1],
         [3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4],
@@ -4067,20 +4384,20 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       ];
       let dry = 0;
       for (const [dx, dz] of around) {
-        if (environment.heightAt(shore.x + dx, shore.z + dz) > 0.02) dry += 1;
+        if (environment.heightAt(coast.x + dx, coast.z + dz) > 0.02) dry += 1;
       }
-      if (dry) errors.push(`border shore meets land at ${dry} samples`);
+      if (dry) errors.push(`border coast meets land at ${dry} samples`);
 
       const portClock = life.probe().port;
       if (!portClock) errors.push("quarantine port has no plane or ship");
       else {
         life.scrubPort(0);
         const parked = life.probe().port;
-        const planeHome = Math.hypot(parked.plane.x - shore.x, parked.plane.z - shore.z);
-        const shipHome = Math.hypot(parked.ship.x - shore.x, parked.ship.z - shore.z);
+        const planeHome = Math.hypot(parked.plane.x - coast.x, parked.plane.z - coast.z);
+        const shipHome = Math.hypot(parked.ship.x - coast.x, parked.ship.z - coast.z);
         if (planeHome > 1.3) errors.push("parked plane left the island");
         if (shipHome < planeHome * 2.2) errors.push("ship sits on the island");
-        if (!(parked.ship.z < shore.z - 1.4)) errors.push("ship is not off the north shore");
+        if (!(parked.ship.z < coast.z - 1.4)) errors.push("ship is not off the north coast");
         if (environment.heightAt(parked.ship.x, parked.ship.z) > 0.02) errors.push("ship berth is on land");
         const face = (t0, t1, craft) => {
           life.scrubPort(t0);
@@ -4102,6 +4419,92 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         else if (sailed.cos < 0.85) errors.push(`ship faces away from travel (cos ${sailed.cos.toFixed(2)})`);
         life.scrubPort(portClock.portTime);
       }
+
+      const savedU = threats.map((threat) => threat.u);
+      const savedBird = birdU;
+      function diskHitsLand(x, z) {
+        if (environment.heightAt(x, z) >= -1) return true;
+        for (let dx = -3; dx <= 3; dx += 1.5) {
+          for (let dz = -3; dz <= 3; dz += 1.5) {
+            if (dx * dx + dz * dz > 9.01) continue;
+            if (environment.heightAt(x + dx, z + dz) > 0) return true;
+          }
+        }
+        return false;
+      }
+      const dirCount = {};
+      let widthSum = {};
+      for (const lane of importLanes) {
+        dirCount[lane.dir] = (dirCount[lane.dir] || 0) + 1;
+        widthSum[lane.dir] = (widthSum[lane.dir] || 0) + lane.mat.linewidth;
+        if (lane.points.length < 2) errors.push(`lane ${lane.id} is short`);
+        for (const point of lane.points) {
+          if (diskHitsLand(point.x, point.z)) errors.push(`lane ${lane.id} meets land`);
+        }
+      }
+      if (!(dirCount.west > (dirCount.south || 0) && dirCount.west > (dirCount.southwest || 0) && dirCount.west > (dirCount.north || 0))) {
+        errors.push("west does not have the most import lanes");
+      }
+      for (const threat of threats) {
+        if (!threat.lane) errors.push(`threat ${threat.islandId} has no sea lane`);
+        else {
+          for (const point of threat.lane) {
+            if (diskHitsLand(point.x, point.z)) errors.push(`threat ${threat.islandId} lane meets land`);
+          }
+        }
+      }
+      const flu = threats.find((threat) => threat.islandId === "flu");
+      const gate = threats.find((threat) => threat.islandId === "border");
+      const faceAlong = (object, before, after) => {
+        const delta = after.clone().sub(before);
+        delta.y = 0;
+        if (delta.length() < 0.02) return 0;
+        const front = new THREE.Vector3(0, 0, -1).applyQuaternion(object.quaternion);
+        front.y = 0;
+        if (front.lengthSq() < 1e-8) return 0;
+        return front.normalize().dot(delta.normalize());
+      };
+      if (!flu?.craft) errors.push("import plane is missing");
+      else {
+        flu.u = 0.35;
+        poseThreat(flu);
+        const before = flu.craft.position.clone();
+        flu.u = 0.55;
+        poseThreat(flu);
+        const cos = faceAlong(flu.craft, before, flu.craft.position.clone());
+        if (cos < 0.85) errors.push(`import plane faces away (${cos.toFixed(2)})`);
+      }
+      if (!gate?.craft) errors.push("import ship is missing");
+      else {
+        gate.u = 0.35;
+        poseThreat(gate);
+        const before = gate.craft.position.clone();
+        gate.u = 0.55;
+        poseThreat(gate);
+        const cos = faceAlong(gate.craft, before, gate.craft.position.clone());
+        if (cos < 0.85) errors.push(`import ship faces away (${cos.toFixed(2)})`);
+      }
+      const birds = importLanes.find((lane) => lane.id === "north-birds");
+      if (!birds?.craft || !birds.germ) errors.push("migratory flock is missing");
+      else {
+        birdU = 0.35;
+        poseBirds();
+        const before = birds.craft.position.clone();
+        const germBefore = birds.germ.position.clone();
+        birdU = 0.55;
+        poseBirds();
+        const cos = faceAlong(birds.craft, before, birds.craft.position.clone());
+        if (cos < 0.85) errors.push(`flock faces away (${cos.toFixed(2)})`);
+        if (birds.germ.position.distanceTo(germBefore) < 0.02) errors.push("flock germ did not move");
+        if (diskHitsLand(birds.germ.position.x, birds.germ.position.z)) errors.push("flock germ is on land");
+      }
+      threats.forEach((threat, index) => {
+        threat.u = savedU[index];
+        poseThreat(threat);
+      });
+      birdU = savedBird;
+      poseBirds();
+      if (Object.keys(widthSum).length < 3) errors.push("import lanes cover fewer than 3 directions");
       return errors;
     },
   };

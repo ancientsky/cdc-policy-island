@@ -72,4 +72,4 @@ npm run preview
 
 An interactive map of public Taiwan CDC programs, arranged as fourteen hexes in the outline of Taiwan. Buildings are pieces of work. Arcs are handoffs. This site is arranged from public Taiwan CDC material. It is not an official site. Data as of October 2026. Chinese text is the source. English and Japanese are descriptive translations, not official titles.
 
-Five germs offshore each move toward their own island: a mosquito by dengue meets emptied water, a mosquito by the port meets screening, an influenza virus meets vaccination, an enterovirus meets handwashing, and a tuberculosis bacillus meets finishing the medicine. That picture is a metaphor, not an operating procedure.
+Five germs out on the water ride import routes toward the quarantine island: a plane, a ship, and a flock of migratory birds. A mosquito by dengue meets emptied water, a mosquito by the port meets screening, an influenza virus meets vaccination, an enterovirus meets handwashing, and a tuberculosis bacillus meets finishing the medicine. That picture is a metaphor, not an operating procedure.

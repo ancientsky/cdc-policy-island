@@ -1,4 +1,4 @@
-import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX, SOURCE_LINKS } from "./data.js";
+import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, importRoutes, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX, SOURCE_LINKS } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, save as savePassport, stampIsland } from "./passport.js";
@@ -839,7 +839,10 @@ export function mount({ scene, islands, flows }) {
       ? `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(island.say)}</p></div>`
       : "";
     sheet.style.setProperty("--c", island.accent);
-    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const why = island.id === "border"
+      ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p><ul class="why-src">${importRoutes.map((route) => `<li><a href="${esc(route.source)}" target="_blank" rel="noopener noreferrer">${esc(route.label[getLang()] || route.label.zh)}</a></li>`).join("")}</ul></section>`
+      : "";
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2>${why}<p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;

@@ -9,6 +9,85 @@ export const SOURCE_INDEX = "https://www.cdc.gov.tw/Category/MPage/kVzFWokFW3l9_
 export const DATA_AS_OF = "2026-10";
 const CDC_HOME = "https://www.cdc.gov.tw/";
 
+// Imported-infection routes. Width follows the cited count.
+// 1.2 + cases/70, and a route with no count stays at 1.5.
+// 2024 week 1–50 country totals (China 64, Indonesia 238, Philippines 68)
+// are in the week-50 surveillance PDF. Full-year 2024 dengue imports are 261
+// and measles imports are 12. H7N9 imports in 2013–2017 are 5, all from the west.
+// The wild-bird note has no positive-sample count, so that route is not sized as cases.
+export function importWidth(cases) {
+  if (!cases) return 1.5;
+  return Math.round((1.2 + cases / 70) * 10) / 10;
+}
+
+export const importRoutes = [
+  {
+    id: "west-air",
+    dir: "west",
+    mode: "air",
+    cases: 64,
+    year: "2024",
+    source: "https://www.cdc.gov.tw/Uploads/files/657cc126-853e-4ab1-bbf6-3eba2182de80.pdf",
+    label: {
+      zh: "2024 年第 1–50 週境外移入，感染地中國 64 例（該週國家別合計）",
+      en: "2024 weeks 1–50 imported cases, China 64 (country total in that weekly)",
+      ja: "2024年第1–50週の輸入感染、中国64例（その週報の国別合計）",
+    },
+  },
+  {
+    id: "west-sea",
+    dir: "west",
+    mode: "sea",
+    cases: 5,
+    year: "2013–2017",
+    source: "https://www.cdc.gov.tw/Bulletin/Detail/bZE85LXA9ZGdCvEJKZe6Cg?typeid=9",
+    label: {
+      zh: "2013–2014 年 4 例、2017 年 1 例，H7N9 境外移入共 5 例（2026-04-02 新聞稿）",
+      en: "H7N9 imported cases: 4 in 2013–2014 and 1 in 2017, 5 in total (2 Apr 2026 bulletin)",
+      ja: "H7N9の輸入感染は2013–2014年4例、2017年1例、計5例（2026-04-02の発表）",
+    },
+  },
+  {
+    id: "south-dengue",
+    dir: "south",
+    mode: "sea",
+    cases: 261,
+    year: "2024",
+    source: "https://www.cdc.gov.tw/Uploads/files/e45b0904-9f5b-4f74-ad63-c6fb3ab4a45e.pdf",
+    label: {
+      zh: "2024 年第 1–52 週登革熱境外移入 261 例",
+      en: "2024 weeks 1–52 imported dengue: 261",
+      ja: "2024年第1–52週のデング熱輸入感染261例",
+    },
+  },
+  {
+    id: "sw-measles",
+    dir: "southwest",
+    mode: "air",
+    cases: 12,
+    year: "2024",
+    source: "https://www.cdc.gov.tw/Bulletin/Detail/ZxnV1SEdQI_xUzF8liQzBQ?typeid=9",
+    label: {
+      zh: "2024 年麻疹境外移入 12 例（越南、馬來西亞、柬埔寨、泰國、航空器；2025-01-07 新聞稿）",
+      en: "2024 imported measles: 12 (Vietnam, Malaysia, Cambodia, Thailand, and aircraft; 7 Jan 2025 bulletin)",
+      ja: "2024年の麻しん輸入感染12例（ベトナム、マレーシア、カンボジア、タイ、航空機。2025-01-07の発表）",
+    },
+  },
+  {
+    id: "north-birds",
+    dir: "north",
+    mode: "bird",
+    cases: 0,
+    year: "2026",
+    source: "https://www.cdc.gov.tw/Bulletin/Detail/bZE85LXA9ZGdCvEJKZe6Cg?typeid=9",
+    label: {
+      zh: "2026-04-02 新聞稿寫多年在雁鴨科野鳥監測到 A 型 H7。稿內沒有陽性樣本數，所以這條用最細的線，不拿例數比粗細。",
+      en: "The 2 Apr 2026 bulletin says H7 has been found for years in wild ducks and geese. It gives no positive-sample count, so this line stays the thinnest and is not compared as a case total.",
+      ja: "2026-04-02の発表は、カモ科の野鳥で多年にわたりA型H7を監視していると書いている。陽性数はないので、この線はいちばん細く、症例数では比べない。",
+    },
+  },
+];
+
 // Plan files opened from the major-policy list on 2026-10-30.
 // A phrase is included only when that list had a plan file or a real section page.
 const PLAN = {

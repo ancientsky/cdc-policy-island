@@ -271,7 +271,7 @@ export const plain = {
     },
     fact: {
       watch: "People can find germs in city sewer water. That can happen before sick people see a doctor.",
-      border: "The English word quarantine comes from an Italian phrase for 40 days. Centuries ago, a ship from a plague port waited 40 days offshore before anyone landed.",
+      border: "The English word quarantine comes from an Italian phrase for 40 days. Centuries ago, a ship from a plague port waited 40 days out on the water before anyone landed.",
       lab: "A virus's genes are like an instruction book. Reading them one letter at a time is called sequencing. The reading shows where the virus came from, and which viruses are its relatives.",
       vax: "Most vaccines must stay between 2 and 8°C, from the factory all the way to your arm. That cold road is called the cold chain.",
       flu: "Flu germs change their look each year. So the flu shot is needed again each year.",
