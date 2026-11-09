@@ -139,7 +139,7 @@ export function mount({ scene, islands, flows }) {
     const island = byId.get(info.islandId);
     const suffix = germSuffix[info.islandId];
     const action = t(toolKey[info.tool] || "toolClean");
-    toast.innerHTML = `<b>${esc(t("repelToast", { action, name: island?.pin || "" }))}</b><span>${esc(suffix ? t(`germDo${suffix}`) : "")}</span>`;
+    toast.innerHTML = `<b>${esc(t("repelToast", { action, name: island?.nick || "" }))}</b><span>${esc(suffix ? t(`germDo${suffix}`) : "")}</span>`;
     toast.hidden = false;
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
