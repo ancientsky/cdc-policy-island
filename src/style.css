@@ -1546,6 +1546,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     min-height: 44px;
     min-width: 44px;
   }
+  #home, #list, #lang-btn { min-width: 44px; }
   .sheet .x, .germ .x { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: var(--fs-xl); }
   .pin button { width: 60px; height: 60px; min-width: 60px; min-height: 60px; padding: 0; }
   .pin b { width: 30px; min-width: 30px; height: 30px; }
