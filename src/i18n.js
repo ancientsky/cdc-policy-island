@@ -1083,7 +1083,7 @@ const body = {
       name: "国際保健", pin: "電波",
       blurb: "外の流行情報は、国内で患者が出る前に当番画面へ入ります。この島は北東に置き、外に向けます。台湾は国際保健規則の中核能力で自らを点検し、協力先と情報を交換します。",
       source: "国際協力と、IHRの国家窓口の常設の仕事です。",
-      hrefLabel: "IHR窓口のページを開く",
+      hrefLabel: "台湾CDCのトップ（国際保健規則を検索）",
       items: {
         "global-intel": item("国際の流行情報", "協力する国と近くの事案は、感染症情報センターの当番に入ります。転送された便りで止まりません。", ["情報", "近く", "交換"]),
         "global-ihr": item("中核能力の点検", "国際保健規則の中核能力で、自ら点検します。見つける、知らせる、対応する、入国地点です。共同行動方案が書くのも、国際的な道具に照らした自己点検か、外部の評価です。窓口には名前と当番表が要ります。メール箱一つでは足りません。", ["IHR", "中核能力", "窓口"]),
@@ -1156,6 +1156,7 @@ function snapshot() {
       fact: island.fact,
       actions: island.actions.map((row) => ({ ...row })),
       source: island.source,
+      href: island.href,
       hrefLabel: island.hrefLabel,
       items: Object.fromEntries(island.items.map((itemRow) => [itemRow.id, {
         name: itemRow.name,
@@ -1190,6 +1191,7 @@ function restore() {
     island.fact = saved.fact;
     island.actions = saved.actions.map((row) => ({ ...row }));
     island.source = saved.source;
+    island.href = saved.href;
     island.hrefLabel = saved.hrefLabel;
     for (const itemRow of island.items) {
       const savedItem = saved.items[itemRow.id];
@@ -1233,6 +1235,7 @@ function paint(code) {
     island.say = sayCopy[code][island.id];
     island.blurb = row.blurb;
     island.source = row.source;
+    island.href = code === "en" && island.hrefEn ? island.hrefEn : shot.islands[island.id].href;
     island.hrefLabel = row.hrefLabel;
     const savedIsland = shot.islands[island.id];
     for (const itemRow of island.items) {

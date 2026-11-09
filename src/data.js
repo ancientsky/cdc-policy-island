@@ -384,7 +384,8 @@ export const islands = [
     kit: "dots",
     blurb: "第三期自 2026 年走到 2030。主動發現和把藥吃完，比再印一本手冊更能讓發生率下降。",
     source: "我國加入 WHO 2035 消除結核第三期計畫（2026–2030）。名稱裡的 2035 是目標年，不是會員資格，消除也還沒有達成。",
-    href: "https://www.cdc.gov.tw/Category/ListPage/2fbGet7KwqEwnjGAy-Zbyg",
+    href: "https://www.cdc.gov.tw/Disease/SubIndex/j5_xY8JbRq3IzXAqxbnAvQ",
+    hrefEn: "https://www.cdc.gov.tw/Category/ListPage/2fbGet7KwqEwnjGAy-Zbyg",
     hrefLabel: "看結核病防治專區",
     items: [
       { id: "tb-find", name: "主動發現", phase: "now", hours: [[9, 17]], keywords: ["接觸者", "篩檢", "高風險", "咳嗽兩週", "肺結核"], detail: "在接觸者和高風險族群裡找出發病的人，不等症狀自己走到門診。" },
@@ -450,7 +451,8 @@ export const islands = [
     kit: "hospital",
     blurb: "醫院和長照機構是病原會放大的地方。感染管制放在東側的醫療帶，一手接群聚通報，一手把抗生素使用交給離岸的抗藥性島。",
     source: "整備計畫裡的傳染病防治醫療網，以及抗藥性行動計畫裡的感染預防。醫院和長照機構的查核是常設業務。",
-    href: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
+    href: "https://www.cdc.gov.tw/Category/List/Wie5hDvyNkeG_ZypRcxssw",
+    hrefEn: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
     hrefLabel: "看感染管制專頁",
     items: [
       { id: "ipc-hospital", name: "醫院感染管制", phase: "now", hours: [[9, 17]], keywords: ["醫院", "隔離", "查核"], detail: "隔離空間、防護裝備和群聚通報要接得上臨床。查核看的是做得到，不是計畫書有沒有這一章。" },
@@ -472,7 +474,8 @@ export const islands = [
     kit: "rings",
     blurb: "抗藥性不在單一科室裡。人醫、動物和環境都有一份，所以這座島離岸，用橋接回實驗室和醫院，而不是蓋在醫院屋頂上。",
     source: "國家級防疫一體抗生素抗藥性管理行動計畫（2025–2029，115 年 3 月修訂）；行政院國家防疫一體聯合行動方案（2026–2030）",
-    href: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
+    href: "https://www.cdc.gov.tw/Category/List/m6WabdS8tHTXcOkBGtlaew",
+    hrefEn: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
     hrefLabel: "看抗藥性監視專頁",
     items: [
       { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院", "消炎藥"], detail: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
@@ -494,7 +497,8 @@ export const islands = [
     kit: "warehouse",
     blurb: "物資、指揮架構和演練放在實驗室東側。監測跨過門檻時，這裡要從庫存狀態改成部署狀態，而不是開始寫第一份計畫。",
     source: "新興傳染病暨流感大流行應變整備及邊境檢疫計畫（2022–2027）；韌性防疫安全網資訊基盤計畫（2026–2030）",
-    href: "https://www.cdc.gov.tw/Category/ListPage/Otpn7pDwnMd2UoVG-QEzdw",
+    href: "https://www.cdc.gov.tw/Category/List/CKUj1F_woc-K_eZZ51jcQQ",
+    hrefEn: "https://www.cdc.gov.tw/Category/ListPage/Otpn7pDwnMd2UoVG-QEzdw",
     hrefLabel: "看整備應變專頁",
     items: [
       { id: "ready-stock", name: "防疫物資儲備", phase: "now", hours: [[9, 18]], keywords: ["物資", "防護", "試劑", "效期"], detail: "個人防護設備、檢測試劑和治療藥要有安全存量、效期和調撥順位。過期的儲備等於沒有儲備。" },
@@ -517,8 +521,9 @@ export const islands = [
     kit: "antenna",
     blurb: "境外的疫情情報要在國內出現病例之前進到值勤畫面。這座島放在東北，面向境外；臺灣依國際衛生條例的核心能力自我檢視，並和合作對象交換情資。",
     source: "國際合作與 IHR 國家對口常設業務",
-    href: "https://www.cdc.gov.tw/Category/Page/pLGVAwA60glWsIoMUWKNYA",
-    hrefLabel: "看國際衛生條例對口頁",
+    href: CDC_HOME,
+    hrefEn: "https://www.cdc.gov.tw/Category/Page/pLGVAwA60glWsIoMUWKNYA",
+    hrefLabel: "疾管署首頁（查詢國際衛生條例）",
     items: [
       { id: "global-intel", name: "國際疫情交換", phase: "now", hours: [[9, 21]], keywords: ["情資", "鄰近", "交換", "出國", "旅遊", "入境"], detail: "合作國家和鄰近地區的事件，要進到疫情中心的值勤，而不是停在一份轉寄的電子報。" },
       { id: "global-ihr", name: "核心能力檢視", phase: "now", hours: [[9, 17]], keywords: ["IHR", "核心能力", "對口"], detail: "依國際衛生條例的核心能力自我檢視：偵測、通報、應變和邊境。聯合行動方案寫的也是對照國際工具做自評或外部評核。對口要有名字和班表，不能只有一個信箱。" },

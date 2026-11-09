@@ -208,6 +208,24 @@ export function mount({ scene, islands, flows }) {
     else hud.insertBefore(passportHud, hud.querySelector(".disclaimer-short") || hud.children[1] || null);
   }
 
+  function placeBadge() {
+    const badge = $("badge");
+    const tools = document.querySelector(".tools");
+    const title = $("brand-title");
+    const lang = $("lang-btn");
+    const pop = $("lang-pop");
+    const brand = title?.parentElement;
+    if (!badge || !tools || !title || !lang || !brand) return;
+    const narrow = window.matchMedia("(max-width: 980px)").matches;
+    if (narrow) {
+      tools.prepend(badge);
+      brand.insertBefore(lang, pop || null);
+    } else {
+      title.after(badge);
+      tools.append(lang);
+    }
+  }
+
   function paintPassport(pop) {
     const view = {
       islands: Object.keys(book.islands).length,
@@ -1729,7 +1747,9 @@ export function mount({ scene, islands, flows }) {
   else if (params.get("flow")) selectFlow(params.get("flow"));
   else if (params.get("island")) selectIsland(params.get("island"));
   placePassport();
+  placeBadge();
   window.addEventListener("resize", placePassport);
+  window.addEventListener("resize", placeBadge);
   if (!quiet && !book.welcome && !deepLink) showGuide();
   else paintMission();
 
