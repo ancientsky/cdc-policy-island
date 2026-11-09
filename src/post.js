@@ -7,9 +7,10 @@ import { OutlinePass } from "three/addons/postprocessing/OutlinePass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
+import * as P from "./palette.js";
 
-const WHITE = new THREE.Color(0xffffff);
-const HIDDEN = new THREE.Color(0x1a3c48);
+const WHITE = new THREE.Color(P.pureWhite);
+const HIDDEN = new THREE.Color(P.k1a3c48);
 
 // Vignette is before OutputPass. A later pass would tone-map and encode sRGB again:
 // materials skip both while the render target is not the screen, and OutputPass applies them once.
@@ -140,7 +141,7 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     bloom.radius = 0.5;
   }
 
-  function setOutline(objects, { selected = false, accent = "#ffffff" } = {}) {
+  function setOutline(objects, { selected = false, accent = P.pureWhite } = {}) {
     if (!outline) return;
     outline.selectedObjects = objects;
     outline.edgeGlow = 0.4;

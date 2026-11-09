@@ -2,6 +2,7 @@
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { bindSway } from "./kit.js";
+import * as P from "./palette.js";
 
 // Basin, far ridges, forest and clouds around the 14 islands.
 // World +x is east, +z is south. The default camera sits on +z (theta 0.18,
@@ -13,13 +14,13 @@ import { bindSway } from "./kit.js";
 // above the frame. The three ribbons are the north skyline instead.
 
 const BANDS = [
-  { t: 0, color: 0xb7a888 },
-  { t: 0.22, color: 0x8aab74 },
-  { t: 0.42, color: 0x6e9a66 },
-  { t: 0.66, color: 0x62866c },
-  { t: 1, color: 0x867a62 },
+  { t: 0, color: P.kb7a888 },
+  { t: 0.22, color: P.k8aab74 },
+  { t: 0.42, color: P.k6e9a66 },
+  { t: 0.66, color: P.k62866c },
+  { t: 1, color: P.k867a62 },
 ];
-const ROCK = 0x8a7a64;
+const ROCK = P.k8a7a64;
 
 function mulberry(seed) {
   let s = seed >>> 0;
@@ -45,7 +46,7 @@ function qualityPlan(quality) {
 
 export function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null } = {}) {
   const plan = qualityPlan(quality);
-  const rng = mulberry(0x22e170);
+  const rng = mulberry(2285936); // hash seed
   const noise = new SimplexNoise({ random: rng });
   const meshes = [];
 
@@ -218,15 +219,15 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   }
   const pines = spots.filter((spot) => spot.pine);
   const rounds = spots.filter((spot) => !spot.pine);
-  plant(pineGeo, pines, 0x5c9a70, true);
-  plant(roundGeo, rounds, 0x6a9a58, true);
-  plant(trunkGeo, spots, 0x9a7a58, false);
+  plant(pineGeo, pines, P.k5c9a70, true);
+  plant(roundGeo, rounds, P.k6a9a58, true);
+  plant(trunkGeo, spots, P.k9a7a58, false);
 
   const ridgeMix = [0.3, 0.55, 0.78];
-  const ridgeBase = [new THREE.Color(0x68967a), new THREE.Color(0x7d92a4), new THREE.Color(0x8aa4b4)];
+  const ridgeBase = [new THREE.Color(P.k68967a), new THREE.Color(P.k7d92a4), new THREE.Color(P.k8aa4b4)];
   const ridgeMats = [];
   const haze = new THREE.Color();
-  const nightTint = new THREE.Color(0x24344c);
+  const nightTint = new THREE.Color(P.k24344c);
   // Three skyline ribbons behind the forest. A flat tall wall leaves
   // this 38° frame, and equal heights collapse into one edge. Each
   // crest rises toward the east so the layers stay stacked in the
@@ -275,12 +276,12 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
 
   const cloudGeo = new THREE.IcosahedronGeometry(1, 2);
   const cloudMat = new THREE.MeshBasicMaterial({
-    color: 0xf3f0e8,
+    color: P.kf3f0e8,
     transparent: true,
     opacity: 1,
     depthWrite: false,
   });
-  const cloudBase = new THREE.Color(0xf3f0e8);
+  const cloudBase = new THREE.Color(P.kf3f0e8);
   const cloudCount = 12;
   const puffsPer = 11;
   const clouds = [];
@@ -389,7 +390,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   }
   const lampGeo = new THREE.SphereGeometry(0.16, 6, 5);
   const lampMat = new THREE.MeshBasicMaterial({
-    color: 0xffc27a,
+    color: P.glowLamp,
     transparent: true,
     opacity: 0,
     depthWrite: false,

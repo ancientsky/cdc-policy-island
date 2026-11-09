@@ -26,6 +26,7 @@ import {
   Vector3,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import * as P from "./palette.js";
 
 const WAVES = [
   { dir: [1, 0.3], steep: 0.1, wl: 18, speed: 0.12 },
@@ -170,7 +171,7 @@ export function createLife(scene, { motion, reduced }) {
     const cone = new ConeGeometry(0.6, 4, 24, 1, true);
     cone.translate(0, 2, 0);
     const mat = new MeshBasicMaterial({
-      color: 0xffe1a8,
+      color: P.kffe1a8,
       transparent: true,
       opacity: 0,
       blending: AdditiveBlending,
@@ -234,7 +235,7 @@ export function createLife(scene, { motion, reduced }) {
       0.03, 0.07, 0,
     ], 3));
     wingGeo.computeVertexNormals();
-    wings = new InstancedMesh(wingGeo, new MeshBasicMaterial({ color: 0xf4f1ea, side: DoubleSide }), 20);
+    wings = new InstancedMesh(wingGeo, new MeshBasicMaterial({ color: P.kf4f1ea, side: DoubleSide }), 20);
     wings.userData.kind = "bird";
     wings.frustumCulled = false;
     wings.raycast = () => {};
@@ -242,7 +243,7 @@ export function createLife(scene, { motion, reduced }) {
     scene.add(wings);
 
     wakes = new InstancedMesh(wakeGeometry(), new MeshBasicMaterial({
-      color: 0xd5ebe8,
+      color: P.kd5ebe8,
       transparent: true,
       opacity: 1,
       depthWrite: false,
@@ -264,7 +265,7 @@ export function createLife(scene, { motion, reduced }) {
     smoke = new Points(smokeGeo, new ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uColor: { value: new Color(0xd5d0c6) } },
+      uniforms: { uColor: { value: new Color(P.kd5d0c6) } },
       vertexShader: `
         attribute float aFade;
         varying float vFade;
@@ -396,10 +397,10 @@ export function createLife(scene, { motion, reduced }) {
       flatShading: true,
     });
     const planeGeo = mergeGeometries([
-      paintBox(0.09, 0.07, 0.46, 0, 0.02, 0, 0xf4f7fb),
-      paintBox(0.62, 0.018, 0.12, 0, 0.03, -0.02, 0xd5dde6),
-      paintBox(0.016, 0.1, 0.08, 0, 0.08, 0.18, 0xc45a3a),
-      paintBox(0.2, 0.014, 0.06, 0, 0.05, 0.2, 0xd5dde6),
+      paintBox(0.09, 0.07, 0.46, 0, 0.02, 0, P.kf4f7fb),
+      paintBox(0.62, 0.018, 0.12, 0, 0.03, -0.02, P.kd5dde6),
+      paintBox(0.016, 0.1, 0.08, 0, 0.08, 0.18, P.kc45a3a),
+      paintBox(0.2, 0.014, 0.06, 0, 0.05, 0.2, P.kd5dde6),
     ]);
     planeGeo.computeVertexNormals();
     const planeBody = new Group();
@@ -408,7 +409,7 @@ export function createLife(scene, { motion, reduced }) {
     planeMesh.raycast = () => {};
     const prop = new Mesh(
       new BoxGeometry(0.2, 0.02, 0.02),
-      new MeshStandardMaterial({ color: 0x5c6670, roughness: 0.6, metalness: 0, flatShading: true }),
+      new MeshStandardMaterial({ color: P.c5c6670, roughness: 0.6, metalness: 0, flatShading: true }),
     );
     prop.position.set(0, 0.02, -0.26);
     prop.castShadow = false;
@@ -426,11 +427,11 @@ export function createLife(scene, { motion, reduced }) {
     scene.add(planeRig);
 
     const shipGeo = mergeGeometries([
-      paintBox(0.26, 0.09, 0.78, 0, 0.05, 0, 0x3e6d78),
-      paintBox(0.16, 0.06, 0.16, 0, 0.05, -0.42, 0x3e6d78),
-      paintBox(0.16, 0.12, 0.16, 0, 0.14, 0.22, 0xf4ede0),
-      paintBox(0.18, 0.1, 0.2, 0, 0.13, -0.12, 0xc46a45),
-      paintBox(0.16, 0.08, 0.16, 0, 0.12, 0.02, 0xd7c7a2),
+      paintBox(0.26, 0.09, 0.78, 0, 0.05, 0, P.k3e6d78),
+      paintBox(0.16, 0.06, 0.16, 0, 0.05, -0.42, P.k3e6d78),
+      paintBox(0.16, 0.12, 0.16, 0, 0.14, 0.22, P.wallFace),
+      paintBox(0.18, 0.1, 0.2, 0, 0.13, -0.12, P.kc46a45),
+      paintBox(0.16, 0.08, 0.16, 0, 0.12, 0.02, P.cd7c7a2),
     ]);
     shipGeo.computeVertexNormals();
     const shipMesh = new Mesh(shipGeo, craftMat);
@@ -439,7 +440,7 @@ export function createLife(scene, { motion, reduced }) {
     const shipWake = new Mesh(
       new PlaneGeometry(0.22, 0.7),
       new MeshBasicMaterial({
-        color: 0xd5ebe8,
+        color: P.kd5ebe8,
         transparent: true,
         opacity: 0,
         depthWrite: false,

@@ -35,8 +35,8 @@ const _blobAt = new THREE.Vector3();
 const _proj = new THREE.Vector3();
 const mixA = new THREE.Color();
 const mixB = new THREE.Color();
-const ASLEEP = new THREE.Color(0x8a8f93);
-const ASLEEP_NIGHT = new THREE.Color(0x8a8f93);
+const ASLEEP = new THREE.Color(P.k8a8f93);
+const ASLEEP_NIGHT = new THREE.Color(P.k8a8f93);
 ASLEEP_NIGHT.offsetHSL(0, -1, -0.12);
 const lookTop = new THREE.Color();
 const lookHor = new THREE.Color();
@@ -115,17 +115,17 @@ function groundMap(island) {
   return tex;
 }
 
-// Time-of-day anchors. Colors are 0x numbers so this file stays free of #rrggbb.
+// Time-of-day anchors. Color numbers are imported from palette.js.
 // h:24 matches h:0. Knots at 05:45 and 16:00 are inserted below.
 // hemiI is 70% of the earlier sky fill so the room environment does not stack a second full hemisphere.
 const LOOKS = [
-  { h: 0, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
-  { h: 5, top: 0x2a2440, hor: 0xc98a8a, bot: 0x1a2232, haze: 0x6a5a78, deep: 0x2f8f72, shallow: 0x9ed9c4, foam: 0xb8a0b0, sun: 0xffb59a, hemi: 0x6a5a7a, ground: 0x2a2026, fill: 0x7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.28, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
-  { h: 8.33, top: 0x9fc8e6, hor: 0xfbe3c8, bot: 0xa9d3cf, haze: 0xf6e2c8, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, sun: 0xffd7a8, hemi: 0xfde8d0, ground: 0x8a7a5c, fill: 0x9cc4e8, key: 2.40, fillI: 0.35, hemiI: 0.455, exposure: 1.00, sunPos: new THREE.Vector3(22, 10, 14), stars: 0, night: 0 },
-  { h: 12.5, top: 0x5fb0e0, hor: 0xdff3f6, bot: 0xbfe6e2, haze: 0xd8eef0, deep: 0x368093, shallow: 0x98e7da, foam: 0xffffff, sun: 0xffffff, hemi: 0xe6f4ff, ground: 0xb0a07c, fill: 0xcfe8f5, key: 2.80, fillI: 0.25, hemiI: 0.70, exposure: 0.95, sunPos: new THREE.Vector3(6, 30, 8), stars: 0, night: 0 },
-  { h: 18.67, top: 0x3b2a5c, hor: 0xf39a6b, bot: 0x2a2f4a, haze: 0xe9a07e, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, sun: 0xff9a5c, hemi: 0xd8c8e4, ground: 0x3a2a3a, fill: 0x7a68c0, key: 1.15, fillI: 0.70, hemiI: 0.63, exposure: 1.00, sunPos: new THREE.Vector3(-24, 6, 6), stars: 0.2, night: 0.3 },
-  { h: 22, top: 0x2a3f70, hor: 0x1e3050, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 0.95, night: 1 },
-  { h: 24, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
+  { h: 0, top: P.k2a3f70, hor: P.k1b2a44, bot: P.k070d18, haze: P.k0f1c2e, deep: P.k071a2b, shallow: P.k12384a, foam: P.k3f6680, sun: P.k9fb4e8, hemi: P.k8aafd6, ground: P.k141c26, fill: P.k6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
+  { h: 5, top: P.k2a2440, hor: P.kc98a8a, bot: P.k1a2232, haze: P.k6a5a78, deep: P.k2f8f72, shallow: P.k9ed9c4, foam: P.kb8a0b0, sun: P.kffb59a, hemi: P.k6a5a7a, ground: P.k2a2026, fill: P.k7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.28, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
+  { h: 8.33, top: P.k9fc8e6, hor: P.kfbe3c8, bot: P.ka9d3cf, haze: P.kf6e2c8, deep: P.k2a7f8f, shallow: P.k9edfcf, foam: P.kfff6e6, sun: P.kffd7a8, hemi: P.kfde8d0, ground: P.k8a7a5c, fill: P.k9cc4e8, key: 2.40, fillI: 0.35, hemiI: 0.455, exposure: 1.00, sunPos: new THREE.Vector3(22, 10, 14), stars: 0, night: 0 },
+  { h: 12.5, top: P.k5fb0e0, hor: P.kdff3f6, bot: P.kbfe6e2, haze: P.kd8eef0, deep: P.k368093, shallow: P.k98e7da, foam: P.pureWhite, sun: P.pureWhite, hemi: P.ke6f4ff, ground: P.kb0a07c, fill: P.kcfe8f5, key: 2.80, fillI: 0.25, hemiI: 0.70, exposure: 0.95, sunPos: new THREE.Vector3(6, 30, 8), stars: 0, night: 0 },
+  { h: 18.67, top: P.k3b2a5c, hor: P.kf39a6b, bot: P.k2a2f4a, haze: P.ke9a07e, deep: P.k2a3d66, shallow: P.kd98f6e, foam: P.kffd9b8, sun: P.kff9a5c, hemi: P.kd8c8e4, ground: P.k3a2a3a, fill: P.k7a68c0, key: 1.15, fillI: 0.70, hemiI: 0.63, exposure: 1.00, sunPos: new THREE.Vector3(-24, 6, 6), stars: 0.2, night: 0.3 },
+  { h: 22, top: P.k2a3f70, hor: P.k1e3050, bot: P.k070d18, haze: P.k0f1c2e, deep: P.k071a2b, shallow: P.k12384a, foam: P.k3f6680, sun: P.k9fb4e8, hemi: P.k8aafd6, ground: P.k141c26, fill: P.k6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 0.95, night: 1 },
+  { h: 24, top: P.k2a3f70, hor: P.k1b2a44, bot: P.k070d18, haze: P.k0f1c2e, deep: P.k071a2b, shallow: P.k12384a, foam: P.k3f6680, sun: P.k9fb4e8, hemi: P.k8aafd6, ground: P.k141c26, fill: P.k6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
 ];
 
 function spliceLookKnot(hour) {
@@ -162,8 +162,8 @@ spliceLookKnot(5.75);
 spliceLookKnot(16);
 // 06:00 sits just after 05:45. Hold that knot on mint shallows so the open sea stays lighter and greener than the night blue.
 const dawnSea = LOOKS.find((row) => Math.abs(row.h - 5.75) < 1e-6);
-dawnSea.deep = 0x3fa882;
-dawnSea.shallow = 0xb4e6d2;
+dawnSea.deep = P.k3fa882;
+dawnSea.shallow = P.kb4e6d2;
 
 function norm(s) {
   return String(s ?? "").toLowerCase().replace(/\s+/g, "");
@@ -243,7 +243,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(P.cf7e6cf);
-  scene.fog = new THREE.FogExp2(0xd8eef0, 0.013);
+  scene.fog = new THREE.FogExp2(P.kd8eef0, 0.013);
   const pmrem = new THREE.PMREMGenerator(renderer);
   const room = new RoomEnvironment();
   scene.environment = pmrem.fromScene(room, 0.04).texture;
@@ -311,9 +311,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   labels.domElement.className = "labels";
   canvas.parentElement.appendChild(labels.domElement);
 
-  const hemi = new THREE.HemisphereLight(0xd7efe8, 0x8d7348, 0.72);
+  const hemi = new THREE.HemisphereLight(P.kd7efe8, P.c8d7348, 0.72);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff3df, 1.35);
+  const sun = new THREE.DirectionalLight(P.kfff3df, 1.35);
   sun.position.set(16, 22, 10);
   sun.castShadow = true;
   sun.shadow.mapSize.set(narrowScreen() ? 1024 : 2048, narrowScreen() ? 1024 : 2048);
@@ -326,7 +326,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   sun.shadow.bias = -0.00035;
   sun.shadow.normalBias = 0.02;
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x9ec9cf, 0.28);
+  const fill = new THREE.DirectionalLight(P.k9ec9cf, 0.28);
   fill.position.set(-14, 8, -10);
   scene.add(fill);
 
@@ -337,9 +337,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     uniforms: THREE.UniformsUtils.merge([
       THREE.UniformsLib.fog,
       {
-        deepColor: { value: new THREE.Color(0x1b86a0) },
-        shallowColor: { value: new THREE.Color(0x86e3d4) },
-        foamColor: { value: new THREE.Color(0xffffff) },
+        deepColor: { value: new THREE.Color(P.k1b86a0) },
+        shallowColor: { value: new THREE.Color(P.k86e3d4) },
+        foamColor: { value: new THREE.Color(P.pureWhite) },
         sunDir: { value: skySunDir },
         sunColor: { value: new THREE.Color(P.cffe6bf) },
         sunAmt: { value: 1 },
@@ -475,7 +475,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
   const stars = new THREE.Points(
     new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3)),
-    new THREE.PointsMaterial({ color: 0xfff8ea, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0 }),
+    new THREE.PointsMaterial({ color: P.kfff8ea, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0 }),
   );
   scene.add(stars);
 
@@ -672,9 +672,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     group.scale.setScalar(reduced ? 1 : 0.7);
     scene.add(group);
 
-    const skirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, vertexColors: true });
-    const coastMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, vertexColors: true });
-    const landMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, map: groundMap(island) });
+    const skirtMat = new THREE.MeshStandardMaterial({ color: P.pureWhite, roughness: 0.97, vertexColors: true });
+    const coastMat = new THREE.MeshStandardMaterial({ color: P.pureWhite, roughness: 0.95, vertexColors: true });
+    const landMat = new THREE.MeshStandardMaterial({ color: P.pureWhite, roughness: 0.92, map: groundMap(island) });
     const asleepUniform = { value: 0 };
     landMat.userData.asleep = asleepUniform;
     landMat.customProgramCacheKey = () => "asleep-land";
@@ -1233,7 +1233,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (threat.tool === "shield") {
       const bubble = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.5, 1),
-        new THREE.MeshBasicMaterial({ color: 0xe1992d, transparent: true, opacity: 0.35, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: P.ke1992d, transparent: true, opacity: 0.35, depthWrite: false }),
       );
       bubble.position.y = 0.35;
       fx.add(bubble);
@@ -1276,7 +1276,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     if (threat.tool === "check") {
       gate = new THREE.Mesh(
         new THREE.PlaneGeometry(1.4, 0.9),
-        new THREE.MeshBasicMaterial({ color: 0x0e8a80, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: P.k0e8a80, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false }),
       );
       gate.position.set(threat.halt.x, 0.7, threat.halt.z);
       const towardHome = new THREE.Vector3(threat.home.x - threat.halt.x, 0, threat.home.z - threat.halt.z);
@@ -1421,7 +1421,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     });
     group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 1), bodyMat));
     const spikeGeo = new THREE.ConeGeometry(0.035, 0.09, 5);
-    const spikeMat = new THREE.MeshStandardMaterial({ color: 0xffd0a8, roughness: 0.6, flatShading: true });
+    const spikeMat = new THREE.MeshStandardMaterial({ color: P.kffd0a8, roughness: 0.6, flatShading: true });
     const spikes = new THREE.InstancedMesh(spikeGeo, spikeMat, 12);
     const dummy = new THREE.Object3D();
     const up = new THREE.Vector3(0, 1, 0);
@@ -1487,8 +1487,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const fit = 0.858;
     const s = (n) => n * fit;
     const group = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2630, roughness: 0.62, flatShading: true });
-    const pale = new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.55, flatShading: true });
+    const dark = new THREE.MeshStandardMaterial({ color: P.k2a2630, roughness: 0.62, flatShading: true });
+    const pale = new THREE.MeshStandardMaterial({ color: P.cf2ede2, roughness: 0.55, flatShading: true });
     const darkParts = [];
     const paleParts = [];
     for (let i = 0; i < 5; i += 1) {
@@ -1516,7 +1516,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
     }
     const wingMat = new THREE.MeshStandardMaterial({
-      color: 0xdff3ff,
+      color: P.kdff3ff,
       transparent: true,
       opacity: 0.35,
       roughness: 0.12,
@@ -1560,8 +1560,8 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const roster = [
       { make: () => makeMosquito(), id: "dengue", tool: "clean", rate: 0.046, plate: "plateAedes" },
       { make: () => makeMosquito(), id: "border", tool: "check", rate: 0.04, plate: "plateAedes" },
-      { make: () => makeVirus(0xd2694a), id: "flu", tool: "shield", rate: 0.038, plate: "plateFlu" },
-      { make: () => makeVirus(0x5aa86a), id: "entero", tool: "wash", rate: 0.04, plate: "plateEntero" },
+      { make: () => makeVirus(P.kd2694a), id: "flu", tool: "shield", rate: 0.038, plate: "plateFlu" },
+      { make: () => makeVirus(P.c5aa86a), id: "entero", tool: "wash", rate: 0.04, plate: "plateEntero" },
       { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034, plate: "plateTb" },
     ];
     roster.forEach((spec, index) => {
@@ -1582,7 +1582,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     placeCrews();
   }
 
-  const liftWhite = new THREE.Color(0xffffff);
+  const liftWhite = new THREE.Color(P.pureWhite);
   const toolKey = {
     clean: "toolClean",
     check: "toolCheck",
@@ -1591,14 +1591,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     finish: "toolFinish",
   };
   const sparkColor = {
-    clean: 0x7ec8e0,
-    wash: 0xffffff,
-    shield: 0xe1992d,
-    finish: 0x91bb70,
-    check: 0x0e8a80,
+    clean: P.k7ec8e0,
+    wash: P.pureWhite,
+    shield: P.ke1992d,
+    finish: P.c8ed15a,
+    check: P.k0e8a80,
   };
   const sparkGeo = new THREE.SphereGeometry(0.035, 8, 6);
-  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+  const sparkMat = new THREE.MeshBasicMaterial({ color: P.pureWhite, transparent: true, opacity: 1, depthWrite: false });
   const sparks = new THREE.InstancedMesh(sparkGeo, sparkMat, 16);
   sparks.frustumCulled = false;
   sparks.visible = false;
@@ -1617,7 +1617,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   scene.add(tipObj);
   let hotIndex = -1;
   const isleGeo = new THREE.BoxGeometry(0.05, 0.05, 0.05);
-  const isleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, depthWrite: false });
+  const isleMat = new THREE.MeshBasicMaterial({ color: P.pureWhite, transparent: true, opacity: 1, depthWrite: false });
   const isleBits = new THREE.InstancedMesh(isleGeo, isleMat, 10);
   isleBits.frustumCulled = false;
   isleBits.visible = false;
@@ -2189,7 +2189,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     for (const view of views.values()) {
       const active = view.buildings.some((building) => building.group.visible && hourCovers(building.item.hours, hour));
       const disc = view.glow.material;
-      disc.color.set(night > 0.5 ? 0xffcf8a : view.island.accent);
+      disc.color.set(night > 0.5 ? P.kffcf8a : view.island.accent);
       disc.opacity = active ? 0.12 + night * 0.28 : 0;
       view.glow.visible = disc.opacity > 0.02;
       let islandAwake = false;
@@ -2294,7 +2294,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function burstAt(threat) {
-    sparkMat.color.setHex(sparkColor[threat.tool] || 0xffffff);
+    sparkMat.color.set(sparkColor[threat.tool] || P.pureWhite);
     sparkMat.opacity = 1;
     sparkLife = 0.6;
     sparks.visible = true;
@@ -3582,7 +3582,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     }
     function makeHull(kind) {
       const mat = new THREE.MeshStandardMaterial({
-        color: kind === "plane" ? 0xc5d0d4 : 0xb7c3be,
+        color: kind === "plane" ? P.kc5d0d4 : P.kb7c3be,
         roughness: 0.62,
         flatShading: true,
       });
@@ -3601,7 +3601,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     function makeFlock() {
       const geo = new THREE.ConeGeometry(0.045, 0.18, 5);
       geo.rotateX(Math.PI / 2);
-      const mat = new THREE.MeshStandardMaterial({ color: 0xe4dcc8, roughness: 0.7, flatShading: true });
+      const mat = new THREE.MeshStandardMaterial({ color: P.ke4dcc8, roughness: 0.7, flatShading: true });
       const flock = new THREE.InstancedMesh(geo, mat, 7);
       const dummy = new THREE.Object3D();
       const spots = [[0, 0, 0], [-0.16, 0.02, 0.18], [0.16, 0.02, 0.18], [-0.3, 0, 0.36], [0.3, 0, 0.36], [-0.12, 0.05, 0.34], [0.12, -0.02, 0.32]];
@@ -3638,7 +3638,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const geo = new LineGeometry();
       geo.setPositions(positions);
       const mat = new LineMaterial({
-        color: 0x8d9a96,
+        color: P.k8d9a96,
         linewidth: importWidth(route.cases),
         worldUnits: false,
         dashed: true,
@@ -3676,7 +3676,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       }
       if (spec.birds) {
         lane.craft = makeFlock();
-        lane.germ = makeVirus(0xb7a07a).group;
+        lane.germ = makeVirus(P.kb7a07a).group;
         lane.germ.userData.kind = "import-germ";
         scene.add(lane.craft, lane.germ);
       }
@@ -3742,7 +3742,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       rbox: box,
     };
     const group = new THREE.Group();
-    for (const part of buildingParts(recipeId, 0xffffff)) {
+    for (const part of buildingParts(recipeId, P.pureWhite)) {
       const geo = geos[part.kind];
       if (!geo) continue;
       const mesh = new THREE.Mesh(geo);
@@ -4145,7 +4145,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const count = list.length * 24;
     const geo = new THREE.PlaneGeometry(0.06, 0.22);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
+      color: P.pureWhite,
       side: THREE.DoubleSide,
       transparent: true,
       depthWrite: false,

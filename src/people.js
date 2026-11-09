@@ -891,11 +891,11 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
 function buildPortrait(renderer) {
   const portraitScene = new THREE.Scene();
   portraitScene.background = new THREE.Color(P.cf4efe4);
-  portraitScene.add(new THREE.AmbientLight(0xfff4e8, 0.85));
-  const key = new THREE.DirectionalLight(0xfff7ee, 1.35);
+  portraitScene.add(new THREE.AmbientLight(P.kfff4e8, 0.85));
+  const key = new THREE.DirectionalLight(P.kfff7ee, 1.35);
   key.position.set(-0.4, 1.2, -1.4);
   portraitScene.add(key);
-  const fill = new THREE.DirectionalLight(0xd5e4ea, 0.45);
+  const fill = new THREE.DirectionalLight(P.cdff3ff, 0.45);
   fill.position.set(0.8, 0.6, -0.4);
   portraitScene.add(fill);
   const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 10);
