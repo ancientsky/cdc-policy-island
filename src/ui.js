@@ -132,6 +132,7 @@ export function mount({ scene, islands, flows }) {
   function paintScore() {
     const chip = counter.querySelector("span");
     if (chip) chip.textContent = t("repelCount", { n: game.total });
+    counter.hidden = game.total < 1;
   }
   function showToast(info) {
     toastInfo = info;

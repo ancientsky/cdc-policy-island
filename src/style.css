@@ -1498,7 +1498,12 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     backdrop-filter: blur(20px) saturate(1.7);
     overflow-x: auto;
   }
-  .brand { height: 44px; }
+  .brand {
+    left: calc(min(320px, 42vw) + 8px);
+    height: 44px;
+  }
+  .brand .tools { flex: none; min-width: max-content; overflow: visible; }
+  .brand strong { flex: 1 1 auto; min-width: 0; }
   .caption { display: none; }
 }
 
