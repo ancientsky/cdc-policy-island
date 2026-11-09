@@ -120,7 +120,7 @@ function groundMap(island) {
 // hemiI is 70% of the earlier sky fill so the room environment does not stack a second full hemisphere.
 const LOOKS = [
   { h: 0, top: 0x2a3f70, hor: 0x1b2a44, bot: 0x070d18, haze: 0x0f1c2e, deep: 0x071a2b, shallow: 0x12384a, foam: 0x3f6680, sun: 0x9fb4e8, hemi: 0x8aafd6, ground: 0x141c26, fill: 0x6a80c0, key: 0.45, fillI: 0.30, hemiI: 0.56, exposure: 1.52, sunPos: new THREE.Vector3(-10, 26, -14), stars: 1, night: 1 },
-  { h: 5, top: 0x2a2440, hor: 0xc98a8a, bot: 0x1a2232, haze: 0x6a5a78, deep: 0x1a2f45, shallow: 0x4a6a80, foam: 0xb8a0b0, sun: 0xffb59a, hemi: 0x6a5a7a, ground: 0x2a2026, fill: 0x7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.28, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
+  { h: 5, top: 0x2a2440, hor: 0xc98a8a, bot: 0x1a2232, haze: 0x6a5a78, deep: 0x2f8f72, shallow: 0x9ed9c4, foam: 0xb8a0b0, sun: 0xffb59a, hemi: 0x6a5a7a, ground: 0x2a2026, fill: 0x7a7ab0, key: 0.60, fillI: 0.35, hemiI: 0.28, exposure: 0.95, sunPos: new THREE.Vector3(24, 4, 12), stars: 0.5, night: 0.6 },
   { h: 8.33, top: 0x9fc8e6, hor: 0xfbe3c8, bot: 0xa9d3cf, haze: 0xf6e2c8, deep: 0x2a7f8f, shallow: 0x9edfcf, foam: 0xfff6e6, sun: 0xffd7a8, hemi: 0xfde8d0, ground: 0x8a7a5c, fill: 0x9cc4e8, key: 2.40, fillI: 0.35, hemiI: 0.455, exposure: 1.00, sunPos: new THREE.Vector3(22, 10, 14), stars: 0, night: 0 },
   { h: 12.5, top: 0x5fb0e0, hor: 0xdff3f6, bot: 0xbfe6e2, haze: 0xd8eef0, deep: 0x368093, shallow: 0x98e7da, foam: 0xffffff, sun: 0xffffff, hemi: 0xe6f4ff, ground: 0xb0a07c, fill: 0xcfe8f5, key: 2.80, fillI: 0.25, hemiI: 0.70, exposure: 0.95, sunPos: new THREE.Vector3(6, 30, 8), stars: 0, night: 0 },
   { h: 18.67, top: 0x3b2a5c, hor: 0xf39a6b, bot: 0x2a2f4a, haze: 0xe9a07e, deep: 0x2a3d66, shallow: 0xd98f6e, foam: 0xffd9b8, sun: 0xff9a5c, hemi: 0xd8c8e4, ground: 0x3a2a3a, fill: 0x7a68c0, key: 1.15, fillI: 0.70, hemiI: 0.63, exposure: 1.00, sunPos: new THREE.Vector3(-24, 6, 6), stars: 0.2, night: 0.3 },
@@ -160,6 +160,10 @@ function spliceLookKnot(hour) {
 }
 spliceLookKnot(5.75);
 spliceLookKnot(16);
+// 06:00 sits just after 05:45. Hold that knot on mint shallows so the open sea stays lighter and greener than the night blue.
+const dawnSea = LOOKS.find((row) => Math.abs(row.h - 5.75) < 1e-6);
+dawnSea.deep = 0x3fa882;
+dawnSea.shallow = 0xb4e6d2;
 
 function norm(s) {
   return String(s ?? "").toLowerCase().replace(/\s+/g, "");
