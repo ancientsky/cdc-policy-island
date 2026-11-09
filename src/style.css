@@ -227,7 +227,6 @@ h1, h2, h3 { text-wrap: balance; }
 .title-card h1 { font: 700 40px/1.2 var(--serif); letter-spacing: 0.04em; margin: 0; }
 .title-card p { font: 400 var(--fs-md)/1.7 var(--sans); margin: 8px 0 0; opacity: 0.9; }
 .title-card.gone { opacity: 0; transform: translateY(8px); }
-body.intro .title-card { opacity: 0; }
 
 .rail {
   position: absolute;
@@ -924,9 +923,7 @@ html[data-theme="night"] .pills .btn.on b { color: var(--on-accent); }
   padding: 18px 20px 14px;
   border-radius: 20px;
 }
-.modal-card.step-1, .modal-card.step-3, .modal-card.mode-static { animation: coach-in 240ms cubic-bezier(.2, .8, .2, 1); }
-.modal-card.step-2 { left: auto; right: 392px; top: 50%; bottom: auto; transform: translateY(-50%); }
-.modal-card.step-4 { left: 50%; right: auto; bottom: 88px; transform: translateX(-50%); }
+.modal-card.mode-static { animation: coach-in 240ms cubic-bezier(.2, .8, .2, 1); }
 @keyframes coach-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .modal-card h2 { font: 700 20px/1.35 var(--serif); letter-spacing: 0.02em; }
 #modal-body { font: 400 var(--fs-md)/1.75 var(--sans); margin: 0; color: #24312c; }
@@ -1294,12 +1291,6 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   .tick { width: 16px; min-width: 16px; height: 16px; min-height: 16px; }
   .view-menu { top: calc(64px + env(safe-area-inset-top)); right: 8px; }
   .disclaimer-short { display: none; }
-  body.intro .disclaimer-short {
-    display: block;
-    top: calc(64px + env(safe-area-inset-top));
-    left: 12px;
-    right: 12px;
-  }
   .disclaimer-peek {
     display: block;
     margin: 0 0 2px;
@@ -1396,7 +1387,6 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     max-height: 46dvh;
     z-index: 5;
   }
-  body.intro .dial, body.intro .ledger, body.intro .toggles, body.intro .caption { visibility: hidden; }
   .modal { place-items: end center; background: transparent; pointer-events: none; display: grid; }
   .modal[hidden] { display: none; }
   .modal-card {
@@ -1409,7 +1399,6 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     overflow: auto;
     transform: none;
   }
-  .modal-card.step-2, .modal-card.step-4 { transform: none; }
   .pin b { min-width: 30px; height: 30px; font-size: var(--fs-sm); }
   body.detail .dial, body.detail .ledger, body.detail .toggles, body.detail .caption { display: none; }
   body.detail .sheet {

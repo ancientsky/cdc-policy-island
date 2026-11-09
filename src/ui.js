@@ -161,7 +161,6 @@ export function mount({ scene, islands, flows }) {
   let chapterHold = 0;
   let chapterShown = null;
   let chapterTimer = 0;
-  let introIndex = 0;
   let lastFocus = null;
   const quiet = new URLSearchParams(location.search).has("quiet");
   let book = loadPassport();
@@ -179,6 +178,10 @@ export function mount({ scene, islands, flows }) {
   guide.id = "guide";
   guide.className = "guide";
   guide.hidden = true;
+  guide.setAttribute("role", "dialog");
+  guide.setAttribute("aria-modal", "false");
+  guide.setAttribute("aria-labelledby", "guide-title");
+  guide.setAttribute("aria-describedby", "guide-say");
   guide.innerHTML = `<div class="guide-face" id="guide-face"></div><div class="guide-copy"><b class="guide-title" id="guide-title"></b><p class="guide-say" id="guide-say"></p></div><button type="button" class="btn btn--solid" id="guide-go"></button>`;
   const mission = document.createElement("section");
   mission.id = "mission";
@@ -273,6 +276,8 @@ export function mount({ scene, islands, flows }) {
   }
 
   function showGuide() {
+    const active = document.activeElement;
+    lastFocus = active && active !== document.body ? active : null;
     guide.hidden = false;
     mission.hidden = true;
     paintGuideCopy();
@@ -281,6 +286,13 @@ export function mount({ scene, islands, flows }) {
       titleCard.classList.add("gone");
       titleCard.hidden = true;
     }
+    $("guide-go").focus({ preventScroll: true });
+  }
+
+  function closeGuide() {
+    if (guide.hidden) return;
+    guide.hidden = true;
+    $("help").focus({ preventScroll: true });
   }
 
   function paintMission() {
@@ -348,7 +360,7 @@ export function mount({ scene, islands, flows }) {
     $("modal-reset").hidden = false;
     $("modal-reset").textContent = t("gradReset");
     $("modal-dots").hidden = true;
-    placeCoach(0);
+    placeCoach();
     openModal();
   }
 
@@ -1054,33 +1066,14 @@ export function mount({ scene, islands, flows }) {
     play.setAttribute("aria-pressed", String(state.playing));
   }
 
-  function placeCoach(index) {
+  function placeCoach() {
     const card = modal.querySelector(".modal-card");
-    card.classList.remove("step-1", "step-2", "step-3", "step-4", "mode-static", "mode-grad");
+    card.classList.remove("mode-static", "mode-grad");
     document.querySelectorAll(".head.pulse").forEach((el) => el.classList.remove("pulse"));
-    const mode = modal.dataset.mode;
-    const dots = $("modal-dots");
-    if (mode === "help" || mode === "about" || mode === "grad") {
-      card.classList.add("mode-static");
-      if (mode === "grad") card.classList.add("mode-grad");
-      document.body.classList.remove("intro");
-      dots.hidden = true;
-      measureSafe();
-      return;
-    }
-    card.classList.add(`step-${index + 1}`);
-    document.body.classList.add("intro");
-    dots.hidden = false;
-    if (index === 1) document.querySelector("#tree .head")?.classList.add("pulse");
-    const desktop = window.matchMedia("(min-width: 981px)").matches;
-    if (index === 1 && desktop) ledger.classList.add("open");
-    else ledger.classList.remove("open", "half");
-    syncDrawerButton();
+    card.classList.add("mode-static");
+    if (modal.dataset.mode === "grad") card.classList.add("mode-grad");
+    $("modal-dots").hidden = true;
     measureSafe();
-  }
-
-  function paintDots(index, total) {
-    $("modal-dots").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i === index ? "on" : ""}"></i>`).join("");
   }
 
   function openModal() {
@@ -1092,30 +1085,6 @@ export function mount({ scene, islands, flows }) {
     $("modal-next").focus();
   }
 
-  function showIntro(index) {
-    introIndex = index;
-    modal.dataset.mode = "";
-    const steps = introSteps();
-    const step = steps[index];
-    $("modal-kicker").textContent = `${index + 1} / ${steps.length}`;
-    $("modal-title").textContent = step.title;
-    $("modal-body").textContent = step.body;
-    $("modal-next").textContent = index === steps.length - 1 ? t("guideGo") : t("next");
-    $("modal-skip").textContent = t("skip");
-    $("modal-skip").hidden = index === steps.length - 1;
-    $("modal-reset").hidden = true;
-    paintDots(index, steps.length);
-    placeCoach(index);
-    openModal();
-    if (step.showFlows) {
-      state.flows = true;
-      state.cargo = true;
-      scene.setShowAllFlows(true);
-      scene.setCargo(true);
-      syncToggles();
-    }
-  }
-
   function showAbout() {
     modal.dataset.mode = "about";
     $("modal-kicker").textContent = t("aboutKicker");
@@ -1124,21 +1093,15 @@ export function mount({ scene, islands, flows }) {
     $("modal-next").textContent = t("gotIt");
     $("modal-skip").hidden = true;
     $("modal-reset").hidden = true;
-    placeCoach(0);
+    placeCoach();
     openModal();
   }
 
   function closeModal() {
-    const wasIntro = document.body.classList.contains("intro");
     modal.hidden = true;
     modal.dataset.mode = "";
     $("modal-reset").hidden = true;
-    document.body.classList.remove("intro");
     document.querySelectorAll(".head.pulse").forEach((el) => el.classList.remove("pulse"));
-    if (wasIntro) {
-      ledger.classList.remove("open", "half");
-      syncDrawerButton();
-    }
     sessionStorage.setItem(INTRO_KEY, "1");
     const back = lastFocus && document.contains(lastFocus) ? lastFocus : $("help");
     back.focus();
@@ -1154,7 +1117,7 @@ export function mount({ scene, islands, flows }) {
       $("modal-next").textContent = t("gotIt");
       $("modal-skip").hidden = true;
       $("modal-reset").hidden = true;
-      placeCoach(0);
+      placeCoach();
       return;
     }
     if (modal.dataset.mode === "grad") {
@@ -1163,9 +1126,7 @@ export function mount({ scene, islands, flows }) {
     }
     if (modal.dataset.mode === "about") {
       showAbout();
-      return;
     }
-    showIntro(introIndex);
   }
 
   const cardAt = new Map();
@@ -1418,7 +1379,7 @@ export function mount({ scene, islands, flows }) {
     $("modal-next").textContent = t("gotIt");
     $("modal-skip").hidden = true;
     $("modal-reset").hidden = true;
-    placeCoach(0);
+    placeCoach();
     openModal();
   });
   $("about").addEventListener("click", showAbout);
@@ -1463,16 +1424,9 @@ export function mount({ scene, islands, flows }) {
     }
   });
   $("modal-next").addEventListener("click", () => {
-    if (modal.dataset.mode === "help" || modal.dataset.mode === "about" || modal.dataset.mode === "grad") {
-      const grad = modal.dataset.mode === "grad";
-      closeModal();
-      if (grad) paintMission();
-      return;
-    }
-    if (introIndex >= introSteps().length - 1) {
-      closeModal();
-      selectIsland("border");
-    } else showIntro(introIndex + 1);
+    const grad = modal.dataset.mode === "grad";
+    closeModal();
+    if (grad) paintMission();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "?" || (event.key === "/" && event.shiftKey)) {
@@ -1496,6 +1450,7 @@ export function mount({ scene, islands, flows }) {
         $("filter").setAttribute("aria-expanded", "false");
         setPane(state.tab);
       } else if (!modal.hidden) closeModal();
+      else if (!guide.hidden) closeGuide();
       else if (state.germ) closeGerm();
       else if (state.person) closePerson();
       else if (state.selected) clearSelection();
