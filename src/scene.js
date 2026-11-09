@@ -1426,7 +1426,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const ring = Math.sqrt(Math.max(0, 1 - y * y));
       const ang = i * 2.399;
       const d = new THREE.Vector3(Math.cos(ang) * ring, y, Math.sin(ang) * ring).normalize();
-      dummy.position.copy(d).multiplyScalar(0.2);
+      dummy.position.copy(d).multiplyScalar(0.17);
       dummy.quaternion.setFromUnitVectors(up, d);
       dummy.updateMatrix();
       spikes.setMatrixAt(i, dummy.matrix);
@@ -1437,16 +1437,18 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function makeRod() {
+    // Aligned span was 0.725. 0.883 brings it to 0.64, under 1.5× the shortest house.
+    const fit = 0.883;
     const group = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({ color: P.c8ed15a, roughness: 0.55 });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.32, 4, 12), mat);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.07 * fit, 0.32 * fit, 4, 12), mat);
     body.rotation.x = Math.PI / 2;
     group.add(body);
     const tailMat = new THREE.MeshStandardMaterial({ color: P.ce7f0cf, roughness: 0.45 });
-    const tails = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.005, 0.003, 0.26, 4), tailMat, 4);
+    const tails = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.005 * fit, 0.003 * fit, 0.26 * fit, 4), tailMat, 4);
     const tailDummy = new THREE.Object3D();
     for (let i = 0; i < 4; i += 1) {
-      tailDummy.position.set((i - 1.5) * 0.028, -0.015, 0.3);
+      tailDummy.position.set((i - 1.5) * 0.028 * fit, -0.015 * fit, 0.3 * fit);
       tailDummy.rotation.set(Math.PI / 2, 0, (i - 1.5) * 0.35);
       tailDummy.updateMatrix();
       tails.setMatrixAt(i, tailDummy.matrix);
@@ -1477,30 +1479,33 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   }
 
   function makeMosquito() {
+    // Wings 0.28 and legs 0.16, then 0.858 so the aligned span stays under 0.66.
+    const fit = 0.858;
+    const s = (n) => n * fit;
     const group = new THREE.Group();
     const dark = new THREE.MeshStandardMaterial({ color: 0x2a2630, roughness: 0.62, flatShading: true });
     const pale = new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.55, flatShading: true });
     const darkParts = [];
     const paleParts = [];
     for (let i = 0; i < 5; i += 1) {
-      const seg = new THREE.Mesh(new THREE.SphereGeometry(0.05 - i * 0.005, 8, 6), i % 2 ? pale : dark);
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(s(0.05 - i * 0.005), 8, 6), i % 2 ? pale : dark);
       seg.scale.set(1, 0.7, 1.2);
-      seg.position.z = 0.02 + i * 0.07;
+      seg.position.z = s(0.02 + i * 0.07);
       (i % 2 ? paleParts : darkParts).push(seg);
     }
-    const thorax = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), dark);
-    thorax.position.z = -0.07;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), dark);
-    head.position.z = -0.16;
-    const beak = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 5), dark);
+    const thorax = new THREE.Mesh(new THREE.SphereGeometry(s(0.07), 10, 8), dark);
+    thorax.position.z = s(-0.07);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(s(0.048), 10, 8), dark);
+    head.position.z = s(-0.16);
+    const beak = new THREE.Mesh(new THREE.CylinderGeometry(s(0.008), s(0.008), s(0.16), 5), dark);
     beak.rotation.x = Math.PI / 2;
-    beak.position.set(0, -0.012, -0.28);
+    beak.position.set(0, s(-0.012), s(-0.28));
     darkParts.push(thorax, head, beak);
-    const legGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.22, 5);
+    const legGeo = new THREE.CylinderGeometry(s(0.012), s(0.012), s(0.16), 5);
     for (const side of [-1, 1]) {
       for (let i = 0; i < 3; i += 1) {
         const leg = new THREE.Mesh(legGeo, dark);
-        leg.position.set(side * 0.07, -0.05, -0.08 + i * 0.06);
+        leg.position.set(s(side * 0.07), s(-0.05), s(-0.08 + i * 0.06));
         leg.rotation.z = side * 1.05;
         leg.rotation.x = -0.35 + i * 0.28;
         darkParts.push(leg);
@@ -1515,12 +1520,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const wingL = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.11), wingMat);
-    wingL.position.set(-0.16, 0.07, -0.02);
+    const wingL = new THREE.Mesh(new THREE.PlaneGeometry(s(0.28), s(0.11)), wingMat);
+    wingL.position.set(s(-0.16), s(0.07), s(-0.02));
     wingL.rotation.z = 0.4;
     wingL.rotation.y = 0.25;
     const wingR = wingL.clone();
-    wingR.position.x = 0.16;
+    wingR.position.x = s(0.16);
     wingR.rotation.z = -0.4;
     wingR.rotation.y = -0.25;
     group.add(mergeLocal(darkParts, dark), mergeLocal(paleParts, pale), mergeLocal([wingL, wingR], wingMat));
@@ -3720,6 +3725,102 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     userPhi = cam.phi;
   }
   placeCamera();
+  function houseHeight(recipeId) {
+    const geos = {
+      box,
+      cyl: unitCyl,
+      cone: unitCone,
+      roof: roofGeo,
+      sphere: unitSphere,
+      torus: unitTorus,
+      rbox: box,
+    };
+    const group = new THREE.Group();
+    for (const part of buildingParts(recipeId, 0xffffff)) {
+      const geo = geos[part.kind];
+      if (!geo) continue;
+      const mesh = new THREE.Mesh(geo);
+      mesh.position.set(part.x, part.y, part.z);
+      mesh.scale.set(part.sx, part.sy, part.sz);
+      if (part.rot) mesh.rotation.set(part.rot.x || 0, part.rot.y || 0, part.rot.z || 0);
+      group.add(mesh);
+    }
+    return new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3()).y;
+  }
+
+  function visibleBounds(root) {
+    const box = new THREE.Box3();
+    const v = new THREE.Vector3();
+    const instance = new THREE.Matrix4();
+    root.updateWorldMatrix(true, true);
+    root.traverse((obj) => {
+      if (!obj.isMesh || obj.visible === false) return;
+      const pos = obj.geometry?.getAttribute("position");
+      if (!pos) return;
+      if (obj.isInstancedMesh) {
+        for (let n = 0; n < obj.count; n += 1) {
+          obj.getMatrixAt(n, instance);
+          instance.premultiply(obj.matrixWorld);
+          for (let i = 0; i < pos.count; i += 1) {
+            v.fromBufferAttribute(pos, i).applyMatrix4(instance);
+            box.expandByPoint(v);
+          }
+        }
+      } else {
+        for (let i = 0; i < pos.count; i += 1) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+          box.expandByPoint(v);
+        }
+      }
+    });
+    return box;
+  }
+
+  function projectedRect(box) {
+    const { W, H } = viewSize();
+    const p = new THREE.Vector3();
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) {
+          p.set(x, y, z).project(camera);
+          const sx = (p.x * 0.5 + 0.5) * W;
+          const sy = (-p.y * 0.5 + 0.5) * H;
+          minX = Math.min(minX, sx);
+          maxX = Math.max(maxX, sx);
+          minY = Math.min(minY, sy);
+          maxY = Math.max(maxY, sy);
+        }
+      }
+    }
+    return { w: maxX - minX, h: maxY - minY };
+  }
+
+  function meshScreen(mesh) {
+    const { W, H } = viewSize();
+    const pos = mesh.geometry?.getAttribute("position");
+    if (!pos) return { w: 0, h: 0 };
+    mesh.updateWorldMatrix(true, true);
+    const v = new THREE.Vector3();
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < pos.count; i += 1) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld).project(camera);
+      const sx = (v.x * 0.5 + 0.5) * W;
+      const sy = (-v.y * 0.5 + 0.5) * H;
+      minX = Math.min(minX, sx);
+      maxX = Math.max(maxX, sx);
+      minY = Math.min(minY, sy);
+      maxY = Math.max(maxY, sy);
+    }
+    return { w: maxX - minX, h: maxY - minY };
+  }
+
   if (import.meta.env.DEV) {
     window.__island = Object.assign(window.__island ?? {}, {
       stats: () => {
@@ -3768,6 +3869,36 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           ambient: people.counts().ambient,
           peopleDraws: people.counts().draws,
           peopleBounds: people.bounds(),
+          cam: {
+            radius: cam.radius,
+            flight: Boolean(flight),
+            introMs: introAt ? performance.now() - introAt : -1,
+          },
+          threatSpans: threats.map((threat) => {
+            const box = visibleBounds(threat.mesh);
+            const size = box.getSize(new THREE.Vector3());
+            const screen = projectedRect(box);
+            const rot = threat.mesh.rotation.clone();
+            threat.mesh.rotation.set(0, 0, 0);
+            const local = visibleBounds(threat.mesh).getSize(new THREE.Vector3());
+            threat.mesh.rotation.copy(rot);
+            threat.mesh.updateWorldMatrix(true, true);
+            return {
+              id: threat.islandId,
+              scale: threat.mesh.scale.x,
+              x: size.x,
+              y: size.y,
+              z: size.z,
+              edge: Math.max(size.x, size.y, size.z),
+              localEdge: Math.max(local.x, local.y, local.z),
+              screenW: screen.w,
+              screenH: screen.h,
+            };
+          }),
+          islandHex: [...views.values()].map((view) => {
+            const screen = meshScreen(view.coast);
+            return { id: view.island.id, w: screen.w, h: screen.h };
+          }),
         };
       },
       personProbe: (index) => {
@@ -4186,6 +4317,29 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         }
       }
       if (threats.length !== 5) errors.push(`expected 5 threats, saw ${threats.length}`);
+      let minHouse = Infinity;
+      const seenRecipe = new Set();
+      for (const view of views.values()) {
+        for (const building of view.buildings) {
+          if (seenRecipe.has(building.recipe)) continue;
+          seenRecipe.add(building.recipe);
+          minHouse = Math.min(minHouse, houseHeight(building.recipe));
+        }
+      }
+      for (const threat of threats) {
+        const rot = threat.mesh.rotation.clone();
+        threat.mesh.rotation.set(0, 0, 0);
+        let edge = 0;
+        try {
+          const size = visibleBounds(threat.mesh).getSize(new THREE.Vector3());
+          edge = Math.max(size.x, size.y, size.z);
+        } finally {
+          threat.mesh.rotation.copy(rot);
+          threat.mesh.updateWorldMatrix(true, true);
+        }
+        const limit = minHouse * 1.5;
+        if (edge > limit + 0.001) errors.push(`threat ${threat.islandId} spans ${edge.toFixed(3)} over ${limit.toFixed(3)}`);
+      }
       if (plateMarks.length !== 5) errors.push(`expected 5 nameplates, saw ${plateMarks.length}`);
       for (const threat of threats) {
         const radius = threat.hit?.geometry?.parameters?.radius ?? 0;
