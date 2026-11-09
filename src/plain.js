@@ -2,11 +2,6 @@
 // details stay in data.js and in the i18n body. Years in this file are CE.
 
 const act = (label, detail = "") => ({ icon: "check", label, detail, href: null });
-const tel = (label, detail) => ({ icon: "phone", label, detail, href: "tel:1922" });
-
-const zhHot = tel("撥打 1922 防疫專線", "免付費、全年無休。也可撥 0800-001922。");
-const enHot = tel("Call the 1922 health line", "Toll-free, every day of the year. You can also call 0800-001922.");
-const jaHot = tel("1922 に電話します", "無料で、年中無休です。0800-001922 でもかけられます。");
 
 export const plain = {
   zh: {
@@ -86,6 +81,66 @@ export const plain = {
       "global-people": "防疫人員會去上課，也會教別的地方的同事。人認識人，比臨時開會更可靠。",
       "global-say": "對大家說的數字，和告訴其他國家的，是同一套。兩套數字，家裡的人會先發現。",
     },
+    kidName: {
+      "watch-notify": "醫生要回報",
+      "watch-duty": "晚上也有人值班",
+      "watch-signal": "急診和污水的線索",
+      "watch-level": "這一週的風險",
+      "border-port": "機場和港口把關",
+      "border-travel": "說出旅遊史",
+      "border-surge": "人夠、隊伍排得開",
+      "border-vector": "檢查飛機和船上的蚊子",
+      "lab-net": "誰來驗這支檢體",
+      "lab-seq": "讀出病毒的基因",
+      "lab-biosafety": "安全地研究危險病菌",
+      "lab-campus": "新的防疫大樓",
+      "vax-routine": "寶寶按時打的針",
+      "vax-season": "每年的流感疫苗",
+      "vax-cold": "一路冰著送到手臂",
+      "vax-fund": "買疫苗的那筆錢",
+      "vax-industry": "自己做出疫苗",
+      "flu-severe": "誰病得很重",
+      "flu-drug": "流感的藥",
+      "flu-cluster": "安養中心一起咳嗽",
+      "flu-novel": "新病毒的練習劇本",
+      "entero-sign": "變嚴重的前兆",
+      "entero-school": "學校的請假人數",
+      "entero-hand": "用肥皂洗手",
+      "entero-term": "開學的三件事",
+      "dengue-source": "倒掉積水",
+      "dengue-index": "這一區有多少蚊子",
+      "dengue-crew": "里長和清潔隊出動",
+      "dengue-routine": "倒積水變成每天的習慣",
+      "tb-find": "找出一起住的人",
+      "tb-dots": "每天陪著把藥吃完",
+      "tb-ltbi": "還沒咳嗽也先吃藥",
+      "tb-2035": "讓結核病變少",
+      "hiv-test": "可以不留名字的檢查",
+      "hiv-prep": "先吃藥來預防",
+      "hiv-treat": "每天吃藥、病毒變少",
+      "hiv-2030": "不要取笑生病的人",
+      "hepa-b": "寶寶的 B 肝疫苗",
+      "hepa-c": "C 肝的口服藥",
+      "hepa-screen": "大人也要抽血",
+      "hepa-follow": "好了也要再檢查",
+      "ipc-hospital": "醫院裡的隔離",
+      "ipc-ltc": "安養中心分開照顧",
+      "ipc-hand": "看病前後洗手",
+      "ipc-route": "少見病菌走哪條路",
+      "amr-steward": "少開不必要的抗生素",
+      "amr-watch": "細菌怕不怕這帖藥",
+      "amr-animal": "農場的藥也算",
+      "amr-joint": "醫院和農場坐同一桌",
+      "ready-stock": "先把口罩和藥存好",
+      "ready-command": "誰做什麼先寫好",
+      "ready-beds": "病床先說好",
+      "ready-drill": "假裝疫情來練習",
+      "ready-info": "防疫用的電腦和資料",
+      "global-intel": "和其他國家交換消息",
+      "global-ihr": "有名字的聯絡人",
+      "global-people": "一起訓練防疫的人",
+      "global-say": "對大家說的是同一件事",
+    },
     fact: {
       watch: "科學家可以從城市下水道的污水裡驗出病毒，常常比病人去看醫生還早發現疫情！",
       border: "「檢疫」的英文 quarantine 來自義大利文的「40 天」。幾百年前，從疫區來的船要在港外等 40 天才能上岸。",
@@ -105,7 +160,7 @@ export const plain = {
     actions: {
       watch: [
         act("看醫生時說實話：告訴醫生你最近去過哪裡、跟誰在一起。"),
-        zhHot,
+
       ],
       border: [
         act("出國回來如果發燒或拉肚子，入境時主動告訴機場檢疫人員。"),
@@ -115,7 +170,7 @@ export const plain = {
       ],
       lab: [
         act("醫護人員請你採檢（例如用棉棒刷鼻子）時，忍耐幾秒鐘，偵探就有線索了。"),
-        zhHot,
+
       ],
       vax: [
         act("翻翻你的兒童健康手冊，看看該打的疫苗是不是都打齊了。"),
@@ -137,7 +192,7 @@ export const plain = {
         act("下雨後幫忙「巡、倒、清、刷」：花盆底盤、瓶罐、廢輪胎的積水都倒掉。"),
         act("穿淺色長袖，再加上含 DEET、Picaridin 或 IR3535 的防蚊液。"),
         act("發燒、頭痛、後眼窩痛就去看醫生，並主動告訴旅遊史。"),
-        zhHot,
+
       ],
       tb: [
         act("咳嗽超過兩週，要請大人帶你去看醫生。"),
@@ -156,7 +211,7 @@ export const plain = {
       ],
       ipc: [
         act("去醫院探病，進出病房都要洗手；自己感冒時就先別去探病。"),
-        zhHot,
+
       ],
       amr: [
         act("醫生開的抗生素要照指示吃完，不要自己停藥，也不要把剩下的藥給別人吃。"),
@@ -164,11 +219,11 @@ export const plain = {
       ],
       ready: [
         act("跟家人一起準備「防疫小包」：口罩、體溫計和常用藥。"),
-        zhHot,
+
       ],
       global: [
         act("出國前查查目的地有沒有傳染病，需要的話先打疫苗。"),
-        zhHot,
+
       ],
     },
     flow: {
@@ -269,6 +324,66 @@ export const plain = {
       "global-people": "Prevention workers go to class, and they teach colleagues from other places. People who know each other last longer than a last-minute meeting.",
       "global-say": "The numbers told to the public and the numbers told to other countries are the same set. Two different sets would be spotted first at home.",
     },
+    kidName: {
+      "watch-notify": "Doctors report it",
+      "watch-duty": "Someone is on duty at night",
+      "watch-signal": "Clues from clinics and sewers",
+      "watch-level": "This week's risk",
+      "border-port": "The airport and port gate",
+      "border-travel": "Say where you traveled",
+      "border-surge": "Enough people on the line",
+      "border-vector": "Mosquitoes on planes and ships",
+      "lab-net": "Who tests this sample",
+      "lab-seq": "Read the virus genes",
+      "lab-biosafety": "Study dangerous germs safely",
+      "lab-campus": "The new prevention building",
+      "vax-routine": "Shots on the baby schedule",
+      "vax-season": "The yearly flu shot",
+      "vax-cold": "Kept cold all the way",
+      "vax-fund": "The money that buys vaccines",
+      "vax-industry": "Making vaccines here",
+      "flu-severe": "Who gets very sick",
+      "flu-drug": "Flu medicine",
+      "flu-cluster": "A home full of coughs",
+      "flu-novel": "A script for a new virus",
+      "entero-sign": "Signs it is getting worse",
+      "entero-school": "Absences at school",
+      "entero-hand": "Soap and water",
+      "entero-term": "Three jobs at term start",
+      "dengue-source": "Dump the standing water",
+      "dengue-index": "How many mosquitoes",
+      "dengue-crew": "Neighbors and cleanup crews",
+      "dengue-routine": "Dumping water every week",
+      "tb-find": "Find people who were close",
+      "tb-dots": "Stay until the pill is swallowed",
+      "tb-ltbi": "Medicine before the cough",
+      "tb-2035": "Make tuberculosis rare",
+      "hiv-test": "A test without your name",
+      "hiv-prep": "Medicine before exposure",
+      "hiv-treat": "Daily medicine, less virus",
+      "hiv-2030": "No teasing, no shunning",
+      "hepa-b": "The baby's hepatitis B shot",
+      "hepa-c": "Pills for hepatitis C",
+      "hepa-screen": "Adults get a blood test too",
+      "hepa-follow": "Check again after you are well",
+      "ipc-hospital": "A room apart in the hospital",
+      "ipc-ltc": "Care homes keep people apart",
+      "ipc-hand": "Wash before and after",
+      "ipc-route": "Which door a rare germ uses",
+      "amr-steward": "Fewer unnecessary antibiotics",
+      "amr-watch": "Does this drug still work",
+      "amr-animal": "Farm medicine counts too",
+      "amr-joint": "Hospital and farm, one table",
+      "ready-stock": "Masks and medicine stored first",
+      "ready-command": "Who does what, written down",
+      "ready-beds": "Beds promised ahead of time",
+      "ready-drill": "Practice a pretend outbreak",
+      "ready-info": "The computers for the reports",
+      "global-intel": "Trade news with other countries",
+      "global-ihr": "A person with a name on duty",
+      "global-people": "Train together",
+      "global-say": "One set of numbers",
+    },
     fact: {
       watch: "People can find germs in city sewer water. That can happen before sick people see a doctor.",
       border: "The English word quarantine comes from an Italian phrase for 40 days. Centuries ago, a ship from a plague port waited 40 days out on the water before anyone landed.",
@@ -288,7 +403,7 @@ export const plain = {
     actions: {
       watch: [
         act("Tell the truth at the clinic: where you went lately, and who you were with."),
-        enHot,
+
       ],
       border: [
         act("If you come home with a fever or a bad stomach, tell the airport staff."),
@@ -298,7 +413,7 @@ export const plain = {
       ],
       lab: [
         act("When a nurse asks for a sample, such as a swab in your nose, hold still for a few seconds. That gives the detectives a clue."),
-        enHot,
+
       ],
       vax: [
         act("Open your child health handbook and see whether the vaccines are all there."),
@@ -320,7 +435,7 @@ export const plain = {
         act("After rain, help inspect, empty, clear, and scrub. Pour out water in saucers, bottles, and old tires."),
         act("Wear light long sleeves. Use bug spray. The label may say DEET."),
         act("Fever, headache, or pain behind the eyes means see a doctor, and say where you traveled."),
-        enHot,
+
       ],
       tb: [
         act("A cough that lasts more than two weeks means an adult should take you to a doctor."),
@@ -339,7 +454,7 @@ export const plain = {
       ],
       ipc: [
         act("Wash your hands when you enter and leave a hospital room. If you have a cold, skip the visit."),
-        enHot,
+
       ],
       amr: [
         act("Finish an antibiotic the way the doctor said. Do not stop early, and do not give the leftover pills to someone else."),
@@ -347,11 +462,11 @@ export const plain = {
       ],
       ready: [
         act("With your family, pack a small kit. Put in masks, a heat checker, and pills you already use."),
-        enHot,
+
       ],
       global: [
         act("Before a trip, check if that place has an outbreak. Get a shot if you need one."),
-        enHot,
+
       ],
     },
     flow: {
@@ -452,6 +567,66 @@ export const plain = {
       "global-people": "防疫の人は勉強しに行き、他の土地の仲間にも教えます。顔なじみは、急な会議より長持ちします。",
       "global-say": "みんなに話す数字と、他の国に話す数字は、同じ一組です。二つあると、まず家の人が気づきます。",
     },
+    kidName: {
+      "watch-notify": "医者が知らせる",
+      "watch-duty": "夜も当番がいる",
+      "watch-signal": "急診と下水の手がかり",
+      "watch-level": "今週の危険",
+      "border-port": "空港と港の門",
+      "border-travel": "旅行先を話す",
+      "border-surge": "人が足りて列が伸びる",
+      "border-vector": "飛行機と船の蚊",
+      "lab-net": "この検体はだれが調べる",
+      "lab-seq": "ウイルスの遺伝子を読む",
+      "lab-biosafety": "危ない菌を安全に調べる",
+      "lab-campus": "新しい防疫のビル",
+      "vax-routine": "赤ちゃんの決まった注射",
+      "vax-season": "毎年のインフルエンザワクチン",
+      "vax-cold": "冷たいまま腕まで",
+      "vax-fund": "ワクチンを買うお金",
+      "vax-industry": "ここでワクチンを作る",
+      "flu-severe": "だれが重症か",
+      "flu-drug": "インフルエンザの薬",
+      "flu-cluster": "施設でいっしょにせき",
+      "flu-novel": "新しいウイルスの練習",
+      "entero-sign": "重症になる前ぶれ",
+      "entero-school": "学校の欠席",
+      "entero-hand": "石けんで手を洗う",
+      "entero-term": "学期はじめの三つの仕事",
+      "dengue-source": "水たまりを捨てる",
+      "dengue-index": "この地域の蚊の数",
+      "dengue-crew": "町と清掃の人",
+      "dengue-routine": "水を捨てるのが毎日の習慣",
+      "tb-find": "近くにいた人を探す",
+      "tb-dots": "飲み込むまでそばにいる",
+      "tb-ltbi": "せきの前に薬",
+      "tb-2035": "結核を少なくする",
+      "hiv-test": "名前を残さない検査",
+      "hiv-prep": "かかる前の予防の薬",
+      "hiv-treat": "毎日の薬でウイルスを減らす",
+      "hiv-2030": "からかわない、のけ者にしない",
+      "hepa-b": "赤ちゃんのB型肝炎ワクチン",
+      "hepa-c": "C型肝炎ののみ薬",
+      "hepa-screen": "大人も血液検査",
+      "hepa-follow": "治ったあとも検査",
+      "ipc-hospital": "病院の離れた部屋",
+      "ipc-ltc": "施設で分けて世話する",
+      "ipc-hand": "触る前後に手を洗う",
+      "ipc-route": "珍しい菌が通る道",
+      "amr-steward": "要らない抗生物質を減らす",
+      "amr-watch": "この薬はまだ効くか",
+      "amr-animal": "農場の薬も数える",
+      "amr-joint": "病院と農場が同じテーブル",
+      "ready-stock": "マスクと薬を先にしまう",
+      "ready-command": "だれが何をするか書いておく",
+      "ready-beds": "ベッドを先に約束する",
+      "ready-drill": "流行のふりをして練習",
+      "ready-info": "報告のためのコンピュータ",
+      "global-intel": "他の国と知らせを交換",
+      "global-ihr": "名前のある連絡係",
+      "global-people": "いっしょに勉強する",
+      "global-say": "数字は一組だけ",
+    },
     fact: {
       watch: "科学者は、街の下水道の汚水からウイルスを見つけることがあります。患者さんがお医者さんに行くより早く、流行に気づくこともあるのです。",
       border: "「検疫」の英語 quarantine は、イタリア語の「40日」から来ています。何百年も前、疫地から来た船は、港の外で40日待ってから上陸しました。",
@@ -471,7 +646,7 @@ export const plain = {
     actions: {
       watch: [
         act("受診のときは本当のことを話します。最近どこへ行き、だれと一緒にいたかを伝えます。"),
-        jaHot,
+
       ],
       border: [
         act("外国から戻って熱や下痢があれば、入国のとき空港の検疫の人に自分から話します。"),
@@ -481,7 +656,7 @@ export const plain = {
       ],
       lab: [
         act("医療者が検体をお願いしたとき（たとえば鼻を綿棒でぬぐうとき）は、数秒がまんします。たんていの手がかりになります。"),
-        jaHot,
+
       ],
       vax: [
         act("子どもの健康手帳を開いて、打つワクチンがそろっているか見ます。"),
@@ -503,7 +678,7 @@ export const plain = {
         act("雨のあと「見て、捨てて、片付けて、こする」を手伝います。受け皿、瓶、古タイヤの水を捨てます。"),
         act("薄い色の長袖を着て、DEET、ピカリジン、または IR3535 の入った虫よけを使います。"),
         act("熱、頭痛、眼の奥の痛みがあれば受診し、旅行先を自分から話します。"),
-        jaHot,
+
       ],
       tb: [
         act("せきが二週間を超えたら、大人に頼んでお医者さんへ行きます。"),
@@ -522,7 +697,7 @@ export const plain = {
       ],
       ipc: [
         act("お見舞いで病室に入るときと出るときに手を洗います。自分がかぜのときは、お見舞いを控えます。"),
-        jaHot,
+
       ],
       amr: [
         act("医師の出した抗生物質は、指示どおり飲み切ります。自分でやめたり、残った薬を他の人に渡したりしません。"),
@@ -530,11 +705,11 @@ export const plain = {
       ],
       ready: [
         act("家族で「防疫の小さな袋」を用意します。マスク、体温計、ふだんの薬です。"),
-        jaHot,
+
       ],
       global: [
         act("出国の前に、行き先に感染症があるか調べ、必要なら先にワクチンを打ちます。"),
-        jaHot,
+
       ],
     },
     flow: {
@@ -565,7 +740,10 @@ export function applyPlain(islands, flows, pack) {
     island.blurbKid = pack.blurbKid[island.id];
     island.fact = pack.fact[island.id];
     island.actions = (pack.actions[island.id] ?? []).map((row) => ({ ...row }));
-    for (const item of island.items) item.kid = pack.item[item.id];
+    for (const item of island.items) {
+      item.kid = pack.item[item.id];
+      item.kidName = pack.kidName[item.id];
+    }
   }
   for (const flow of flows) {
     const row = pack.flow[flow.id];

@@ -77,7 +77,10 @@ function countWord(value, word) {
 const rows = [];
 for (const island of islands) rows.push({ id: `${island.id}.blurbKid`, kind: "blurb", text: island.blurbKid });
 for (const island of islands) {
-  for (const item of island.items) rows.push({ id: item.id, kind: "item", text: item.kid });
+  for (const item of island.items) {
+    rows.push({ id: item.id, kind: "item", text: item.kid });
+    rows.push({ id: `${item.id}.kidName`, kind: "name", text: item.kidName ?? "" });
+  }
 }
 for (const flow of flows) {
   rows.push({ id: `${flow.id}.kidTitle`, kind: "flow", text: flow.kidTitle });
@@ -88,13 +91,16 @@ const exempt = new Set(Object.values(mandated));
 const failures = [];
 let notBlurb = 0;
 let notAll = 0;
+let notRather = 0;
 let rocHits = 0;
 const bannedHits = [];
 const over = [];
 
 for (const row of rows) {
   const text = row.text ?? "";
+  if (row.kind === "name" && !text) failures.push(`${row.id} missing kidName`);
   notAll += countWord(text, "不是");
+  notRather += countWord(text, "而不是");
   if (row.kind === "blurb") {
     notBlurb += countWord(text, "不是");
     const first = firstSentence(text);
@@ -148,6 +154,7 @@ if (!borderBlurb.includes("四面環海")) failures.push("border adult blurb los
 console.log(`islands ${islands.length}  items ${rows.filter((row) => row.kind === "item").length}  flows ${flows.length}`);
 console.log(`blurbKid 不是 ${notBlurb}`);
 console.log(`kid-layer 不是 ${notAll}`);
+console.log(`kid-layer 而不是 ${notRather}`);
 console.log(`ROC /1[01]\\d\\s?年/ ${rocHits}`);
 console.log(`banned ${bannedHits.length}`);
 console.log(`paragraph > 60 (mandated exempt) ${over.length}`);

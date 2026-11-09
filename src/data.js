@@ -279,7 +279,7 @@ export const islands = [
       { id: "lab-net", name: "全國檢驗分工", phase: "now", hours: [[9, 18]], keywords: ["檢驗", "參考實驗室", "合約"], detail: "一般檢體在地做，特殊病原送參考實驗室。分工要寫得出哪一種病原、哪一級實驗室。" },
       { id: "lab-seq", name: "基因體定序", phase: "mid", hours: [[0, 8], [18, 24]], keywords: ["定序", "基因體", "流感", "新冠"], detail: "流感、新冠、腸病毒和其他病原的流行株要定得出來。網絡計畫走到 2030，定序是中程要站穩的量能，不是一次性專案。" },
       { id: "lab-biosafety", name: "生物安全與保全", phase: "now", hours: [[9, 18]], keywords: ["生物安全", "病原", "庫存"], detail: "高風險病原的操作、庫存和人員管制依生物安全等級管理。量能變大時，這套制度要一起變大。" },
-      { id: "lab-campus", name: "防疫中心興建", phase: "far", hours: [[9, 17]], keywords: ["防疫中心", "高防護實驗室", "2032"], detail: "行政院 115 年 3 月第二次修正。工期自 110 年至 121 年，也就是 2021 到 2032。國家衛生指揮中心、國家級實驗室和行政部門收進昆陽基地的同一棟，含高防護實驗室。房子要到 2032 才收，不是 2027。房子本身不是防疫。" },
+      { id: "lab-campus", name: "防疫中心興建", phase: "far", hours: [[9, 17]], keywords: ["防疫中心", "高防護實驗室", "2032"], detail: "行政院 2026 年（民國 115 年）3 月第二次修正。工期自 2021 年（民國 110 年）至 2032 年（民國 121 年），也就是 2021 到 2032。國家衛生指揮中心、國家級實驗室和行政部門收進昆陽基地的同一棟，含高防護實驗室。房子要到 2032 才收，不是 2027。房子本身不是防疫。" },
     ],
   },
   {
@@ -302,7 +302,7 @@ export const islands = [
       { id: "vax-season", name: "季節流感與新冠", phase: "now", hours: [[8, 20]], keywords: ["流感疫苗", "新冠", "長者", "高風險"], detail: "每季開打，高風險與長者優先，為了減少重症和死亡。開打日不是終點，庫存和接種率才是。" },
       { id: "vax-cold", name: "冷鏈與調撥", phase: "now", hours: [[6, 18]], keywords: ["冷鏈", "封緘", "衛生局", "庫存"], detail: "從封緘、冷儲到縣市衛生局，溫度和庫存要看得到，縣市之間調得動。" },
       { id: "vax-fund", name: "基金長得住", phase: "far", hours: [[9, 17]], keywords: ["疫苗基金", "財源", "緊急採購"], detail: "第四期的正式名稱是充實國家疫苗基金及促進國民免疫力計畫，收到 2028。長期要留下的是財源和緊急採購。這一條是買、送、打，和產業計畫不是同一份。" },
-      { id: "vax-industry", name: "疫苗產業韌性", phase: "mid", hours: [[9, 17]], keywords: ["疫苗產業", "預購協議", "研發", "115"], detail: "這是基金以外的另一份計畫，自 115 年 1 月 1 日至 119 年 12 月 31 日，衛生福利部與經濟部一起做。工作是大流行疫苗的準備與預購、研發、國內供應的韌性，以及產業的國際連結。基金負責買得到；這一項負責做得出來、急時擴得開。" },
+      { id: "vax-industry", name: "疫苗產業韌性", phase: "mid", hours: [[9, 17]], keywords: ["疫苗產業", "預購協議", "研發", "115"], detail: "這是基金以外的另一份計畫，自 2026 年（民國 115 年）1 月 1 日至 2030 年（民國 119 年）12 月 31 日，衛生福利部與經濟部一起做。工作是大流行疫苗的準備與預購、研發、國內供應的韌性，以及產業的國際連結。基金負責買得到；這一項負責做得出來、急時擴得開。" },
     ],
   },
   {
@@ -413,7 +413,7 @@ export const islands = [
       { id: "hiv-test", name: "擴大篩檢", phase: "now", hours: [[12, 20]], keywords: ["匿名", "自我篩檢", "篩檢", "保險套", "PrEP"], detail: "匿名篩檢、自我篩檢，以及就醫時提供的檢驗，是為了找出還不知道自己感染的人。" },
       { id: "hiv-prep", name: "暴露前預防", phase: "now", hours: [[9, 17]], keywords: ["PrEP", "暴露前"], detail: "對有感染風險的人提供 PrEP 和定期追蹤。它是治療以外的預防，不是取代保險套或篩檢。" },
       { id: "hiv-treat", name: "治療即預防", phase: "now", hours: [[9, 17]], keywords: ["U=U", "病毒量", "治療"], detail: "確診後儘速治療、病毒量測不到，才能降低再傳染。慢下來的那一截通常不是藥物，是銜接。" },
-      { id: "hiv-2030", name: "2030 之前的覆蓋", phase: "mid", hours: [[9, 17]], keywords: ["2030", "污名", "覆蓋率"], detail: "第一期在 2026 年結束，2030 仍是目標，不是已經消除。114 年的檢討仍寫著有人不知道自己感染、延遲診斷還在。污名若還在，最需要進來的人不會出現在統計裡。" },
+      { id: "hiv-2030", name: "2030 之前的覆蓋", phase: "mid", hours: [[9, 17]], keywords: ["2030", "污名", "覆蓋率"], detail: "第一期在 2026 年結束，2030 仍是目標，不是已經消除。2025 年（民國 114 年）的檢討仍寫著有人不知道自己感染、延遲診斷還在。污名若還在，最需要進來的人不會出現在統計裡。" },
     ],
   },
   {
@@ -473,7 +473,7 @@ export const islands = [
     accent: "#7a6eb8",
     kit: "rings",
     blurb: "抗藥性不在單一科室裡。人醫、動物和環境都有一份，所以這座島離岸，用橋接回實驗室和醫院，而不是蓋在醫院屋頂上。",
-    source: "國家級防疫一體抗生素抗藥性管理行動計畫（2025–2029，115 年 3 月修訂）；行政院國家防疫一體聯合行動方案（2026–2030）",
+    source: "國家級防疫一體抗生素抗藥性管理行動計畫（2025–2029，2026 年（民國 115 年）3 月修訂）；行政院國家防疫一體聯合行動方案（2026–2030）",
     href: "https://www.cdc.gov.tw/Category/List/m6WabdS8tHTXcOkBGtlaew",
     hrefEn: "https://www.cdc.gov.tw/Category/Page/J63NmsvevBg2u3I2qYBenw",
     hrefLabel: "看抗藥性監視專頁",
@@ -481,7 +481,7 @@ export const islands = [
       { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院", "消炎藥"], detail: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
       { id: "amr-watch", name: "抗藥性監視", phase: "now", hours: [[9, 18]], keywords: ["抗藥性", "菌株", "THAS"], detail: "臨床分離株的抗藥性比例，按菌種回饋給醫院。沒有持續上傳的藥物敏感性，行動計畫只剩百分比的空格。" },
       { id: "amr-animal", name: "動物與環境", phase: "near", hours: [[9, 17]], keywords: ["One Health", "動物", "環境"], detail: "與農業、環境部門對齊動物用藥和環境中的抗藥性。近期要做的是把人醫以外的資料接進來。" },
-      { id: "amr-joint", name: "同一張跨部會的桌子", phase: "mid", hours: [[9, 17]], keywords: ["政策會報", "聯合行動", "2029", "自評"], detail: "行政院於 114 年 4 月 30 日核定國家防疫一體政策會報。聯合行動方案涵蓋 115 年至 119 年，把人醫、動物、食品和環境放在同一張桌子，範圍比抗藥性大。抗藥性行動計畫是其中的抗藥性切片，收到 2029，115 年 3 月修訂過。核心能力仍是對照國際工具做自評或外部評核。" },
+      { id: "amr-joint", name: "同一張跨部會的桌子", phase: "mid", hours: [[9, 17]], keywords: ["政策會報", "聯合行動", "2029", "自評"], detail: "行政院於 2025 年（民國 114 年）4 月 30 日核定國家防疫一體政策會報。聯合行動方案涵蓋 2026 年（民國 115 年）至 2030 年（民國 119 年），把人醫、動物、食品和環境放在同一張桌子，範圍比抗藥性大。抗藥性行動計畫是其中的抗藥性切片，收到 2029，2026 年（民國 115 年）3 月修訂過。核心能力仍是對照國際工具做自評或外部評核。" },
     ],
   },
   {
@@ -505,7 +505,7 @@ export const islands = [
       { id: "ready-command", name: "指揮與情資架構", phase: "now", hours: [[0, 24]], keywords: ["指揮中心", "疫情中心", "權責"], detail: "需要跨部會時，能從日常疫情中心升到指揮中心。權責事先寫好，才不會在事件當天重新發明。" },
       { id: "ready-beds", name: "醫療量能約定", phase: "near", hours: [[9, 17]], keywords: ["病床", "採檢", "急診"], detail: "與醫療網約定重症床、採檢和人力，避免單一病原擠垮急診。這是整備計畫裡還沒有完全變成日常的那一截。" },
       { id: "ready-drill", name: "演練", phase: "now", hours: [[9, 16]], keywords: ["演練", "桌演", "實兵"], detail: "用桌面演練和實兵找出計畫寫得通、現場做不到的段落。沒有事後清單的演練，只是活動。" },
-      { id: "ready-info", name: "防疫資訊基盤", phase: "mid", hours: [[9, 18]], keywords: ["資訊", "資安", "資料治理", "AI"], detail: "資訊基盤計畫自 115 年至 119 年。五條策略是韌性與安全的資訊基礎（含配合防疫中心興建的資安標準機房）、資料治理、交換與通報標準、防疫服務裡的人工智慧，以及資訊人才。這一項是整備島上的資訊，不取代演練。" },
+      { id: "ready-info", name: "防疫資訊基盤", phase: "mid", hours: [[9, 18]], keywords: ["資訊", "資安", "資料治理", "AI"], detail: "資訊基盤計畫自 2026 年（民國 115 年）至 2030 年（民國 119 年）。五條策略是韌性與安全的資訊基礎（含配合防疫中心興建的資安標準機房）、資料治理、交換與通報標準、防疫服務裡的人工智慧，以及資訊人才。這一項是整備島上的資訊，不取代演練。" },
     ],
   },
   {
@@ -691,14 +691,14 @@ export function validate() {
       if (!pillarIds.has(pillar)) errors.push(`${island.id} bad pillar ${pillar}`);
     }
     if (!island.blurbKid || !island.fact) errors.push(`${island.id} missing kid layer`);
-    if (!island.actions || island.actions.length < 2 || island.actions.length > 4) errors.push(`${island.id} actions`);
+    if (!island.actions || island.actions.length < 1 || island.actions.length > 4) errors.push(`${island.id} actions`);
     for (const action of island.actions ?? []) {
       if (action.href != null && !String(action.href).startsWith("tel:")) errors.push(`${island.id} href`);
     }
     for (const item of island.items) {
       if (!phasesOk.has(item.phase)) errors.push(`${item.id} bad phase`);
       if (!Array.isArray(item.hours) || !Array.isArray(item.hours[0])) errors.push(`${item.id} bad hours`);
-      if (!item.detail || !item.kid) errors.push(`${item.id} missing detail or kid`);
+      if (!item.detail || !item.kid || !item.kidName) errors.push(`${item.id} missing detail or kid`);
     }
   }
   for (const flow of flows) {

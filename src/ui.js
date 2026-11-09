@@ -725,7 +725,7 @@ export function mount({ scene, islands, flows }) {
     }
     const cards = ordered.filter((island) => {
       if (!q) return true;
-      const blob = [island.name, island.nick, island.pin, island.blurb, island.blurbKid, island.source, ...island.items.flatMap((item) => [item.name, item.detail, item.kid, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
+      const blob = [island.name, island.nick, island.pin, island.blurb, island.blurbKid, island.source, ...island.items.flatMap((item) => [item.name, item.kidName, item.detail, item.kid, ...(item.keywords ?? [])])].join(" ").toLowerCase().replace(/\s+/g, "");
       return blob.includes(q);
     });
     tree.innerHTML = cards.length ? cards.map((island) => islandCard(island)).join("") : emptySearch();
@@ -736,7 +736,7 @@ export function mount({ scene, islands, flows }) {
     const open = state.selected && ((state.selected.type === "island" && state.selected.id === island.id) || (state.selected.type === "item" && state.selected.islandId === island.id) || (state.selected.type === "flow" && (state.selected.flow.a === island.id || state.selected.flow.b === island.id)));
     const items = island.items.map((item) => {
       const on = state.selected?.type === "item" && state.selected.itemId === item.id;
-      return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
+      return `<button type="button" class="btn sub ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span>${esc(item.kidName || item.name)}</span><small>${esc(phaseLabel[item.phase])}</small></button>`;
     }).join("");
     return `<section class="island ${open ? "open" : ""}"><button type="button" class="btn head ${open ? "on" : ""}" data-island="${island.id}" aria-expanded="${open ? "true" : "false"}"><i style="${toneStyle(island)}">${esc(island.no)}</i><span><b>${esc(island.nick)}</b><small class="official">${esc(island.name)}</small></span></button><div class="subs">${items}</div></section>`;
   }
@@ -859,7 +859,7 @@ export function mount({ scene, islands, flows }) {
     const related = flows.filter((flow) => flow.a === island.id || flow.b === island.id);
     const items = island.items.map((item) => {
       const on = selected.type === "item" && selected.itemId === item.id;
-      return `<button type="button" class="btn detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.name)}</b></span><em>${esc(item.kid)}</em></button>`;
+      return `<button type="button" class="btn detail-item ${on ? "on" : ""}" data-item="${item.id}" data-island="${island.id}"><span><b>${esc(item.kidName || item.name)}</b></span><em>${esc(item.kid)}</em></button>`;
     }).join("");
     const links = related.map((flow) => `<button type="button" class="btn" data-flow="${flow.id}">${esc(flow.kidTitle || flow.title)}</button>`).join("");
     const actions = (island.actions ?? []).map((action) => {

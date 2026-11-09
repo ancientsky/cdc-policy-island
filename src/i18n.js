@@ -1162,6 +1162,7 @@ function snapshot() {
         name: itemRow.name,
         detail: itemRow.detail,
         kid: itemRow.kid,
+        kidName: itemRow.kidName,
         keywords: [...(itemRow.keywords ?? [])],
       }])),
     }])),
@@ -1198,6 +1199,7 @@ function restore() {
       itemRow.name = savedItem.name;
       itemRow.detail = savedItem.detail;
       itemRow.kid = savedItem.kid;
+      itemRow.kidName = savedItem.kidName;
       delete itemRow.text;
       itemRow.keywords = [...savedItem.keywords];
     }
