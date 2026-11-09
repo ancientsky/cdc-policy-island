@@ -2040,25 +2040,27 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     let wave = 0;
     for (const route of flowViews) {
       const forced = Boolean(query) && norm(route.flow._hay).includes(query);
-      const related = hoverId === route.flow.a || hoverId === route.flow.b
-        || [...selected].some((id) => id === route.flow.a || id === route.flow.b);
+      const hovered = hoverId === route.flow.a || hoverId === route.flow.b;
+      const picked = [...selected].some((id) => id === route.flow.a || id === route.flow.b);
+      const related = hovered || picked;
       const ends = Boolean(views.get(route.flow.a).lit && views.get(route.flow.b).lit);
       const focusing = selected.size > 0;
-      const want = Boolean(ends && (showAllFlows || related || forced) && !(focusing && !related && !forced));
+      // Hover alone does not draw lines. The route switch or a selected island does.
+      const want = Boolean(ends && (showAllFlows || forced || (focusing && related)) && !(focusing && !related && !forced));
       const arch = focusing && (related || forced) ? 0.6 : 1;
       if (arch !== route.arch) {
         route.arch = arch;
         layoutRoute(route);
       }
       let opacity = 0;
-      let width = 1.5;
+      let width = 2.5;
       if (want) {
         if (hoverId || focusing) {
           opacity = related || forced ? 1 : 0.06;
           width = related || forced ? 3 : 1.5;
         } else {
-          opacity = 0.18;
-          width = 1.5;
+          opacity = 0.45;
+          width = 2.5;
         }
         if (starsOn && opacity >= 0.18) opacity = 1;
       }
@@ -3856,6 +3858,27 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           flowWidth: flowViews[0]?.mat.linewidth ?? -1,
           flowRes: flowViews[0]?.mat.resolution.toArray() ?? [],
           flowPeak: flowViews.reduce((peak, route) => Math.max(peak, route.curve.getPoint(0.5).y), 0),
+          flowRows: flowViews.map((route) => {
+            const size = viewSize();
+            const p = new THREE.Vector3();
+            const marks = [];
+            for (let i = 2; i <= 8; i += 1) {
+              route.curve.getPoint(i / 10, p);
+              p.project(camera);
+              marks.push([
+                Math.round((p.x * 0.5 + 0.5) * size.W),
+                Math.round((-p.y * 0.5 + 0.5) * size.H),
+              ]);
+            }
+            return {
+              id: route.flow.id,
+              opacity: Math.round(route.mat.opacity * 1000) / 1000,
+              width: route.mat.linewidth,
+              n: route.geo.instanceCount,
+              phase: route.phase,
+              marks,
+            };
+          }),
           imports: importLanes.map((lane) => ({
             id: lane.id,
             dir: lane.dir,
@@ -3869,6 +3892,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           ambient: people.counts().ambient,
           peopleDraws: people.counts().draws,
           peopleBounds: people.bounds(),
+          hover: hoverId,
           cam: {
             radius: cam.radius,
             flight: Boolean(flight),
