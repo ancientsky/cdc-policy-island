@@ -479,7 +479,7 @@ export const plain = {
       f07: { title: "Both ends of a big wave", text: "In a big flu wave, the town needs pills. The airport also makes the check line bigger." },
       f08: { title: "School reports first", text: "When more children stay home, the teacher tells the lookout. That is earlier than one severe-case report." },
       f09: { title: "The same handwashing", text: "Handwashing at school and handwashing at the hospital are the same job. One is in a classroom, one is in a ward." },
-      f10: { title: "Mosquitoes warn first", text: "When the no-puddle island sees more mosquitoes, it tells the lookout before anyone is ill." },
+      f10: { title: "Mosquitoes warn first", text: "The island with no puddles sees more mosquitoes. It tells the lookout before anyone is ill." },
       f11: { title: "Keep bugs off the ship", text: "While the town dumps water, the airport and the port stop bugs on ships." },
       f12: { title: "One test, two illnesses", text: "One blood draw can check for HIV and for hepatitis, which saves time and effort." },
       f13: { title: "Genes find one cluster", text: "Germs from a TB patient go to the lab. If the gene pattern matches, it is one chain of spread." },
