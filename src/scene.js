@@ -802,6 +802,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       coastMat,
       landMat,
       skirtMat,
+      skirt,
       glow,
       shade,
       ring,
@@ -875,6 +876,22 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     line.raycast = () => {};
     line.renderOrder = 3;
     scene.add(line);
+    const glowGeo = new LineGeometry();
+    const glowMat = new LineMaterial({
+      vertexColors: true,
+      linewidth: 8,
+      worldUnits: false,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const glowLine = new Line2(glowGeo, glowMat);
+    glowLine.visible = false;
+    glowLine.frustumCulled = false;
+    glowLine.userData.kind = "flow-glow";
+    glowLine.raycast = () => {};
+    glowLine.renderOrder = 2;
+    scene.add(glowLine);
     flow._hay = [flow.title, flow.kidTitle, flow.text, flow.kid, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name, views.get(flow.a).island.nick, views.get(flow.b).island.nick].join(" ");
     return {
       flow,
@@ -888,6 +905,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       geo,
       mat,
       line,
+      glowGeo,
+      glowMat,
+      glowLine,
       curve: new THREE.QuadraticBezierCurve3(start, mid.clone(), end),
       arch: 1,
       phase: "hidden",
@@ -906,6 +926,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     const pts = curve.getPoints(FLOW_SPLIT);
     const positions = new Float32Array(pts.length * 3);
     const colors = new Float32Array(pts.length * 3);
+    const glowColors = new Float32Array(pts.length * 3);
     for (let i = 0; i < pts.length; i += 1) {
       positions[i * 3] = pts[i].x;
       positions[i * 3 + 1] = pts[i].y;
@@ -916,12 +937,18 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       colors[i * 3] = open ? color.r * flowBright : Math.min(1, color.r * flowBright);
       colors[i * 3 + 1] = open ? color.g * flowBright : Math.min(1, color.g * flowBright);
       colors[i * 3 + 2] = open ? color.b * flowBright : Math.min(1, color.b * flowBright);
+      glowColors[i * 3] = color.r;
+      glowColors[i * 3 + 1] = color.g;
+      glowColors[i * 3 + 2] = color.b;
     }
     const drawn = Number.isFinite(route.geo.instanceCount) ? route.geo.instanceCount : 0;
     route.geo.setPositions(positions);
     route.geo.setColors(colors);
     route.line.computeLineDistances();
     route.geo.instanceCount = drawn;
+    route.glowGeo.setPositions(positions);
+    route.glowGeo.setColors(glowColors);
+    route.glowGeo.instanceCount = drawn;
     route.curve = curve;
   }
   for (const route of flowViews) layoutRoute(route);
@@ -1990,22 +2017,67 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     view.ring.scale.setScalar(1);
   }
 
+  const _gradePt = new THREE.Vector3();
+
+  function outlineMeshes(view) {
+    const meshes = [view.skirt, view.coast, view.top];
+    for (const building of view.buildings) {
+      building.group.traverse((child) => {
+        if (!child.isMesh || child.userData.kind === "item") return;
+        meshes.push(child);
+      });
+    }
+    return meshes;
+  }
+
+  function focusPose(view) {
+    let minY = 1;
+    let maxY = 0;
+    let count = 0;
+    const take = (x, y, z) => {
+      _gradePt.set(x, y, z).project(camera);
+      if (_gradePt.z > 1) return;
+      const uv = _gradePt.y * 0.5 + 0.5;
+      minY = Math.min(minY, uv);
+      maxY = Math.max(maxY, uv);
+      count += 1;
+    };
+    const base = view.base;
+    take(base.x, 0.15, base.z);
+    take(base.x, 1.7, base.z);
+    take(base.x + MESH_R, 0.4, base.z);
+    take(base.x - MESH_R, 0.4, base.z);
+    take(base.x, 0.4, base.z + MESH_R);
+    take(base.x, 0.4, base.z - MESH_R);
+    if (!count) return { r: 0.45, band: 0.2 };
+    const mid = (minY + maxY) * 0.5;
+    const half = (maxY - minY) * 0.5 + 0.04;
+    return {
+      r: THREE.MathUtils.clamp(mid, 0.08, 0.92),
+      band: THREE.MathUtils.clamp(half, 0.08, 0.36),
+    };
+  }
+
   function poseGrade() {
     if (!post) return;
     const ids = [...selected];
     if (ids.length) {
       const id = hoverId && selected.has(hoverId) ? hoverId : ids[0];
       const view = views.get(id);
-      const groups = [];
+      const meshes = [];
       for (const item of ids) {
         const entry = views.get(item);
-        if (entry) groups.push(entry.group);
+        if (entry) meshes.push(...outlineMeshes(entry));
       }
-      post.setOutline(groups, { selected: true, accent: view?.island.accent || P.pureWhite });
+      post.setOutline(meshes, { selected: true, accent: view?.island.accent || P.pureWhite });
+      const posed = view ? focusPose(view) : { r: 0.45, band: 0.2 };
+      post.setFocus(posed.r, posed.band);
     } else if (hoverId && views.get(hoverId)) {
-      post.setOutline([views.get(hoverId).group], { selected: false });
+      post.setOutline(outlineMeshes(views.get(hoverId)), { selected: false });
+      post.setFocus(0.45, 0.2);
     } else {
       post.setOutline([], { selected: false });
+      post.setFocus(0.45, 0.2);
     }
   }
 
@@ -2232,7 +2304,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     renderer.setSize(W, H, false);
     if (post) post.resize(W, H, pixelCap);
     labels.setSize(W, H);
-    for (const route of flowViews) route.mat.resolution.set(W, H);
+    for (const route of flowViews) {
+      route.mat.resolution.set(W, H);
+      route.glowMat.resolution.set(W, H);
+    }
     for (const lane of importLanes) lane.mat.resolution.set(W, H);
     applyFit();
   }
@@ -2735,6 +2810,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
           route.mat.opacity = route.targetOpacity;
           route.mat.linewidth = route.targetWidth;
         }
+        const glowOn = flowBright > 1.5 && route.line.visible && route.mat.opacity > 0.2;
+        route.glowLine.visible = glowOn;
+        route.glowMat.opacity = glowOn ? 0.22 : 0;
+        route.glowGeo.instanceCount = glowOn ? route.geo.instanceCount : 0;
       }
     }
     stepHandoffs(frozen ? 0 : step);
@@ -4089,6 +4168,26 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       },
       setPostDraw(on) { drawPost = Boolean(on); },
       setVignette(on) { if (post) post.setVignette(on); },
+      setTilt(on) { if (post) post.setTilt(on); },
+      holdFrame() { frozen = true; holdRender = 2; },
+      thaw() { frozen = false; holdRender = 0.4; },
+      outlineProbe(id) {
+        const view = views.get(id);
+        if (!view) return null;
+        const meshes = outlineMeshes(view);
+        const picked = new Set(meshes);
+        return {
+          count: meshes.length,
+          hasGlow: picked.has(view.glow),
+          hasRing: picked.has(view.ring),
+          hasShade: picked.has(view.shade),
+          hasSkirt: picked.has(view.skirt),
+          hasCoast: picked.has(view.coast),
+          hasTop: picked.has(view.top),
+          coast: meshScreen(view.coast),
+          glow: meshScreen(view.glow),
+        };
+      },
       setTone(name) {
         const aces = name === "aces";
         toneName = aces ? "aces" : "neutral";

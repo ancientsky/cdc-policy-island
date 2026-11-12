@@ -418,7 +418,8 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     });
     lampMat.opacity = night;
     lamps.visible = night > 0.02;
-    cloudMat.color.copy(cloudBase).lerp(haze, 0.18);
+    // Stacked day-white puffs cross the night bloom threshold and wash out. Pull them toward the haze.
+    cloudMat.color.copy(cloudBase).lerp(haze, 0.18 + night * 0.62);
     cloudMat.opacity = 1 - night * 0.65;
   }
 
@@ -444,6 +445,8 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
       pines: pines.length,
       rounds: rounds.length,
       clouds: cloudCount,
+      cloud: `#${cloudMat.color.getHexString()}`,
+      cloudOpacity: cloudMat.opacity,
       lights: lampSpots.length,
       quality,
       seg: plan.seg,

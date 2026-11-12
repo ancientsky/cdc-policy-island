@@ -16,6 +16,31 @@ const HIDDEN = new THREE.Color(P.k1a3c48);
 // materials skip both while the render target is not the screen, and OutputPass applies them once.
 const VIGNETTE_OFFSET = 0.7;
 const VIGNETTE_DARKNESS = 1;
+// Full-strength tilt reaches this many CSS pixels. Inside the sharp band the radius is zero.
+const TILT_EDGE_PX = 12;
+
+function tiltWithBand(source, sample) {
+  const uniforms = THREE.UniformsUtils.clone(source.uniforms);
+  uniforms.band = { value: 0.2 };
+  const decl = "uniform float r;";
+  const line = sample === "h"
+    ? "float hh = h * abs( r - vUv.y );"
+    : "float vv = v * abs( r - vUv.y );";
+  const next = sample === "h"
+    ? "float hh = h * smoothstep(band, band + 0.22, abs(r - vUv.y));"
+    : "float vv = v * smoothstep(band, band + 0.22, abs(r - vUv.y));";
+  if (!source.fragmentShader.includes(decl) || !source.fragmentShader.includes(line)) {
+    throw new Error("tilt shader shape changed");
+  }
+  return {
+    name: source.name,
+    uniforms,
+    vertexShader: source.vertexShader,
+    fragmentShader: source.fragmentShader
+      .replace(decl, "uniform float r;\n\t\tuniform float band;")
+      .replace(line, next),
+  };
+}
 
 function colorTargetOk(gl, { samples, half }) {
   const fb = gl.createFramebuffer();
@@ -70,6 +95,8 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   let gtao = null;
   let outline = null;
   let bloom = null;
+  let hTilt = null;
+  let vTilt = null;
   let vignette = null;
 
   if (tier === "full") {
@@ -109,7 +136,22 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     composer.addPass(bloom);
     kinds.push("bloom");
 
-    // Tilt-shift stayed out. A focus band on the selected island blurred the whole map.
+    if (tier === "full") {
+      const [{ HorizontalTiltShiftShader }, { VerticalTiltShiftShader }] = await Promise.all([
+        import("three/addons/shaders/HorizontalTiltShiftShader.js"),
+        import("three/addons/shaders/VerticalTiltShiftShader.js"),
+      ]);
+      hTilt = new ShaderPass(tiltWithBand(HorizontalTiltShiftShader, "h"));
+      vTilt = new ShaderPass(tiltWithBand(VerticalTiltShiftShader, "v"));
+      hTilt.uniforms.r.value = 0.45;
+      vTilt.uniforms.r.value = 0.45;
+      hTilt.uniforms.band.value = 0.2;
+      vTilt.uniforms.band.value = 0.2;
+      composer.addPass(hTilt);
+      composer.addPass(vTilt);
+      kinds.push("tilt-h", "tilt-v");
+    }
+
     vignette = new ShaderPass(VignetteShader);
     vignette.uniforms.offset.value = VIGNETTE_OFFSET;
     vignette.uniforms.darkness.value = VIGNETTE_DARKNESS;
@@ -123,6 +165,8 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   function resize(cssW, cssH, pixelRatio) {
     composer.setPixelRatio(pixelRatio);
     composer.setSize(cssW, cssH);
+    if (hTilt) hTilt.uniforms.h.value = (TILT_EDGE_PX / 4) / Math.max(1, cssW);
+    if (vTilt) vTilt.uniforms.v.value = (TILT_EDGE_PX / 4) / Math.max(1, cssH);
   }
 
   function setBloom(stars) {
@@ -164,6 +208,22 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     }
   }
 
+  function setFocus(r, band = 0.2) {
+    if (!hTilt) return;
+    const focus = Number.isFinite(r) ? r : 0.45;
+    const span = Number.isFinite(band) ? band : 0.2;
+    hTilt.uniforms.r.value = focus;
+    vTilt.uniforms.r.value = focus;
+    hTilt.uniforms.band.value = span;
+    vTilt.uniforms.band.value = span;
+  }
+
+  function setTilt(on) {
+    const enabled = Boolean(on);
+    if (hTilt) hTilt.enabled = enabled;
+    if (vTilt) vTilt.enabled = enabled;
+  }
+
   function setVignette(on) {
     if (vignette) vignette.enabled = Boolean(on);
   }
@@ -193,7 +253,9 @@ export async function mountPost({ renderer, scene, camera, tier }) {
           enabled: vignette.enabled !== false,
         }
         : null,
-      focus: null,
+      focus: hTilt ? hTilt.uniforms.r.value : null,
+      focusBand: hTilt ? hTilt.uniforms.band.value : null,
+      tilt: hTilt ? hTilt.enabled !== false : false,
     };
   }
 
@@ -201,5 +263,5 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   renderer.getSize(size);
   resize(size.x, size.y, renderer.getPixelRatio());
 
-  return { composer, resize, setBloom, setOutline, setVignette, info, kinds };
+  return { composer, resize, setBloom, setOutline, setFocus, setTilt, setVignette, info, kinds };
 }
