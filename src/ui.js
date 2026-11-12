@@ -785,6 +785,38 @@ export function mount({ scene, islands, flows }) {
     if (!suffix) return;
     germ.hidden = false;
     germ.innerHTML = `<button type="button" class="btn x" data-germ-close aria-label="${esc(t("close"))}">×</button><p class="k">${esc(t("germWhatLabel"))}</p><p>${esc(t(`germWhat${suffix}`))}</p><p class="k">${esc(t("germHowLabel"))}</p><p>${esc(t(`germHow${suffix}`))}</p><p class="k">${esc(t("germDoLabel"))}</p><p class="do">${esc(t(`germDo${suffix}`))}</p>`;
+    placeGerm(live);
+  }
+
+  function placeGerm(point) {
+    const margin = 8;
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
+    if (!point || !Number.isFinite(point.x)) {
+      germ.style.left = "";
+      germ.style.right = "";
+      germ.style.top = "";
+      germ.style.width = "";
+      return;
+    }
+    const roomLeft = Math.max(0, point.x - margin * 2);
+    const roomRight = Math.max(0, viewW - point.x - margin * 2);
+    const onLeft = roomLeft >= roomRight;
+    const room = onLeft ? roomLeft : roomRight;
+    const width = Math.max(148, Math.min(viewW <= 980 ? 220 : 280, room - 12));
+    const left = onLeft ? margin : Math.max(margin, viewW - margin - width);
+    let top = viewW <= 980 ? 64 : 88;
+    const cardH = Math.min(320, Math.max(120, viewH - top - margin));
+    const covers = point.y >= top && point.y <= top + cardH && point.x >= left && point.x <= left + width;
+    if (covers) {
+      const below = point.y + 28;
+      const above = point.y - cardH - 28;
+      top = below + cardH < viewH - margin ? below : Math.max(margin, above);
+    }
+    germ.style.right = "auto";
+    germ.style.width = `${Math.round(width)}px`;
+    germ.style.left = `${Math.round(left)}px`;
+    germ.style.top = `${Math.round(top)}px`;
   }
 
   function openGerm(index) {
@@ -882,7 +914,7 @@ export function mount({ scene, islands, flows }) {
     const why = island.id === "border"
       ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p><ul class="why-src">${importRoutes.map((route) => `<li><a href="${esc(route.source)}" target="_blank" rel="noopener noreferrer">${esc(route.label[getLang()] || route.label.zh)}</a></li>`).join("")}</ul></section>`
       : "";
-    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2>${why}<p class="official">${esc(island.name)}</p>${say}<section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section>${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;

@@ -130,17 +130,13 @@ function wakeGeometry() {
     zmin = Math.min(zmin, pos.getZ(i));
     zmax = Math.max(zmax, pos.getZ(i));
   }
-  const colors = new Float32Array(pos.count * 4);
+  const alphas = new Float32Array(pos.count);
   const span = zmax - zmin || 1;
   for (let i = 0; i < pos.count; i += 1) {
     const t = (pos.getZ(i) - zmin) / span;
-    const alpha = 0.5 * (1 - t);
-    colors[i * 4] = 1;
-    colors[i * 4 + 1] = 1;
-    colors[i * 4 + 2] = 1;
-    colors[i * 4 + 3] = alpha;
+    alphas[i] = 0.5 * (1 - t);
   }
-  geo.setAttribute("color", new BufferAttribute(colors, 4));
+  geo.setAttribute("aAlpha", new BufferAttribute(alphas, 1));
   return geo;
 }
 
@@ -242,15 +238,24 @@ export function createLife(scene, { motion, reduced }) {
     wings.instanceMatrix.setUsage(DynamicDrawUsage);
     scene.add(wings);
 
-    wakes = new InstancedMesh(wakeGeometry(), new MeshBasicMaterial({
+    const wakeMat = new MeshBasicMaterial({
       color: P.kd5ebe8,
       transparent: true,
       opacity: 1,
       depthWrite: false,
-      vertexColors: true,
-      vertexAlphas: true,
       side: DoubleSide,
-    }), sailors.length);
+    });
+    // MeshBasicMaterial has no vertexAlphas. Fade the stern with a custom attribute.
+    wakeMat.customProgramCacheKey = () => "wake-alpha";
+    wakeMat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nattribute float aAlpha;\nvarying float vWake;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWake = aAlpha;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying float vWake;")
+        .replace("#include <opaque_fragment>", "diffuseColor.a *= vWake;\n#include <opaque_fragment>");
+    };
+    wakes = new InstancedMesh(wakeGeometry(), wakeMat, sailors.length);
     wakes.userData.kind = "wake";
     wakes.frustumCulled = false;
     wakes.raycast = () => {};

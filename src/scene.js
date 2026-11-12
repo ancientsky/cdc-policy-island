@@ -2165,7 +2165,9 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const job = wakeQueue.shift();
       const el = document.createElement("div");
       el.className = "wake-label";
-      el.textContent = job.name;
+      const text = document.createElement("span");
+      text.textContent = job.name;
+      el.append(text);
       const obj = new CSS2DObject(el);
       obj.position.set(0, 0.95, 0);
       job.building.group.add(obj);
@@ -2933,11 +2935,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
         }
       }
     } else renderer.render(scene, camera);
-    if (!labelsStill()) {
-      labels.render(scene, camera);
+    const labelsIdle = labelsStill();
+    // Crews and pathogens keep moving after the camera settles. CSS2D still
+    // has to follow them, but the pin nudge must not run every frame.
+    if (!labelsIdle || actorsLive()) labels.render(scene, camera);
+    if (!labelsIdle) {
       shadePins();
       markCrowding();
     }
+    cullFloatingLabels();
+    nudgePlates();
   }
 
   let hoverSample = null;
@@ -2970,6 +2977,72 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const labelCam = new Float64Array(16);
   let labelCamReady = false;
   let labelForce = false;
+
+  function cullFloatingLabels() {
+    const root = labels.domElement.getBoundingClientRect();
+    const pad = 2;
+    const nodes = labels.domElement.querySelectorAll(".wake-label, .crew-label, .threat-name, .threat-tip, .handoff-pop, .item-tip");
+    for (const el of nodes) {
+      el.classList.remove("offscreen");
+      if (el.style.display === "none") continue;
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const outside = rect.width < 1
+        || cx < root.left + pad
+        || cx > root.right - pad
+        || cy < root.top + pad
+        || cy > root.bottom - pad;
+      el.classList.toggle("offscreen", outside);
+    }
+  }
+
+  function nudgePlates() {
+    const pins = [];
+    for (const view of views.values()) {
+      const mark = view.pinEl.querySelector("b");
+      if (!mark) continue;
+      const rect = mark.getBoundingClientRect();
+      if (rect.width < 1) continue;
+      pins.push({
+        el: view.pinEl,
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+    }
+    let topZ = 1;
+    for (const threat of threats) {
+      const el = threat.plateEl;
+      if (!el) continue;
+      topZ = Math.max(topZ, Number(el.style.zIndex) || 0);
+      el.style.marginLeft = "0px";
+      el.style.marginTop = "0px";
+    }
+    for (const threat of threats) {
+      const el = threat.plateEl;
+      if (!el || el.style.display === "none" || el.classList.contains("offscreen")) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 1) continue;
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      let dx = 0;
+      let dy = 0;
+      for (const pin of pins) {
+        const dist = Math.hypot(x - pin.x, y - pin.y);
+        if (dist >= 40) continue;
+        if (dist < 0.5) {
+          dy -= 40;
+          continue;
+        }
+        const push = 40 - dist;
+        dx += ((x - pin.x) / dist) * push;
+        dy += ((y - pin.y) / dist) * push;
+      }
+      el.style.marginLeft = `${Math.round(dx)}px`;
+      el.style.marginTop = `${Math.round(dy)}px`;
+    }
+    for (const pin of pins) pin.el.style.zIndex = String(topZ + 2);
+  }
 
   function labelsStill() {
     if (platesDirty) {
@@ -4171,6 +4244,32 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       setTilt(on) { if (post) post.setTilt(on); },
       holdFrame() { frozen = true; holdRender = 2; },
       thaw() { frozen = false; holdRender = 0.4; },
+      threatAt(index) {
+        const threat = threats[index];
+        if (!threat || threat.gone || !threat.mesh.visible) return null;
+        const rect = canvas.getBoundingClientRect();
+        threat.mesh.getWorldPosition(_proj);
+        _proj.project(camera);
+        return {
+          index,
+          islandId: threat.islandId,
+          taps: threat.taps,
+          x: rect.left + (_proj.x * 0.5 + 0.5) * rect.width,
+          y: rect.top + (-_proj.y * 0.5 + 0.5) * rect.height,
+          behind: _proj.z < -1 || _proj.z > 1,
+        };
+      },
+      cloudScreen() {
+        const rect = canvas.getBoundingClientRect();
+        return environment.cloudSample().map((cloud) => {
+          _proj.set(cloud.x, cloud.y, cloud.z).project(camera);
+          return {
+            x: rect.left + (_proj.x * 0.5 + 0.5) * rect.width,
+            y: rect.top + (-_proj.y * 0.5 + 0.5) * rect.height,
+            behind: _proj.z < -1 || _proj.z > 1,
+          };
+        });
+      },
       outlineProbe(id) {
         const view = views.get(id);
         if (!view) return null;
@@ -4373,7 +4472,16 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     threatInfo(index) {
       const threat = threats[index];
       if (!threat || threat.gone) return null;
-      return { index, islandId: threat.islandId, tool: threat.tool };
+      const rect = canvas.getBoundingClientRect();
+      const at = threat.mesh.getWorldPosition(_proj);
+      at.project(camera);
+      return {
+        index,
+        islandId: threat.islandId,
+        tool: threat.tool,
+        x: rect.left + (at.x * 0.5 + 0.5) * rect.width,
+        y: rect.top + (-at.y * 0.5 + 0.5) * rect.height,
+      };
     },
     personPortrait: (index) => people.portrait(index),
     markFlow(id) { if (id) markCb(id); },
@@ -4674,6 +4782,7 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       const envInfo = environment.info();
       if (envInfo.draws > 12) errors.push(`environment draws ${envInfo.draws}`);
       if (envInfo.trees < 3000) errors.push(`environment trees ${envInfo.trees}`);
+      if (envInfo.lights < 200) errors.push(`village lights ${envInfo.lights} < 200`);
       if (!scene.environment || scene.environment.isTexture !== true) errors.push("scene.environment is not a texture");
       if (sun.shadow.normalBias !== 0.02) errors.push(`sun normalBias ${sun.shadow.normalBias}`);
 

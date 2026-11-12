@@ -388,6 +388,13 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
       lampSpots.push({ x, y: y + 0.22, z });
     }
   }
+  // Hamlet boxes only catch a few dozen lamps. The rest sit on trees that
+  // already cleared the ridges, so the night village reads as a village.
+  const lampStride = Math.max(1, Math.floor(spots.length / 220));
+  for (let i = 0; i < spots.length && lampSpots.length < 220; i += lampStride) {
+    const spot = spots[i];
+    lampSpots.push({ x: spot.x, y: spot.y + 0.22, z: spot.z });
+  }
   const lampGeo = new THREE.SphereGeometry(0.16, 6, 5);
   const lampMat = new THREE.MeshBasicMaterial({
     color: P.glowLamp,

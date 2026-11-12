@@ -566,6 +566,8 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
   border-radius: 20px;
   z-index: 4;
 }
+.hud > .germ { pointer-events: none; }
+.germ .x { pointer-events: auto; }
 .germ[hidden] { display: none; }
 .germ .x { float: right; width: 36px; height: 36px; border-radius: 50%; background: var(--field); }
 .germ .k { margin: 8px 0 2px; font-size: var(--fs-sm); font-weight: 700; }
@@ -595,9 +597,8 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
 }
 .repel-count {
   position: absolute;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 72px;
+  left: 16px;
   z-index: 5;
   margin: 0;
   pointer-events: none;
@@ -847,6 +848,9 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
   padding: 3px 8px;
   pointer-events: none;
   white-space: nowrap;
+}
+.wake-label span {
+  display: block;
   animation: wake-float 1.6s ease forwards;
 }
 @keyframes wake-float {
@@ -1215,6 +1219,12 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   white-space: nowrap;
   pointer-events: none;
 }
+.wake-label.offscreen,
+.crew-label.offscreen,
+.threat-name.offscreen,
+.threat-tip.offscreen,
+.handoff-pop.offscreen,
+.item-tip.offscreen { display: none !important; }
 #diag:not([hidden]) {
   position: fixed; z-index: 6; left: 12px; bottom: 12px;
   max-width: min(480px, 90vw); padding: 10px; white-space: pre-wrap;
@@ -1264,9 +1274,15 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     width: auto;
     height: 48px;
   }
+  .repel-count {
+    top: calc(60px + env(safe-area-inset-top));
+    left: calc(8px + env(safe-area-inset-left));
+  }
   .brand strong {
-    flex: 1 1 auto;
-    min-width: 4.5em;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 7.2em;
+    max-width: 9em;
     font-size: var(--fs-lg);
     letter-spacing: 0;
     margin-right: 4px;
@@ -1527,7 +1543,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .veil, .title-card, .ledger, .modal-card, .caption, .breathe, .pin b, .chapter, .wake-label { transition: none; animation: none; }
+  .veil, .title-card, .ledger, .modal-card, .caption, .breathe, .pin b, .chapter, .wake-label, .wake-label span { transition: none; animation: none; }
   .pin.ping b::before, .stamp.fresh, .passport-count.pop, .sheet.bump { animation: none; }
   .mission-rotator { transition: none; }
 }
