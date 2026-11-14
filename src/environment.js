@@ -45,8 +45,14 @@ function qualityPlan(quality) {
   return { seg: 200, trees: 6000 };
 }
 
-export async function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null } = {}) {
+export async function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null, pulse = null } = {}) {
   const plan = qualityPlan(quality);
+  function pauseSlice() {
+    const pause = step();
+    if (!pause) return null;
+    if (typeof pulse === "function") pulse();
+    return pause;
+  }
   const rng = mulberry(2285936); // hash seed
   const noise = new SimplexNoise({ random: rng });
   const meshes = [];
@@ -96,7 +102,7 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
     const y = heightAt(pos.getX(i), pos.getZ(i));
     heights[i] = y;
     pos.setY(i, y);
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   const colors = new Float32Array(pos.count * 3);
@@ -141,12 +147,12 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
     colors[i * 3] = paint.r * wobble;
     colors[i * 3 + 1] = paint.g * wobble;
     colors[i * 3 + 2] = paint.b * wobble;
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   terrainGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   terrainGeo.computeVertexNormals();
@@ -201,7 +207,7 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
   while (spots.length < plan.trees && guard < plan.trees * 50) {
     guard += 1;
     {
-      const pause = step();
+      const pause = pauseSlice();
       if (pause) await pause;
     }
     let x;
@@ -244,7 +250,7 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
       dummy.rotation.y = spot.x * 0.2;
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
-      const pause = step();
+      const pause = pauseSlice();
       if (pause) await pause;
     }
     mesh.instanceMatrix.needsUpdate = true;

@@ -225,33 +225,101 @@ function lookAtHour(hour) {
   };
 }
 
-export async function createScene(canvas, data, { reduced = false } = {}) {
+// A refused attribute set must not be followed by another getContext on the same
+// canvas: the second call can succeed and then leave that canvas unusable.
+// powerPreference "low-power" is one of the sets some phones reject outright.
+function takeWebgl2(canvas, sets) {
+  const ask = (attributes) => {
+    try {
+      return attributes ? canvas.getContext("webgl2", attributes) : canvas.getContext("webgl2");
+    } catch {
+      return null;
+    }
+  };
+  for (const attributes of sets) {
+    const gl = ask(attributes);
+    if (gl && !gl.isContextLost()) return gl;
+  }
+  const gl = ask(null);
+  if (gl && !gl.isContextLost()) return gl;
+  return null;
+}
+
+function webglSets(plain) {
+  const base = {
+    alpha: false,
+    depth: true,
+    stencil: false,
+    antialias: false,
+    premultipliedAlpha: true,
+    preserveDrawingBuffer: false,
+    powerPreference: "default",
+  };
+  const fewer = { alpha: false, antialias: false, depth: true };
+  const least = { antialias: false };
+  if (plain) return [base, fewer, least];
+  return [{ ...base, antialias: true }, base, fewer, least];
+}
+
+export async function createScene(canvas, data, { reduced = false, rescue = false } = {}) {
   let introAt = 0;
   const narrowScreen = () => (canvas.clientWidth || window.innerWidth || 1200) < 980;
-  // A phone GPU often refuses a multisampled WebGL2 context. Three then throws
-  // "Error creating WebGL context with your selected attributes" and the canvas
-  // cannot be asked again, so the narrow path requests a plain context.
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: !narrowScreen(),
-    powerPreference: narrowScreen() ? "low-power" : "default",
-  });
-  let pixelCap = Math.min(window.devicePixelRatio || 1, narrowScreen() ? 1.5 : 2);
+  const tight = rescue || narrowScreen();
+  const gl = takeWebgl2(canvas, webglSets(tight));
+  if (!gl) throw new Error("Error creating WebGL context.");
+  const renderer = new THREE.WebGLRenderer({ canvas, context: gl });
+  let pixelCap = Math.min(window.devicePixelRatio || 1, tight ? 1 : 2);
   renderer.setPixelRatio(pixelCap);
   try {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
   } catch (error) {
     console.error(error);
   }
+
+  function touchContext() {
+    const current = renderer.getContext();
+    if (!current || current.isContextLost()) throw new Error("WebGL context lost");
+    try {
+      current.clear(current.COLOR_BUFFER_BIT);
+    } catch (error) {
+      if (current.isContextLost()) throw new Error("WebGL context lost");
+      console.error(error);
+    }
+  }
+
+  function pauseSlice() {
+    const pause = step();
+    if (!pause) return null;
+    touchContext();
+    return pause;
+  }
+
+  function presentFrame() {
+    touchContext();
+    const { W, H } = viewSize();
+    if (W > 2 && H > 2) {
+      renderer.setPixelRatio(pixelCap);
+      renderer.setSize(W, H, false);
+      camera.aspect = W / Math.max(H, 1);
+      camera.updateProjectionMatrix();
+    }
+    try {
+      renderer.render(scene, camera);
+    } catch (error) {
+      const current = renderer.getContext();
+      if (!current || current.isContextLost()) throw new Error("WebGL context lost");
+      throw error;
+    }
+  }
   // Noon starts on Neutral. applyClock multiplies LOOKS exposure by toneScale so the table itself stays unchanged.
   let toneName = "neutral";
   let toneScale = 0.9;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !rescue;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
-  renderer.shadowMap.needsUpdate = true;
+  renderer.shadowMap.needsUpdate = !rescue;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(P.cf7e6cf);
@@ -270,7 +338,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   if (room) room.dispose();
   if (pmrem) pmrem.dispose();
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
 
@@ -339,8 +407,8 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(P.kfff3df, 1.35);
   sun.position.set(16, 22, 10);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(narrowScreen() ? 1024 : 2048, narrowScreen() ? 1024 : 2048);
+  sun.castShadow = !rescue;
+  if (!rescue) sun.shadow.mapSize.set(narrowScreen() ? 512 : 2048, narrowScreen() ? 512 : 2048);
   sun.shadow.camera.near = 2;
   sun.shadow.camera.far = 70;
   sun.shadow.camera.left = -20;
@@ -475,7 +543,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   water.receiveShadow = false;
   scene.add(water);
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
 
@@ -558,7 +626,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   const kit = createKit(motion);
   const life = createLife(scene, { motion, reduced });
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   kit.geo("box", box);
@@ -815,7 +883,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
       const item = island.items[index];
       const [sx, sz] = spots[index] ?? spots[index % spots.length];
       buildings.push(house(group, item, sx, sz, index, island));
-      const pause = step();
+      const pause = pauseSlice();
       if (pause) await pause;
     }
 
@@ -861,7 +929,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
       hay,
     });
     {
-      const pause = step();
+      const pause = pauseSlice();
       if (pause) await pause;
     }
   }
@@ -993,7 +1061,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   }
   for (const route of flowViews) {
     layoutRoute(route);
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
 
@@ -1742,7 +1810,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   let strikeCb = () => {};
   let repelCb = () => {};
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   const people = createPeople({
@@ -1759,7 +1827,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     },
   });
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
 
@@ -2347,13 +2415,18 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   function resize() {
     const { W, H } = viewSize();
     if (W < 2 || H < 2) return;
-    const cap = Math.min(window.devicePixelRatio || 1, W < 980 ? 1.5 : 2);
+    const cap = Math.min(window.devicePixelRatio || 1, (W < 980 || rescue) ? 1 : 2);
     if (cap < pixelCap) pixelCap = cap;
     renderer.setPixelRatio(pixelCap);
-    const shadow = W < 980 ? 1024 : 2048;
-    if (sun.shadow.mapSize.x !== shadow) {
-      sun.shadow.mapSize.set(shadow, shadow);
-      renderer.shadowMap.needsUpdate = true;
+    if (rescue) {
+      sun.castShadow = false;
+      renderer.shadowMap.enabled = false;
+    } else {
+      const shadow = W < 980 ? 512 : 2048;
+      if (sun.shadow.mapSize.x !== shadow) {
+        sun.shadow.mapSize.set(shadow, shadow);
+        renderer.shadowMap.needsUpdate = true;
+      }
     }
     renderer.setSize(W, H, false);
     if (post) post.resize(W, H, pixelCap);
@@ -3907,14 +3980,16 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     ...placed.map((point) => ({ x: point.x, z: point.z, r: MESH_R + 1.15 })),
     ...sea.islets.map((spot) => ({ x: spot.x, z: spot.z, r: 1.35 })),
   ]);
+  presentFrame();
   const environment = await createEnvironment(THREE, scene, {
     quality: narrowScreen() ? "mid" : "high",
     camera,
     clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
     motion,
+    pulse: touchContext,
   });
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   placeImportLanes();
@@ -3924,7 +3999,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     }
   }
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   kit.build(scene);
@@ -3936,7 +4011,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     }
   });
   {
-    const pause = step();
+    const pause = pauseSlice();
     if (pause) await pause;
   }
   refresh();
@@ -3952,6 +4027,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     userPhi = cam.phi;
   }
   placeCamera();
+  presentFrame();
   function houseHeight(recipeId) {
     const geos = {
       box,
@@ -4506,7 +4582,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     try {
       for (const child of scene.children) {
         renderer.compile(child, camera, scene);
-        const pause = step();
+        const pause = pauseSlice();
         if (pause) await pause;
       }
     } catch (error) {
