@@ -173,7 +173,11 @@ function failWebgl(error) {
   document.dispatchEvent(new CustomEvent("cdc-revealed"));
   const note = document.querySelector("#hero-lead");
   if (note) note.textContent = t("fallback");
-  writeDiag();
+  const diag = document.querySelector("#diag");
+  if (!diag) return;
+  const reason = error instanceof Error ? error.message : "";
+  diag.textContent = reason ? `${t("fallback")}\n${reason}` : t("fallback");
+  diag.hidden = false;
 }
 
 function revealVeil() {
@@ -207,6 +211,12 @@ function revealVeil() {
     });
   });
 }
+
+document.addEventListener("cdc-webgl-failed", (event) => {
+  if (document.body.classList.contains("no-webgl")) return;
+  const reason = event.detail instanceof Error ? event.detail : new Error("WebGL");
+  failWebgl(reason);
+});
 
 async function bootScene() {
   try {

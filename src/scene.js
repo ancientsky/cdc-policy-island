@@ -227,11 +227,22 @@ function lookAtHour(hour) {
 
 export async function createScene(canvas, data, { reduced = false } = {}) {
   let introAt = 0;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   const narrowScreen = () => (canvas.clientWidth || window.innerWidth || 1200) < 980;
+  // A phone GPU often refuses a multisampled WebGL2 context. Three then throws
+  // "Error creating WebGL context with your selected attributes" and the canvas
+  // cannot be asked again, so the narrow path requests a plain context.
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: !narrowScreen(),
+    powerPreference: narrowScreen() ? "low-power" : "default",
+  });
   let pixelCap = Math.min(window.devicePixelRatio || 1, narrowScreen() ? 1.5 : 2);
   renderer.setPixelRatio(pixelCap);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  try {
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+  } catch (error) {
+    console.error(error);
+  }
   // Noon starts on Neutral. applyClock multiplies LOOKS exposure by toneScale so the table itself stays unchanged.
   let toneName = "neutral";
   let toneScale = 0.9;
@@ -245,12 +256,19 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(P.cf7e6cf);
   scene.fog = new THREE.FogExp2(P.kd8eef0, 0.013);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const room = new RoomEnvironment();
-  scene.environment = pmrem.fromScene(room, 0.04).texture;
-  scene.environmentIntensity = 0.35;
-  room.dispose();
-  pmrem.dispose();
+  let pmrem = null;
+  let room = null;
+  try {
+    pmrem = new THREE.PMREMGenerator(renderer);
+    room = new RoomEnvironment();
+    scene.environment = pmrem.fromScene(room, 0.04).texture;
+    scene.environmentIntensity = 0.35;
+  } catch (error) {
+    console.error(error);
+    scene.environment = null;
+  }
+  if (room) room.dispose();
+  if (pmrem) pmrem.dispose();
   {
     const pause = step();
     if (pause) await pause;
@@ -258,6 +276,7 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
 
   let post = null;
   let drawPost = true;
+  let drawFailed = false;
   const tier = reduced
     ? "reduced"
     : ((navigator.hardwareConcurrency || 8) <= 4 || narrowScreen() ? "lite" : "full");
@@ -2949,25 +2968,30 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     }
     const draw = (!reduced && !frozen) || moving || holdRender > 0;
     holdRender = Math.max(0, holdRender - step);
-    if (!draw) return;
+    if (!draw || drawFailed) return;
     poseBlobs();
     kit.sync();
     poseGrade();
-    if (post && drawPost) {
-      try {
-        post.composer.render(step);
-      } catch (err) {
-        drawPost = false;
-        renderer.render(scene, camera);
-      }
-      if (drawPost && presentWatch < 3) {
-        presentWatch += 1;
-        if (presentWatch === 3 && presentedBlank()) {
+    try {
+      if (post && drawPost) {
+        try {
+          post.composer.render(step);
+        } catch (err) {
           drawPost = false;
           renderer.render(scene, camera);
         }
-      }
-    } else renderer.render(scene, camera);
+        if (drawPost && presentWatch < 3) {
+          presentWatch += 1;
+          if (presentWatch === 3 && presentedBlank()) {
+            drawPost = false;
+            renderer.render(scene, camera);
+          }
+        }
+      } else renderer.render(scene, camera);
+    } catch (error) {
+      drawFailed = true;
+      document.dispatchEvent(new CustomEvent("cdc-webgl-failed", { detail: error }));
+    }
     const labelsIdle = labelsStill();
     // Crews and pathogens keep moving after the camera settles. CSS2D still
     // has to follow them, but the pin nudge must not run every frame.
@@ -4475,10 +4499,19 @@ export async function createScene(canvas, data, { reduced = false } = {}) {
     armRibbons(list);
   }
 
-  for (const child of scene.children) {
-    renderer.compile(child, camera, scene);
-    const pause = step();
-    if (pause) await pause;
+  // Compiling every object here uploads the whole map before the first frame.
+  // On a phone that spike can drop the WebGL context and abort startup. The
+  // first tick compiles what it draws. Desktop still warms shaders up front.
+  if (!narrowScreen()) {
+    try {
+      for (const child of scene.children) {
+        renderer.compile(child, camera, scene);
+        const pause = step();
+        if (pause) await pause;
+      }
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   return {

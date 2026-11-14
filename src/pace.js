@@ -10,10 +10,21 @@ export function beginSlice() {
 }
 
 function yieldToMain() {
-  const schedulerYield = globalThis.scheduler && globalThis.scheduler.yield;
-  if (typeof schedulerYield === "function") return schedulerYield.call(globalThis.scheduler);
   return new Promise((resolve) => {
-    setTimeout(resolve, 0);
+    const done = () => resolve();
+    try {
+      const host = globalThis.scheduler;
+      const schedulerYield = host && host.yield;
+      if (typeof schedulerYield === "function") {
+        Promise.resolve(schedulerYield.call(host)).then(done, () => {
+          setTimeout(done, 0);
+        });
+        return;
+      }
+    } catch {
+      // A partial scheduler throws. A timeout still gives the browser a turn.
+    }
+    setTimeout(done, 0);
   });
 }
 
