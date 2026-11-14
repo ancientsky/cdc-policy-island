@@ -176,7 +176,7 @@ export async function mountPost({ renderer, scene, camera, tier }) {
     ];
     for (const [name, material, target] of pieces) {
       await breakTask();
-      gtao.renderPass(renderer, material, target, 0xffffff, 1);
+      gtao._renderPass(renderer, material, target, 0xffffff, 1);
     }
   }
   const enabled = composer.passes.map((pass) => pass.enabled);
