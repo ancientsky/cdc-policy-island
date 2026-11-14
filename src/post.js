@@ -8,6 +8,7 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
 import * as P from "./palette.js";
+import { breakTask } from "./pace.js";
 
 const WHITE = new THREE.Color(P.pureWhite);
 const HIDDEN = new THREE.Color(P.k1a3c48);
@@ -161,6 +162,32 @@ export async function mountPost({ renderer, scene, camera, tier }) {
 
   composer.addPass(new OutputPass());
   kinds.push("output");
+  composer.setPixelRatio(1);
+  composer.setSize(4, 4);
+  if (gtao) {
+    const depth = rt.depthTexture || new THREE.DepthTexture(4, 4);
+    gtao.gtaoMaterial.uniforms.tDepth.value = depth;
+    gtao.pdMaterial.uniforms.tDepth.value = depth;
+    const pieces = [
+      ["ao", gtao.gtaoMaterial, gtao.gtaoRenderTarget],
+      ["denoise", gtao.pdMaterial, gtao.pdRenderTarget],
+      ["copy", gtao.copyMaterial, null],
+      ["blend", gtao.blendMaterial, null],
+    ];
+    for (const [name, material, target] of pieces) {
+      await breakTask();
+      gtao.renderPass(renderer, material, target, 0xffffff, 1);
+    }
+  }
+  const enabled = composer.passes.map((pass) => pass.enabled);
+  for (let i = 0; i < composer.passes.length; i += 1) {
+    for (let j = 0; j < composer.passes.length; j += 1) composer.passes[j].enabled = j <= i;
+    await breakTask();
+    composer.render();
+  }
+  composer.passes.forEach((pass, index) => {
+    pass.enabled = enabled[index];
+  });
 
   function resize(cssW, cssH, pixelRatio) {
     composer.setPixelRatio(pixelRatio);

@@ -3,6 +3,7 @@ import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { bindSway } from "./kit.js";
 import * as P from "./palette.js";
+import { step } from "./pace.js";
 
 // Basin, far ridges, forest and clouds around the 14 islands.
 // World +x is east, +z is south. The default camera sits on +z (theta 0.18,
@@ -44,7 +45,7 @@ function qualityPlan(quality) {
   return { seg: 200, trees: 6000 };
 }
 
-export function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null } = {}) {
+export async function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null } = {}) {
   const plan = qualityPlan(quality);
   const rng = mulberry(2285936); // hash seed
   const noise = new SimplexNoise({ random: rng });
@@ -89,17 +90,36 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   const terrainGeo = new THREE.PlaneGeometry(160, 160, plan.seg, plan.seg);
   terrainGeo.rotateX(-Math.PI / 2);
   const pos = terrainGeo.attributes.position;
+  const grid = plan.seg + 1;
+  const heights = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i += 1) {
+    const y = heightAt(pos.getX(i), pos.getZ(i));
+    heights[i] = y;
+    pos.setY(i, y);
+    const pause = step();
+    if (pause) await pause;
+  }
   const colors = new Float32Array(pos.count * 3);
   const sand = new THREE.Color();
   const grass = new THREE.Color();
   const rock = new THREE.Color(ROCK);
   const paint = new THREE.Color();
+  const spanX = 160 / plan.seg;
+  const spanZ = 160 / plan.seg;
   for (let i = 0; i < pos.count; i += 1) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    const y = heightAt(x, z);
-    pos.setY(i, y);
-    const slope = Math.hypot(heightAt(x + 1.2, z) - heightAt(x - 1.2, z), heightAt(x, z + 1.2) - heightAt(x, z - 1.2)) / 2.4;
+    const ix = i % grid;
+    const iz = (i / grid) | 0;
+    const ix0 = Math.max(0, ix - 1);
+    const ix1 = Math.min(grid - 1, ix + 1);
+    const iz0 = Math.max(0, iz - 1);
+    const iz1 = Math.min(grid - 1, iz + 1);
+    const dx = (ix1 - ix0) * spanX || spanX;
+    const dz = (iz1 - iz0) * spanZ || spanZ;
+    const slope = Math.hypot(
+      (heights[iz * grid + ix1] - heights[iz * grid + ix0]) / dx,
+      (heights[iz1 * grid + ix] - heights[iz0 * grid + ix]) / dz,
+    );
+    const y = heights[i];
     const bandT = smoothstep(-1.2, 7.2, y);
     let lo = BANDS[0];
     let hi = BANDS[BANDS.length - 1];
@@ -115,12 +135,20 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     grass.set(hi.color);
     paint.copy(sand).lerp(grass, (bandT - lo.t) / span);
     if (slope > 0.35) paint.lerp(rock, Math.min(1, (slope - 0.35) / 0.45));
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
     const wobble = 1 + noise.noise3d(x * 0.17, z * 0.17, 4) * 0.025;
     colors[i * 3] = paint.r * wobble;
     colors[i * 3 + 1] = paint.g * wobble;
     colors[i * 3 + 2] = paint.b * wobble;
+    const pause = step();
+    if (pause) await pause;
   }
   terrainGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
   terrainGeo.computeVertexNormals();
   const terrainMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -172,6 +200,10 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   let guard = 0;
   while (spots.length < plan.trees && guard < plan.trees * 50) {
     guard += 1;
+    {
+      const pause = step();
+      if (pause) await pause;
+    }
     let x;
     let z;
     const roll = rng();
@@ -195,7 +227,7 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     spots.push({ x, y, z, scale: northTree ? northScale : 0.72 + rng() * 0.4, pine: rng() < 0.55 });
   }
 
-  function plant(geo, list, color, sway) {
+  async function plant(geo, list, color, sway) {
     if (!list.length) return null;
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true });
     if (sway && motion) bindSway(mat, motion);
@@ -205,13 +237,16 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
     mesh.receiveShadow = true;
     mesh.raycast = () => {};
     const dummy = new THREE.Object3D();
-    list.forEach((spot, index) => {
+    for (let index = 0; index < list.length; index += 1) {
+      const spot = list[index];
       dummy.position.set(spot.x, spot.y, spot.z);
       dummy.scale.setScalar(spot.scale);
       dummy.rotation.y = spot.x * 0.2;
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
-    });
+      const pause = step();
+      if (pause) await pause;
+    }
     mesh.instanceMatrix.needsUpdate = true;
     scene.add(mesh);
     meshes.push(mesh);
@@ -219,9 +254,9 @@ export function createEnvironment(THREE, scene, { quality = "high", camera = nul
   }
   const pines = spots.filter((spot) => spot.pine);
   const rounds = spots.filter((spot) => !spot.pine);
-  plant(pineGeo, pines, P.k5c9a70, true);
-  plant(roundGeo, rounds, P.k6a9a58, true);
-  plant(trunkGeo, spots, P.k9a7a58, false);
+  await plant(pineGeo, pines, P.k5c9a70, true);
+  await plant(roundGeo, rounds, P.k6a9a58, true);
+  await plant(trunkGeo, spots, P.k9a7a58, false);
 
   const ridgeMix = [0.3, 0.55, 0.78];
   const ridgeBase = [new THREE.Color(P.k68967a), new THREE.Color(P.k7d92a4), new THREE.Color(P.k8aa4b4)];

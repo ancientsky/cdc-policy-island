@@ -1,4 +1,5 @@
 import "./style.css";
+import { beginSlice, paintFirst } from "./pace.js";
 
 const serifFont = new URL("./fonts/NotoSerifTC-Bold.subset.woff2", import.meta.url);
 const preloadFont = document.createElement("link");
@@ -209,8 +210,11 @@ function revealVeil() {
 
 async function bootScene() {
   try {
+    await paintFirst();
     const { createScene } = await import("./scene.js");
-    impl = createScene(canvas, { islands, flows }, { reduced });
+    await paintFirst();
+    beginSlice();
+    impl = await createScene(canvas, { islands, flows }, { reduced });
     impl.onPick(pick);
     impl.onArrive(arrive);
     for (const [name, args] of queued.splice(0)) impl[name](...args);

@@ -10,6 +10,7 @@ import * as P from "./palette.js";
 import { addIslandDecor, addSeaDecor, buildingParts, decorReport, prepareLeaf, resetDecor, seaState } from "./decor.js";
 import { createLife } from "./life.js";
 import { createEnvironment } from "./environment.js";
+import { step } from "./pace.js";
 import { createPeople } from "./people.js";
 import { play as playSfx } from "./sfx.js";
 import { Line2 } from "three/addons/lines/Line2.js";
@@ -224,7 +225,7 @@ function lookAtHour(hour) {
   };
 }
 
-export function createScene(canvas, data, { reduced = false } = {}) {
+export async function createScene(canvas, data, { reduced = false } = {}) {
   let introAt = 0;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   const narrowScreen = () => (canvas.clientWidth || window.innerWidth || 1200) < 980;
@@ -250,6 +251,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   scene.environmentIntensity = 0.35;
   room.dispose();
   pmrem.dispose();
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
 
   let post = null;
   let drawPost = true;
@@ -450,6 +455,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   const water = new THREE.Mesh(waterGeo, waterMat);
   water.receiveShadow = false;
   scene.add(water);
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
 
   const sandMat = new THREE.MeshBasicMaterial({ color: P.ce9d6a8, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
   const sandGeo = new THREE.CircleGeometry(0.6, 6);
@@ -529,6 +538,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   };
   const kit = createKit(motion);
   const life = createLife(scene, { motion, reduced });
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
   kit.geo("box", box);
   kit.geo("cyl", unitCyl);
   kit.geo("cone", unitCone);
@@ -778,10 +791,14 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       [0.32, 0.6],
       [0.02, -0.35],
     ];
-    const buildings = island.items.map((item, index) => {
+    const buildings = [];
+    for (let index = 0; index < island.items.length; index += 1) {
+      const item = island.items[index];
       const [sx, sz] = spots[index] ?? spots[index % spots.length];
-      return house(group, item, sx, sz, index, island);
-    });
+      buildings.push(house(group, item, sx, sz, index, island));
+      const pause = step();
+      if (pause) await pause;
+    }
 
     addKit(group, island, lamps, kit, life);
     addIslandDecor(group, island, kit, lamps, placed, spots.slice(0, island.items.length));
@@ -824,6 +841,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       base: new THREE.Vector3(x, 0.4, z),
       hay,
     });
+    {
+      const pause = step();
+      if (pause) await pause;
+    }
   }
 
   const introOrder = [...views.values()].sort((a, b) => {
@@ -951,7 +972,11 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     route.glowGeo.instanceCount = drawn;
     route.curve = curve;
   }
-  for (const route of flowViews) layoutRoute(route);
+  for (const route of flowViews) {
+    layoutRoute(route);
+    const pause = step();
+    if (pause) await pause;
+  }
 
   const skinHex = [P.cf0c7a4, P.cd9a57a, P.cc48a6a, P.c8d5a3c];
   let cargoOn = false;
@@ -1697,6 +1722,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
   let markCb = () => {};
   let strikeCb = () => {};
   let repelCb = () => {};
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
   const people = createPeople({
     scene,
     renderer,
@@ -1710,6 +1739,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       arriveCb(event);
     },
   });
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -3850,17 +3883,25 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     ...placed.map((point) => ({ x: point.x, z: point.z, r: MESH_R + 1.15 })),
     ...sea.islets.map((spot) => ({ x: spot.x, z: spot.z, r: 1.35 })),
   ]);
-  const environment = createEnvironment(THREE, scene, {
+  const environment = await createEnvironment(THREE, scene, {
     quality: narrowScreen() ? "mid" : "high",
     camera,
     clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
     motion,
   });
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
   placeImportLanes();
   if (!reduced) {
     for (const view of views.values()) {
       for (const rec of view.treeRecs) rec.scaleMul = 0;
     }
+  }
+  {
+    const pause = step();
+    if (pause) await pause;
   }
   kit.build(scene);
   scene.traverse((obj) => {
@@ -3870,6 +3911,10 @@ export function createScene(canvas, data, { reduced = false } = {}) {
       mat.needsUpdate = true;
     }
   });
+  {
+    const pause = step();
+    if (pause) await pause;
+  }
   refresh();
   applyClock();
   paintedMinutes = minutes;
@@ -4428,6 +4473,12 @@ export function createScene(canvas, data, { reduced = false } = {}) {
     flight.ease = "sine";
     flight.celebrate = true;
     armRibbons(list);
+  }
+
+  for (const child of scene.children) {
+    renderer.compile(child, camera, scene);
+    const pause = step();
+    if (pause) await pause;
   }
 
   return {
