@@ -18,7 +18,7 @@ assertHexFrame();
 validate();
 applyLocale(savedLang());
 
-let canvas = document.querySelector("#c");
+const canvas = document.querySelector("#c");
 const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const veil = document.querySelector("#veil");
 
@@ -142,23 +142,6 @@ const screenWatch = new IntersectionObserver((entries) => {
   if (onScreen) startLoop();
 });
 screenWatch.observe(canvas);
-
-function replaceCanvas() {
-  try {
-    const gl = canvas.getContext("webgl2");
-    const lose = gl && gl.getExtension("WEBGL_lose_context");
-    if (lose) lose.loseContext();
-  } catch (error) {
-    console.error(error);
-  }
-  canvas.parentElement?.querySelectorAll(":scope > .labels").forEach((node) => node.remove());
-  const next = canvas.cloneNode(false);
-  canvas.replaceWith(next);
-  screenWatch.unobserve(canvas);
-  canvas = next;
-  screenWatch.observe(canvas);
-}
-
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible" || !canvasInView()) return;
   onScreen = true;
@@ -241,14 +224,7 @@ async function bootScene() {
     const { createScene } = await import("./scene.js");
     await paintFirst();
     beginSlice();
-    try {
-      impl = await createScene(canvas, { islands, flows }, { reduced });
-    } catch (error) {
-      console.error(error);
-      replaceCanvas();
-      beginSlice();
-      impl = await createScene(canvas, { islands, flows }, { reduced, rescue: true });
-    }
+    impl = await createScene(canvas, { islands, flows }, { reduced });
     impl.onPick(pick);
     impl.onArrive(arrive);
     for (const [name, args] of queued.splice(0)) impl[name](...args);

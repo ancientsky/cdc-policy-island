@@ -245,6 +245,23 @@ function takeWebgl2(canvas, sets) {
   return null;
 }
 
+// Pixel 10's PowerVR DXT resets the GPU when a shadow map is drawn, and the
+// next attempt to open a WebGL context then fails. One context, no shadows.
+function fragileGpu(gl) {
+  try {
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const parts = [
+      ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "",
+      ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : "",
+      gl.getParameter(gl.RENDERER),
+      gl.getParameter(gl.VENDOR),
+    ];
+    return /PowerVR|Imagination/i.test(parts.join(" "));
+  } catch {
+    return false;
+  }
+}
+
 function webglSets(plain) {
   const base = {
     alpha: false,
@@ -267,6 +284,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   const tight = rescue || narrowScreen();
   const gl = takeWebgl2(canvas, webglSets(tight));
   if (!gl) throw new Error("Error creating WebGL context.");
+  const powervr = fragileGpu(gl);
+  const noShadow = rescue || powervr;
   const renderer = new THREE.WebGLRenderer({ canvas, context: gl });
   let pixelCap = Math.min(window.devicePixelRatio || 1, tight ? 1 : 2);
   renderer.setPixelRatio(pixelCap);
@@ -278,11 +297,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
 
   function touchContext() {
     const current = renderer.getContext();
-    if (!current || current.isContextLost()) throw new Error("WebGL context lost");
+    if (!current || current.isContextLost() || powervr) return;
     try {
       current.clear(current.COLOR_BUFFER_BIT);
     } catch (error) {
-      if (current.isContextLost()) throw new Error("WebGL context lost");
       console.error(error);
     }
   }
@@ -295,7 +313,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   function presentFrame() {
-    touchContext();
+    const current = renderer.getContext();
+    if (!current || current.isContextLost()) return;
     const { W, H } = viewSize();
     if (W > 2 && H > 2) {
       renderer.setPixelRatio(pixelCap);
@@ -306,9 +325,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     try {
       renderer.render(scene, camera);
     } catch (error) {
-      const current = renderer.getContext();
-      if (!current || current.isContextLost()) throw new Error("WebGL context lost");
-      throw error;
+      console.error(error);
     }
   }
   // Noon starts on Neutral. applyClock multiplies LOOKS exposure by toneScale so the table itself stays unchanged.
@@ -316,24 +333,27 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let toneScale = 0.9;
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = !rescue;
+  renderer.shadowMap.enabled = !noShadow;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
-  renderer.shadowMap.needsUpdate = !rescue;
+  renderer.shadowMap.needsUpdate = !noShadow;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(P.cf7e6cf);
   scene.fog = new THREE.FogExp2(P.kd8eef0, 0.013);
+  let environmentExpected = !powervr;
   let pmrem = null;
   let room = null;
-  try {
-    pmrem = new THREE.PMREMGenerator(renderer);
-    room = new RoomEnvironment();
-    scene.environment = pmrem.fromScene(room, 0.04).texture;
-    scene.environmentIntensity = 0.35;
-  } catch (error) {
-    console.error(error);
-    scene.environment = null;
+  if (!powervr) {
+    try {
+      pmrem = new THREE.PMREMGenerator(renderer);
+      room = new RoomEnvironment();
+      scene.environment = pmrem.fromScene(room, 0.04).texture;
+      scene.environmentIntensity = 0.35;
+    } catch (error) {
+      console.error(error);
+      scene.environment = null;
+    }
   }
   if (room) room.dispose();
   if (pmrem) pmrem.dispose();
@@ -407,8 +427,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(P.kfff3df, 1.35);
   sun.position.set(16, 22, 10);
-  sun.castShadow = !rescue;
-  if (!rescue) sun.shadow.mapSize.set(narrowScreen() ? 512 : 2048, narrowScreen() ? 512 : 2048);
+  sun.castShadow = !noShadow;
+  if (!noShadow) sun.shadow.mapSize.set(narrowScreen() ? 512 : 2048, narrowScreen() ? 512 : 2048);
   sun.shadow.camera.near = 2;
   sun.shadow.camera.far = 70;
   sun.shadow.camera.left = -20;
@@ -2418,7 +2438,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const cap = Math.min(window.devicePixelRatio || 1, (W < 980 || rescue) ? 1 : 2);
     if (cap < pixelCap) pixelCap = cap;
     renderer.setPixelRatio(pixelCap);
-    if (rescue) {
+    if (noShadow) {
       sun.castShadow = false;
       renderer.shadowMap.enabled = false;
     } else {
@@ -3062,6 +3082,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         }
       } else renderer.render(scene, camera);
     } catch (error) {
+      const current = renderer.getContext();
+      if (!current || current.isContextLost()) {
+        console.error(error);
+        return;
+      }
       drawFailed = true;
       document.dispatchEvent(new CustomEvent("cdc-webgl-failed", { detail: error }));
     }
@@ -3981,13 +4006,25 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     ...sea.islets.map((spot) => ({ x: spot.x, z: spot.z, r: 1.35 })),
   ]);
   presentFrame();
-  const environment = await createEnvironment(THREE, scene, {
-    quality: narrowScreen() ? "mid" : "high",
-    camera,
-    clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
-    motion,
-    pulse: touchContext,
-  });
+  let environment;
+  try {
+    environment = await createEnvironment(THREE, scene, {
+      quality: narrowScreen() ? "mid" : "high",
+      camera,
+      clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
+      motion,
+      pulse: touchContext,
+    });
+  } catch (error) {
+    console.error(error);
+    environment = {
+      setTime() {},
+      update() {},
+      heightAt() { return -5; },
+      info() { return { draws: 0, trees: 0, lights: 0 }; },
+      cloudSample() { return []; },
+    };
+  }
   {
     const pause = pauseSlice();
     if (pause) await pause;
@@ -4943,7 +4980,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       if (envInfo.draws > 12) errors.push(`environment draws ${envInfo.draws}`);
       if (envInfo.trees < 3000) errors.push(`environment trees ${envInfo.trees}`);
       if (envInfo.lights < 200) errors.push(`village lights ${envInfo.lights} < 200`);
-      if (!scene.environment || scene.environment.isTexture !== true) errors.push("scene.environment is not a texture");
+      if (environmentExpected && (!scene.environment || scene.environment.isTexture !== true)) errors.push("scene.environment is not a texture");
       if (sun.shadow.normalBias !== 0.02) errors.push(`sun normalBias ${sun.shadow.normalBias}`);
 
       // Sample offsets around the quarantine island, not a heading frame.
