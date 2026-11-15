@@ -1,3 +1,4 @@
+import "./errors.js";
 import "./style.css";
 import { beginSlice, paintFirst } from "./pace.js";
 
@@ -61,6 +62,7 @@ function fallbackScene() {
     debugState: () => ({ flows: 0, lit: [] }),
     onContextLoss: () => () => {},
     isLost: () => false,
+    diagnostics: () => null,
   };
 }
 
@@ -71,7 +73,7 @@ let ready = false;
 const queued = [];
 let pick = () => {};
 let arrive = () => {};
-const passthrough = new Set(["tick", "resize", "isBird", "getTheta", "selfTest", "debugState", "onContextLoss", "isLost"]);
+const passthrough = new Set(["tick", "resize", "isBird", "getTheta", "selfTest", "debugState", "onContextLoss", "isLost", "diagnostics"]);
 const scene = new Proxy({}, {
   get(_target, key) {
     if (key === "onPick") {
@@ -336,3 +338,44 @@ async function bootScene() {
   }
 }
 bootScene();
+
+let debugLoading = null;
+
+function openDebug() {
+  if (document.querySelector("#dbg") || debugLoading) return;
+  debugLoading = import("./debug.js")
+    .then((mod) => {
+      debugLoading = null;
+      mod.mountDebug({ scene, canvas });
+    })
+    .catch((error) => {
+      debugLoading = null;
+      console.error(error);
+    });
+}
+
+if (new URLSearchParams(location.search).has("debug")) openDebug();
+
+const brandTitle = document.querySelector("#brand-title");
+if (brandTitle) {
+  brandTitle.addEventListener("pointerdown", (event) => {
+    if (event.button > 0) return;
+    const id = event.pointerId;
+    const origin = { x: event.clientX, y: event.clientY };
+    const timer = window.setTimeout(() => openDebug(), 1200);
+    const end = (ev) => {
+      if (ev.pointerId !== id) return;
+      window.clearTimeout(timer);
+      brandTitle.removeEventListener("pointerup", end);
+      brandTitle.removeEventListener("pointercancel", end);
+      brandTitle.removeEventListener("pointermove", move);
+    };
+    const move = (ev) => {
+      if (ev.pointerId !== id) return;
+      if (Math.hypot(ev.clientX - origin.x, ev.clientY - origin.y) > 12) end(ev);
+    };
+    brandTitle.addEventListener("pointerup", end);
+    brandTitle.addEventListener("pointercancel", end);
+    brandTitle.addEventListener("pointermove", move);
+  });
+}

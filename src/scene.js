@@ -284,6 +284,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   const tight = rescue || narrowScreen();
   const gl = takeWebgl2(canvas, webglSets(tight));
   if (!gl) throw new Error("Error creating WebGL context.");
+  const shadowShaders = new WeakSet();
+  const shaderSource = gl.shaderSource.bind(gl);
+  gl.shaderSource = function (shader, source) {
+    if (typeof source === "string" && source.includes("#define USE_SHADOWMAP")) shadowShaders.add(shader);
+    return shaderSource(shader, source);
+  };
   const powervr = fragileGpu(gl);
   const noShadow = rescue || powervr;
   const renderer = new THREE.WebGLRenderer({ canvas, context: gl });
@@ -361,6 +367,35 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     setLabelsHidden(false);
     emitLoss(false);
   });
+
+  renderer.debug.onShaderError = (glContext, program, vertexShader, fragmentShader) => {
+    let programLog = "";
+    try {
+      programLog = (glContext.getProgramInfoLog(program) || "").trim();
+    } catch {
+      programLog = "";
+    }
+    let lostNow = false;
+    try {
+      lostNow = Boolean(glContext.isContextLost?.());
+    } catch {
+      lostNow = true;
+    }
+    const recentLost = (window.__glEvents || []).some((event) => event.type === "lost" && performance.now() - event.t <= 1000);
+    if (!programLog && (lostNow || recentLost || contextLost)) {
+      console.error("GPU lost during link");
+      return;
+    }
+    let vertexLog = "";
+    let fragmentLog = "";
+    try {
+      vertexLog = (glContext.getShaderInfoLog(vertexShader) || "").trim();
+      fragmentLog = (glContext.getShaderInfoLog(fragmentShader) || "").trim();
+    } catch {
+      vertexLog = "";
+    }
+    console.error(["WebGLProgram: Shader Error", programLog, vertexLog, fragmentLog].filter(Boolean).join("\n"));
+  };
 
   let pixelCap = Math.min(window.devicePixelRatio || 1, tight ? 1 : 2);
   renderer.setPixelRatio(pixelCap);
@@ -4726,6 +4761,78 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     isLost() {
       const current = renderer.getContext();
       return contextLost || !current || Boolean(current.isContextLost?.());
+    },
+    diagnostics() {
+      const current = renderer.getContext();
+      const lost = contextLost || !current || Boolean(current.isContextLost?.());
+      let attrs = null;
+      let gpu = "unknown";
+      let caps = "n/a";
+      if (current && !lost) {
+        try {
+          attrs = current.getContextAttributes();
+        } catch {
+          attrs = null;
+        }
+        try {
+          const ext = current.getExtension("WEBGL_debug_renderer_info");
+          const rendererName = ext ? current.getParameter(ext.UNMASKED_RENDERER_WEBGL) : current.getParameter(current.RENDERER);
+          const vendorName = ext ? current.getParameter(ext.UNMASKED_VENDOR_WEBGL) : current.getParameter(current.VENDOR);
+          gpu = [rendererName, vendorName].filter(Boolean).join(" / ") || "unknown";
+        } catch {
+          gpu = "unknown";
+        }
+        try {
+          const names = [
+            ["MAX_SAMPLES", current.getParameter(current.MAX_SAMPLES)],
+            ["MAX_TEXTURE_SIZE", current.getParameter(current.MAX_TEXTURE_SIZE)],
+            ["MAX_RENDERBUFFER_SIZE", current.getParameter(current.MAX_RENDERBUFFER_SIZE)],
+            ["EXT_color_buffer_half_float", Boolean(current.getExtension("EXT_color_buffer_half_float"))],
+            ["EXT_color_buffer_float", Boolean(current.getExtension("EXT_color_buffer_float"))],
+            ["OES_texture_float_linear", Boolean(current.getExtension("OES_texture_float_linear"))],
+            ["KHR_parallel_shader_compile", Boolean(current.getExtension("KHR_parallel_shader_compile"))],
+          ];
+          caps = names.map(([name, value]) => `${name}=${value}`).join(" ");
+        } catch {
+          caps = "n/a";
+        }
+      }
+      const programs = renderer.info.programs ?? [];
+      const byKey = programs.filter((item) => typeof item.cacheKey === "string" && item.cacheKey.includes("shadowMapEnabled")).length;
+      const bySource = programs.filter((item) => shadowShaders.has(item.vertexShader) || shadowShaders.has(item.fragmentShader)).length;
+      let posted = { tier, kinds: [], samples: 0, half: false };
+      if (post) {
+        try {
+          posted = post.info();
+        } catch {
+          posted = { tier, kinds: [], samples: 0, half: false };
+        }
+      }
+      const attrText = attrs
+        ? `antialias:${attrs.antialias} alpha:${attrs.alpha} powerPreference:${attrs.powerPreference || "default"}`
+        : "n/a";
+      return {
+        build: typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev",
+        builtAt: typeof __BUILD_AT__ === "string" ? __BUILD_AT__ : "",
+        ua: navigator.userAgent || "unknown",
+        gpu,
+        fragileGpu: powervr,
+        webgl: `webgl2, attrs = ${attrText}`,
+        dpr: window.devicePixelRatio || 1,
+        pixelRatio: renderer.getPixelRatio(),
+        css: `${canvas.clientWidth || 0}×${canvas.clientHeight || 0}`,
+        buffer: current ? `${current.drawingBufferWidth || 0}×${current.drawingBufferHeight || 0}` : "0×0",
+        caps,
+        tier: `tier=${posted.tier || tier} kinds=${(posted.kinds || []).join(",") || "none"} samples=${posted.samples ?? 0} half=${posted.half ?? false} draw=${Boolean(post) && drawPost}`,
+        shadow: `${renderer.shadowMap.enabled ? "true" : "false"} cast=${sun.castShadow ? "true" : "false"} map=${sun.shadow.mapSize.x}`,
+        programs: programs.length,
+        shadowPrograms: byKey || bySource,
+        draws: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+        lost,
+        events: (window.__glEvents || []).slice(),
+        quality: "n/a",
+      };
     },
     setSafeRect,
     setMinutes(value) { minutes = value; },
