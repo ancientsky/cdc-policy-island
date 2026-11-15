@@ -280,9 +280,13 @@ function webglSets(plain) {
 
 export async function createScene(canvas, data, { reduced = false, rescue = false } = {}) {
   let introAt = 0;
+  // The short side is known before any GL call. PowerVR is not, and this canvas
+  // cannot take a second attribute set, so only phoneLike may force antialias off.
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const phoneLike = coarse && Math.min(screen.width, screen.height) < 600;
   const narrowScreen = () => (canvas.clientWidth || window.innerWidth || 1200) < 980;
   const tight = rescue || narrowScreen();
-  const gl = takeWebgl2(canvas, webglSets(tight));
+  const gl = takeWebgl2(canvas, webglSets(phoneLike || tight));
   if (!gl) throw new Error("Error creating WebGL context.");
   const shadowShaders = new WeakSet();
   const shaderSource = gl.shaderSource.bind(gl);
@@ -291,6 +295,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     return shaderSource(shader, source);
   };
   const powervr = fragileGpu(gl);
+  const deviceClass = powervr ? "fragile" : (phoneLike ? "phone" : "desktop");
   const noShadow = rescue || powervr;
   const renderer = new THREE.WebGLRenderer({ canvas, context: gl });
   // A loss can arrive while createScene is still building later bindings.
@@ -397,7 +402,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     console.error(["WebGLProgram: Shader Error", programLog, vertexLog, fragmentLog].filter(Boolean).join("\n"));
   };
 
-  let pixelCap = Math.min(window.devicePixelRatio || 1, tight ? 1 : 2);
+  const pixelLimit = deviceClass === "fragile" ? 1 : deviceClass === "phone" ? 1.5 : (tight ? 1 : 2);
+  let pixelCap = Math.min(window.devicePixelRatio || 1, pixelLimit);
   renderer.setPixelRatio(pixelCap);
   try {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -477,7 +483,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let drawFailed = false;
   const tier = reduced
     ? "reduced"
-    : ((navigator.hardwareConcurrency || 8) <= 4 || narrowScreen() ? "lite" : "full");
+    : (deviceClass !== "desktop" || (navigator.hardwareConcurrency || 8) <= 4 || narrowScreen() ? "lite" : "full");
 
   const skySunDir = new THREE.Vector3(0.45, 0.7, 0.3);
   const skyMat = new THREE.ShaderMaterial({
@@ -1952,6 +1958,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     views,
     flows: data.flows,
     crews,
+    deviceClass,
     onArrive: (event) => {
       flashHandoff(event.to, event.carried);
       playSfx("arrive");
@@ -2547,7 +2554,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   function resize() {
     const { W, H } = viewSize();
     if (W < 2 || H < 2) return;
-    const cap = Math.min(window.devicePixelRatio || 1, (W < 980 || rescue) ? 1 : 2);
+    const cap = Math.min(window.devicePixelRatio || 1, (W < 980 || rescue) ? 1 : 2, pixelLimit);
     if (cap < pixelCap) pixelCap = cap;
     renderer.setPixelRatio(pixelCap);
     if (noShadow) {
@@ -4616,7 +4623,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   import("./post.js")
-    .then((mod) => mod.mountPost({ renderer, scene, camera, tier }))
+    .then((mod) => mod.mountPost({ renderer, scene, camera, tier, deviceClass }))
     .then((api) => {
       post = api;
       resize();
@@ -4730,7 +4737,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   // Compiling every object here uploads the whole map before the first frame.
   // On a phone that spike can drop the WebGL context and abort startup. The
   // first tick compiles what it draws. Desktop still warms shaders up front.
-  if (!narrowScreen()) {
+  if (deviceClass === "desktop" && !narrowScreen()) {
     try {
       for (const child of scene.children) {
         renderer.compile(child, camera, scene);
@@ -4800,12 +4807,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       const programs = renderer.info.programs ?? [];
       const byKey = programs.filter((item) => typeof item.cacheKey === "string" && item.cacheKey.includes("shadowMapEnabled")).length;
       const bySource = programs.filter((item) => shadowShaders.has(item.vertexShader) || shadowShaders.has(item.fragmentShader)).length;
-      let posted = { tier, kinds: [], samples: 0, half: false };
+      let posted = { tier, kinds: [], samples: 0, half: false, deviceClass, depthTexture: false };
       if (post) {
         try {
           posted = post.info();
         } catch {
-          posted = { tier, kinds: [], samples: 0, half: false };
+          posted = { tier, kinds: [], samples: 0, half: false, deviceClass, depthTexture: false };
         }
       }
       const attrText = attrs
@@ -4823,7 +4830,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         css: `${canvas.clientWidth || 0}×${canvas.clientHeight || 0}`,
         buffer: current ? `${current.drawingBufferWidth || 0}×${current.drawingBufferHeight || 0}` : "0×0",
         caps,
-        tier: `tier=${posted.tier || tier} kinds=${(posted.kinds || []).join(",") || "none"} samples=${posted.samples ?? 0} half=${posted.half ?? false} draw=${Boolean(post) && drawPost}`,
+        tier: `tier=${posted.tier || tier} device=${posted.deviceClass || deviceClass} kinds=${(posted.kinds || []).join(",") || "none"} samples=${posted.samples ?? 0} half=${posted.half ?? false} depth=${posted.depthTexture ? "true" : "false"} draw=${Boolean(post) && drawPost}`,
         shadow: `${renderer.shadowMap.enabled ? "true" : "false"} cast=${sun.castShadow ? "true" : "false"} map=${sun.shadow.mapSize.x}`,
         programs: programs.length,
         shadowPrograms: byKey || bySource,

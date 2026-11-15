@@ -70,24 +70,62 @@ function colorTargetOk(gl, { samples, half }) {
   return ok;
 }
 
-export async function mountPost({ renderer, scene, camera, tier }) {
+export async function mountPost({ renderer, scene, camera, tier, deviceClass = "desktop" }) {
   // Phones often cannot multisample a half-float target. An incomplete buffer
   // leaves the canvas black, so the narrow tier skips MSAA and drops to bytes
   // when half-float itself is missing. Desktop GTAO still reads the color-pass depth.
   const gl = renderer.getContext();
   const full = tier === "full";
   let samples = full ? 4 : 0;
+  try {
+    const maxSamples = gl.getParameter(gl.MAX_SAMPLES);
+    if (Number.isFinite(maxSamples)) samples = Math.min(samples, maxSamples);
+  } catch {
+    samples = 0;
+  }
   let half = true;
   if (!colorTargetOk(gl, { samples, half: true })) {
     samples = 0;
     half = colorTargetOk(gl, { samples: 0, half: true });
   }
   renderer.state.reset();
-  const rt = new THREE.WebGLRenderTarget(1, 1, {
-    type: half ? THREE.HalfFloatType : THREE.UnsignedByteType,
-    samples,
-    ...(full ? { depthTexture: new THREE.DepthTexture(1, 1) } : {}),
-  });
+  let depthOn = full;
+
+  function makeTarget(sampleCount, withDepth) {
+    return new THREE.WebGLRenderTarget(1, 1, {
+      type: half ? THREE.HalfFloatType : THREE.UnsignedByteType,
+      samples: sampleCount,
+      ...(withDepth ? { depthTexture: new THREE.DepthTexture(1, 1) } : {}),
+    });
+  }
+
+  function boundTargetOk(target) {
+    let complete = false;
+    try {
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      const error = gl.getError();
+      complete = status === gl.FRAMEBUFFER_COMPLETE && error === gl.NO_ERROR;
+    } catch {
+      complete = false;
+    }
+    try {
+      renderer.setRenderTarget(null);
+    } catch {
+      // The failed target is discarded below.
+    }
+    return complete;
+  }
+
+  let rt = makeTarget(samples, depthOn);
+  if (!boundTargetOk(rt)) {
+    rt.dispose();
+    samples = 0;
+    depthOn = false;
+    rt = makeTarget(0, false);
+  }
+  renderer.state.reset();
   const composer = new EffectComposer(renderer, rt);
   const kinds = ["render"];
   const renderPass = new RenderPass(scene, camera);
@@ -100,7 +138,7 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   let vTilt = null;
   let vignette = null;
 
-  if (tier === "full") {
+  if (tier === "full" && depthOn) {
     const { GTAOPass } = await import("three/addons/postprocessing/GTAOPass.js");
     gtao = new GTAOPass(scene, camera, 1, 1);
     gtao.blendIntensity = 0.6;
@@ -258,9 +296,11 @@ export async function mountPost({ renderer, scene, camera, tier }) {
   function info() {
     return {
       tier,
+      deviceClass,
       kinds: kinds.slice(),
       passes: composer.passes.length,
       samples: composer.renderTarget1.samples,
+      depthTexture: Boolean(composer.renderTarget1.depthTexture),
       half: half,
       bloom: bloom
         ? { strength: bloom.strength, threshold: bloom.threshold, radius: bloom.radius }

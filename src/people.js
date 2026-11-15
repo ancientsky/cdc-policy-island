@@ -327,7 +327,7 @@ function resizeChannel(mesh, count) {
   return fresh;
 }
 
-export function createPeople({ scene, renderer, camera, views, flows, crews, onArrive }) {
+export function createPeople({ scene, renderer, camera, views, flows, crews, onArrive, deviceClass = "desktop" }) {
   const graph = buildGraph(views);
   const { channels } = makeChannels(scene);
   const list = [];
@@ -798,7 +798,7 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
     };
   }
 
-  const portrait = buildPortrait(renderer);
+  const portrait = buildPortrait(renderer, deviceClass);
 
   function counts() {
     let walkers = 0;
@@ -888,7 +888,7 @@ export function createPeople({ scene, renderer, camera, views, flows, crews, onA
   };
 }
 
-function buildPortrait(renderer) {
+function buildPortrait(renderer, deviceClass) {
   const portraitScene = new THREE.Scene();
   portraitScene.background = new THREE.Color(P.cf4efe4);
   portraitScene.add(new THREE.AmbientLight(P.kfff4e8, 0.85));
@@ -930,7 +930,9 @@ function buildPortrait(renderer) {
     portraitScene.add(group);
     groups.set(role, group);
   }
-  let target = new THREE.WebGLRenderTarget(160, 160, { samples: 4 });
+  const maxSamples = renderer.capabilities.maxSamples || 0;
+  const samples = deviceClass === "desktop" ? Math.min(4, maxSamples) : 0;
+  let target = new THREE.WebGLRenderTarget(160, 160, { samples });
   target.texture.colorSpace = THREE.SRGBColorSpace;
   let plain = null;
   const buffer = new Uint8Array(160 * 160 * 4);
