@@ -2,6 +2,7 @@
 import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { bindSway } from "./kit.js";
+import { textureCanvas } from "./canvas2d.js";
 import * as P from "./palette.js";
 import { step } from "./pace.js";
 
@@ -375,10 +376,7 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
 
   const shadowGeo = new THREE.CircleGeometry(4.2, 20);
   shadowGeo.rotateX(-Math.PI / 2);
-  const shadowCanvas = document.createElement("canvas");
-  shadowCanvas.width = 64;
-  shadowCanvas.height = 64;
-  const shadowCtx = shadowCanvas.getContext("2d");
+  const { canvas: shadowCanvas, g: shadowCtx } = textureCanvas(64, 64);
   const shadowGrad = shadowCtx.createRadialGradient(32, 32, 2, 32, 32, 32);
   shadowGrad.addColorStop(0, "rgba(36, 44, 52, 1)");
   shadowGrad.addColorStop(0.55, "rgba(36, 44, 52, 0.55)");

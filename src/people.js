@@ -7,6 +7,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { MESH_R } from "./hex.js";
 import { t } from "./i18n.js";
 import * as P from "./palette.js";
+import { textureCanvas } from "./canvas2d.js";
 
 const RING = MESH_R * 0.8;
 const SPEED = 0.42;
@@ -936,10 +937,7 @@ function buildPortrait(renderer, deviceClass) {
   target.texture.colorSpace = THREE.SRGBColorSpace;
   let plain = null;
   const buffer = new Uint8Array(160 * 160 * 4);
-  const canvas = document.createElement("canvas");
-  canvas.width = 160;
-  canvas.height = 160;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const { canvas, g: ctx } = textureCanvas(160, 160);
   const cache = new Map();
 
   function shoot(person) {

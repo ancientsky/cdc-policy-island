@@ -47,7 +47,7 @@ npm install
 npm run dev
 ```
 
-開發伺服器在 <http://localhost:5173/>。畫布中斷的檢查：`node scripts/check-webgl-loss.mjs`（開發伺服器要先開著）。診斷面板的檢查：`node scripts/check-debug.mjs`（會先建置，預覽在 4173）。裝置畫質的檢查：`node scripts/check-device-class.mjs`（會先建置，預覽在 4173）。畫質階梯的檢查：`node scripts/check-quality.mjs`（會先建置，預覽在 4173）。
+開發伺服器在 <http://localhost:5173/>。畫布中斷的檢查：`node scripts/check-webgl-loss.mjs`（開發伺服器要先開著）。診斷面板的檢查：`node scripts/check-debug.mjs`（會先建置，預覽在 4173）。裝置畫質的檢查：`node scripts/check-device-class.mjs`（會先建置，預覽在 4173）。畫質階梯的檢查：`node scripts/check-quality.mjs`（會先建置，預覽在 4173）。貼圖 canvas 的檢查：`node scripts/check-canvas2d.mjs`（會先建置，預覽在 4173）。
 
 ```bash
 npm run build
@@ -67,6 +67,7 @@ npm run preview
 - 只能學技巧後自己重寫。禁止複製或改寫任何 JS/CSS 片段、數值表、3D 模型的零件參數、SVG 圖示、文案句型、標題、按鈕名稱、教學步驟結構、logo 或截圖。
 - 不得在網站、README、commit 訊息或程式註解中提及參考網站的名稱或網址。
 - 新寫的每個 3D 模組檔頭加一行：`// Original implementation for this project. Not derived from third-party source code.`
+- 要當 three 貼圖的 2D canvas 一律用 `textureCanvas()`（CPU 版），否則 GPU 當掉後恢復會變黑。
 
 ## English
 

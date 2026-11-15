@@ -13,6 +13,7 @@ import { createEnvironment } from "./environment.js";
 import { step } from "./pace.js";
 import { createPeople } from "./people.js";
 import { bootQuality, gpuName, markQualityOk, noteQualityLoss, qualityText, settleQuality } from "./quality.js";
+import { textureCanvas } from "./canvas2d.js";
 import { play as playSfx } from "./sfx.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
@@ -105,10 +106,8 @@ function hexTopGeometry() {
 }
 
 function groundMap(island) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  P.paintGround(canvas.getContext("2d"), island.id, island.land);
+  const { canvas, g } = textureCanvas(256, 256);
+  P.paintGround(g, island.id, island.land);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
@@ -307,6 +306,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   // Until lossReady, only record it and hide labels that already exist.
   let contextLost = false;
   let lossReady = false;
+  let refreshCanvasMaps = () => {};
   let labelsEl = null;
   const lossListeners = new Set();
   if (!Array.isArray(window.__glEvents)) window.__glEvents = [];
@@ -371,6 +371,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         drawPost = Boolean(post);
         presentWatch = 0;
         if (!noShadow) renderer.shadowMap.needsUpdate = true;
+        refreshCanvasMaps();
         kit.touch();
         holdRender = 1;
         resize();
@@ -465,6 +466,16 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   renderer.shadowMap.needsUpdate = !noShadow;
 
   const scene = new THREE.Scene();
+  refreshCanvasMaps = () => {
+    scene.traverse((obj) => {
+      const material = obj.material;
+      if (!material) return;
+      const list = Array.isArray(material) ? material : [material];
+      for (const item of list) {
+        if (item.map && item.map.isCanvasTexture) item.map.needsUpdate = true;
+      }
+    });
+  };
   scene.background = new THREE.Color(P.cf7e6cf);
   scene.fog = new THREE.FogExp2(P.kd8eef0, 0.013);
   let environmentExpected = !powervr;
@@ -730,10 +741,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   const topGeo = hexTopGeometry();
   skirtGeo.rotateY(Math.PI / 6);
   coastGeo.rotateY(Math.PI / 6);
-  const shadeCanvas = document.createElement("canvas");
-  shadeCanvas.width = 128;
-  shadeCanvas.height = 128;
-  const shadeG = shadeCanvas.getContext("2d");
+  const { canvas: shadeCanvas, g: shadeG } = textureCanvas(128, 128);
   const shadeGrad = shadeG.createRadialGradient(64, 64, 0, 64, 64, 64);
   shadeGrad.addColorStop(0, "rgba(11,42,53,0.35)");
   shadeGrad.addColorStop(1, "rgba(11,42,53,0)");

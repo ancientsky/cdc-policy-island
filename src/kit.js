@@ -14,6 +14,7 @@ import {
   SRGBColorSpace,
 } from "three";
 import { glowLamp, trim } from "./palette.js";
+import { textureCanvas } from "./canvas2d.js";
 
 // One solid material and one glowing material. Instance color carries the paint.
 // Windows and lamps share the glow material and a per-instance aGlow.
@@ -228,10 +229,7 @@ export function createKit(motion) {
 
   function buildContacts(scene) {
     if (!contacts.length || contactMesh) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const { canvas, g: ctx } = textureCanvas(64, 64);
     if (!ctx) return;
     const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
     grad.addColorStop(0, "rgba(11,42,53,0.42)");
