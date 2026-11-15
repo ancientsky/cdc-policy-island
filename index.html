@@ -12,6 +12,14 @@
 <body>
   <div id="view">
     <canvas id="c" role="img" aria-label="十四座島排成臺灣的形狀。完整說明在清單裡。"></canvas>
+    <div id="gl-lost" class="gl-lost" role="alert" hidden>
+      <h2 id="gl-lost-title">島嶼畫面暫停了</h2>
+      <p id="gl-lost-body">手機的繪圖晶片剛剛重新啟動。正在試著接回來…</p>
+      <div class="gl-lost-actions">
+        <button type="button" id="gl-lost-reload" class="btn btn--solid">重新載入</button>
+        <button type="button" id="gl-lost-list" class="btn">用清單閱讀</button>
+      </div>
+    </div>
   </div>
   <div class="hud">
     <header class="brand">

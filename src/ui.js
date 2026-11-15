@@ -522,6 +522,21 @@ export function mount({ scene, islands, flows }) {
     $("view-btn")?.setAttribute("aria-label", t("viewMenu"));
     const veilText = $("veil-text");
     if (veilText) veilText.textContent = t("veil");
+    const lostCard = $("gl-lost");
+    if (lostCard) {
+      const lostTitle = $("gl-lost-title");
+      const lostBody = $("gl-lost-body");
+      const lostReload = $("gl-lost-reload");
+      const lostList = $("gl-lost-list");
+      if (lostTitle) lostTitle.textContent = t("glLostTitle");
+      if (lostBody) {
+        const stuck = lostCard.dataset.stuck === "1";
+        const boot = lostCard.dataset.mode === "boot";
+        lostBody.textContent = stuck ? t("glLostStuck") : (boot ? t("glLostBoot") : t("glLostBody"));
+      }
+      if (lostReload) lostReload.textContent = t("glLostReload");
+      if (lostList) lostList.textContent = t("glLostList");
+    }
     paintScore();
     if (toastInfo && !toast.hidden) showToast(toastInfo);
     $("c")?.setAttribute("role", "img");

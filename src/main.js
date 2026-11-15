@@ -59,6 +59,8 @@ function fallbackScene() {
     relabel: noop,
     selfTest: () => [t("fallback")],
     debugState: () => ({ flows: 0, lit: [] }),
+    onContextLoss: () => () => {},
+    isLost: () => false,
   };
 }
 
@@ -69,7 +71,7 @@ let ready = false;
 const queued = [];
 let pick = () => {};
 let arrive = () => {};
-const passthrough = new Set(["tick", "resize", "isBird", "getTheta", "selfTest", "debugState"]);
+const passthrough = new Set(["tick", "resize", "isBird", "getTheta", "selfTest", "debugState", "onContextLoss", "isLost"]);
 const scene = new Proxy({}, {
   get(_target, key) {
     if (key === "onPick") {
@@ -180,16 +182,90 @@ function failWebgl(error) {
   diag.hidden = false;
 }
 
+let revealed = false;
+
+function paintLossCard() {
+  const card = document.querySelector("#gl-lost");
+  if (!card) return;
+  const title = document.querySelector("#gl-lost-title");
+  const body = document.querySelector("#gl-lost-body");
+  const reload = document.querySelector("#gl-lost-reload");
+  const list = document.querySelector("#gl-lost-list");
+  if (title) title.textContent = t("glLostTitle");
+  if (body) {
+    const stuck = card.dataset.stuck === "1";
+    const boot = card.dataset.mode === "boot";
+    body.textContent = stuck ? t("glLostStuck") : (boot ? t("glLostBoot") : t("glLostBody"));
+  }
+  if (reload) reload.textContent = t("glLostReload");
+  if (list) list.textContent = t("glLostList");
+}
+
+function showLossCard(mode) {
+  const card = document.querySelector("#gl-lost");
+  if (!card) return;
+  card.dataset.mode = mode;
+  card.dataset.stuck = "0";
+  card.hidden = false;
+  document.body.classList.add("gl-lost");
+  paintLossCard();
+  window.clearTimeout(showLossCard.timer);
+  showLossCard.timer = window.setTimeout(() => {
+    if (card.hidden) return;
+    const still = canvas.dataset.glLost === "1" || (typeof impl.isLost === "function" && impl.isLost());
+    if (!still) return;
+    card.dataset.stuck = "1";
+    paintLossCard();
+  }, 4000);
+}
+
+function hideLossCard() {
+  const card = document.querySelector("#gl-lost");
+  if (card) card.hidden = true;
+  document.body.classList.remove("gl-lost");
+  window.clearTimeout(showLossCard.timer);
+}
+
+document.querySelector("#gl-lost-reload")?.addEventListener("click", () => {
+  location.reload();
+});
+document.querySelector("#gl-lost-list")?.addEventListener("click", () => {
+  document.querySelector("#list")?.click();
+});
+
+let revealPending = false;
+
+function contextIsLost() {
+  return canvas.dataset.glLost === "1" || (typeof impl.isLost === "function" && impl.isLost());
+}
+
 function revealVeil() {
+  if (revealed || revealPending) return;
+  revealPending = true;
   const startIntro = () => {
+    if (revealed) return;
+    revealPending = false;
+    if (contextIsLost()) {
+      if (veil) veil.classList.remove("out");
+      showLossCard("boot");
+      return;
+    }
+    revealed = true;
     if (veil?.isConnected) veil.remove();
     document.dispatchEvent(new CustomEvent("cdc-revealed"));
     impl.playIntro();
+    setTimeout(writeDiag, 1800);
   };
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      if (contextIsLost()) {
+        revealPending = false;
+        if (veil) veil.classList.remove("out");
+        showLossCard("boot");
+        return;
+      }
       if (!veil) {
-        impl.playIntro();
+        startIntro();
         return;
       }
       if (reduced) {
@@ -214,6 +290,10 @@ function revealVeil() {
 
 document.addEventListener("cdc-webgl-failed", (event) => {
   if (document.body.classList.contains("no-webgl")) return;
+  if (canvas.dataset.glLost === "1" || (typeof impl.isLost === "function" && impl.isLost())) {
+    showLossCard(revealed ? "play" : "boot");
+    return;
+  }
   const reason = event.detail instanceof Error ? event.detail : new Error("WebGL");
   failWebgl(reason);
 });
@@ -228,11 +308,30 @@ async function bootScene() {
     impl.onPick(pick);
     impl.onArrive(arrive);
     for (const [name, args] of queued.splice(0)) impl[name](...args);
+    impl.onContextLoss((lost) => {
+      if (lost) {
+        if (!revealed && veil) veil.classList.remove("out");
+        showLossCard(revealed ? "play" : "boot");
+        return;
+      }
+      const resume = !revealed;
+      hideLossCard();
+      if (resume) revealVeil();
+    });
     ready = true;
+    if (impl.isLost()) {
+      showLossCard("boot");
+      return;
+    }
     impl.resize();
     revealVeil();
-    setTimeout(writeDiag, 1800);
   } catch (error) {
+    if (canvas.dataset.glLost === "1") {
+      console.error(error);
+      ready = true;
+      showLossCard("boot");
+      return;
+    }
     failWebgl(error);
   }
 }

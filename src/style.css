@@ -142,6 +142,54 @@ h1, h2, h3 { text-wrap: balance; }
 #view { position: fixed; inset: 0; }
 #c { width: 100%; height: 100%; display: block; touch-action: none; }
 .labels { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.gl-lost {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  right: 16px;
+  top: 42%;
+  width: min(440px, calc(100% - 32px));
+  margin-inline: auto;
+  padding: 22px 22px 18px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--teal) 72%, #10292e);
+  color: var(--paper-solid);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  text-align: center;
+  pointer-events: auto;
+}
+.gl-lost h2 {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.35;
+  color: inherit;
+}
+.gl-lost p {
+  margin: 0;
+  color: var(--paper-solid);
+  font-size: var(--fs-md);
+  line-height: 1.6;
+}
+.gl-lost-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.gl-lost .btn {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.gl-lost .btn--solid {
+  background: var(--teal);
+  color: var(--on-accent);
+  border-color: transparent;
+}
 
 .hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
 .hud > * { pointer-events: auto; }
@@ -967,6 +1015,7 @@ html[data-theme="night"] .rail .btn { color: var(--c-on-dark, var(--c-ink, var(-
   transition: opacity 600ms cubic-bezier(.22, 1, .36, 1), visibility 0s 600ms;
 }
 .veil.out { opacity: 0; visibility: hidden; }
+body.gl-lost .veil { visibility: hidden; pointer-events: none; }
 .pin { display: flex; flex-direction: column; align-items: center; gap: 3px; transition: opacity 250ms linear; }
 .pin button {
   display: grid;

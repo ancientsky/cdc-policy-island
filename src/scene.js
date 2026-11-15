@@ -287,6 +287,81 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   const powervr = fragileGpu(gl);
   const noShadow = rescue || powervr;
   const renderer = new THREE.WebGLRenderer({ canvas, context: gl });
+  // A loss can arrive while createScene is still building later bindings.
+  // Until lossReady, only record it and hide labels that already exist.
+  let contextLost = false;
+  let lossReady = false;
+  let labelsEl = null;
+  const lossListeners = new Set();
+  if (!Array.isArray(window.__glEvents)) window.__glEvents = [];
+
+  function noteGl(type) {
+    const now = performance.now();
+    const events = window.__glEvents;
+    let ms = 0;
+    if (type === "restored") {
+      for (let i = events.length - 1; i >= 0; i -= 1) {
+        if (events[i].type === "lost") {
+          ms = now - events[i].t;
+          break;
+        }
+      }
+    }
+    events.push({
+      t: now,
+      type,
+      during: introAt ? "play" : "boot",
+      ms,
+    });
+    if (events.length > 20) events.splice(0, events.length - 20);
+  }
+
+  function setLabelsHidden(hidden) {
+    if (!labelsEl) return;
+    labelsEl.style.visibility = hidden ? "hidden" : "";
+  }
+
+  function emitLoss(lost) {
+    for (const fn of lossListeners) {
+      try {
+        fn(lost);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+
+  canvas.addEventListener("webglcontextlost", (event) => {
+    event.preventDefault();
+    contextLost = true;
+    canvas.dataset.glLost = "1";
+    noteGl("lost");
+    setLabelsHidden(true);
+    emitLoss(true);
+  });
+
+  canvas.addEventListener("webglcontextrestored", () => {
+    contextLost = false;
+    delete canvas.dataset.glLost;
+    noteGl("restored");
+    if (lossReady) {
+      try {
+        drawFailed = false;
+        drawPost = Boolean(post);
+        presentWatch = 0;
+        if (!noShadow) renderer.shadowMap.needsUpdate = true;
+        kit.touch();
+        holdRender = 1;
+        resize();
+        applyClock();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    setLabelsHidden(false);
+    emitLoss(false);
+  });
+
   let pixelCap = Math.min(window.devicePixelRatio || 1, tight ? 1 : 2);
   renderer.setPixelRatio(pixelCap);
   try {
@@ -421,6 +496,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 220);
   const labels = new CSS2DRenderer();
   labels.domElement.className = "labels";
+  labelsEl = labels.domElement;
+  if (contextLost) labelsEl.style.visibility = "hidden";
   canvas.parentElement.appendChild(labels.domElement);
 
   const hemi = new THREE.HemisphereLight(P.kd7efe8, P.c8d7348, 0.72);
@@ -2746,6 +2823,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   function tick(dt) {
+    if (contextLost) return;
+    const liveGl = renderer.getContext();
+    if (!liveGl || liveGl.isContextLost()) return;
     const step = Math.min(dt, 0.05);
     easeSafe(step);
     if (!frozen) elapsed += step;
@@ -4627,9 +4707,26 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     }
   }
 
+  const liveGl = renderer.getContext();
+  if (!liveGl || liveGl.isContextLost()) {
+    contextLost = true;
+    canvas.dataset.glLost = "1";
+    setLabelsHidden(true);
+  }
+  lossReady = true;
+
   return {
     tick,
     resize,
+    onContextLoss(fn) {
+      if (typeof fn !== "function") return () => {};
+      lossListeners.add(fn);
+      return () => lossListeners.delete(fn);
+    },
+    isLost() {
+      const current = renderer.getContext();
+      return contextLost || !current || Boolean(current.isContextLost?.());
+    },
     setSafeRect,
     setMinutes(value) { minutes = value; },
     relabel() {
