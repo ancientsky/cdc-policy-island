@@ -1,6 +1,7 @@
 import "./errors.js";
 import "./style.css";
 import { beginSlice, paintFirst } from "./pace.js";
+import { bootQuality, requestReload } from "./quality.js";
 
 const serifFont = new URL("./fonts/NotoSerifTC-Bold.subset.woff2", import.meta.url);
 const preloadFont = document.createElement("link");
@@ -229,6 +230,7 @@ function hideLossCard() {
 }
 
 document.querySelector("#gl-lost-reload")?.addEventListener("click", () => {
+  if (!requestReload()) return;
   location.reload();
 });
 document.querySelector("#gl-lost-list")?.addEventListener("click", () => {
@@ -306,7 +308,8 @@ async function bootScene() {
     const { createScene } = await import("./scene.js");
     await paintFirst();
     beginSlice();
-    impl = await createScene(canvas, { islands, flows }, { reduced });
+    const gfxBoot = bootQuality();
+    impl = await createScene(canvas, { islands, flows }, { reduced, rescue: gfxBoot.rescue, gfx: gfxBoot });
     impl.onPick(pick);
     impl.onArrive(arrive);
     for (const [name, args] of queued.splice(0)) impl[name](...args);

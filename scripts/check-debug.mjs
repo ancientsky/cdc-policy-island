@@ -122,7 +122,7 @@ try {
   const text = await shown.page.locator("#dbg-text").innerText();
   for (const name of fields) field(text, name);
   if (!field(text, "build").startsWith("dev")) fail(`build id ${field(text, "build")}`);
-  if (field(text, "quality") !== "n/a") fail("quality should be n/a");
+  if (!field(text, "quality").startsWith("rung=")) fail("quality should name a rung");
   await shown.context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await shown.page.locator("#dbg-copy").click();
   const copied = await shown.page.evaluate(async () => {
@@ -134,6 +134,10 @@ try {
   });
   const copyLabel = await shown.page.locator("#dbg-copy").innerText();
   if (!copied.includes("build") && copyLabel !== "請長按複製") fail(`copy failed ${copyLabel}`);
+  await shown.page.waitForFunction(() => {
+    const row = (document.querySelector("#dbg-text")?.textContent || "").split("\n").find((line) => line.startsWith("quality"));
+    return row && row.includes("pending=null") && !row.includes("ok=null");
+  }, null, { timeout: 25000 });
   await lose(shown.page);
   await shown.page.waitForFunction(() => {
     const row = (document.querySelector("#dbg-text")?.textContent || "").split("\n").find((line) => line.startsWith("lost"));

@@ -12,6 +12,7 @@ import { createLife } from "./life.js";
 import { createEnvironment } from "./environment.js";
 import { step } from "./pace.js";
 import { createPeople } from "./people.js";
+import { bootQuality, gpuName, markQualityOk, noteQualityLoss, qualityText, settleQuality } from "./quality.js";
 import { play as playSfx } from "./sfx.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
@@ -278,8 +279,10 @@ function webglSets(plain) {
   return [{ ...base, antialias: true }, base, fewer, least];
 }
 
-export async function createScene(canvas, data, { reduced = false, rescue = false } = {}) {
+export async function createScene(canvas, data, { reduced = false, rescue = false, gfx = null } = {}) {
   let introAt = 0;
+  const plan = gfx || bootQuality();
+  rescue = Boolean(rescue || plan.rescue);
   // The short side is known before any GL call. PowerVR is not, and this canvas
   // cannot take a second attribute set, so only phoneLike may force antialias off.
   const coarse = window.matchMedia("(pointer: coarse)").matches;
@@ -296,7 +299,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   };
   const powervr = fragileGpu(gl);
   const deviceClass = powervr ? "fragile" : (phoneLike ? "phone" : "desktop");
-  const noShadow = rescue || powervr;
+  const gfxState = settleQuality(plan, gpuName(gl), { powervr, openedRescue: rescue });
+  const noShadow = !gfxState.shadow;
+  const usePost = gfxState.post;
   const renderer = new THREE.WebGLRenderer({ canvas, context: gl });
   // A loss can arrive while createScene is still building later bindings.
   // Until lossReady, only record it and hide labels that already exist.
@@ -348,6 +353,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     canvas.dataset.glLost = "1";
     noteGl("lost");
     setLabelsHidden(true);
+    const action = noteQualityLoss();
+    if (action.reload) {
+      location.reload();
+      return;
+    }
     emitLoss(true);
   });
 
@@ -402,7 +412,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     console.error(["WebGLProgram: Shader Error", programLog, vertexLog, fragmentLog].filter(Boolean).join("\n"));
   };
 
-  const pixelLimit = deviceClass === "fragile" ? 1 : deviceClass === "phone" ? 1.5 : (tight ? 1 : 2);
+  const pixelLimit = rescue ? 1 : deviceClass === "fragile" ? 1 : deviceClass === "phone" ? 1.5 : (tight ? 1 : 2);
   let pixelCap = Math.min(window.devicePixelRatio || 1, pixelLimit);
   renderer.setPixelRatio(pixelCap);
   try {
@@ -479,7 +489,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   let post = null;
-  let drawPost = true;
+  let drawPost = usePost;
+  let proofFrames = 0;
+  let proofAt = 0;
   let drawFailed = false;
   const tier = reduced
     ? "reduced"
@@ -875,6 +887,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       group.scale.setScalar(0);
       group.visible = false;
     }
+    kit.contact(group, 0, -0.14, 0, 0.42);
     parent.add(group);
     return {
       group,
@@ -2558,8 +2571,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     if (cap < pixelCap) pixelCap = cap;
     renderer.setPixelRatio(pixelCap);
     if (noShadow) {
-      sun.castShadow = false;
       renderer.shadowMap.enabled = false;
+      scene.traverse((obj) => {
+        if (obj.isLight) obj.castShadow = false;
+      });
     } else {
       const shadow = W < 980 ? 512 : 2048;
       if (sun.shadow.mapSize.x !== shadow) {
@@ -2868,6 +2883,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     if (contextLost) return;
     const liveGl = renderer.getContext();
     if (!liveGl || liveGl.isContextLost()) return;
+    if (gfxState.ok !== gfxState.rung && proofFrames >= 90 && proofAt && performance.now() - proofAt >= 5000) {
+      markQualityOk();
+    }
     const step = Math.min(dt, 0.05);
     easeSafe(step);
     if (!frozen) elapsed += step;
@@ -3203,6 +3221,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
           }
         }
       } else renderer.render(scene, camera);
+      if (gfxState.ok !== gfxState.rung) {
+        if (proofFrames === 0) proofAt = performance.now();
+        proofFrames += 1;
+      }
     } catch (error) {
       const current = renderer.getContext();
       if (!current || current.isContextLost()) {
@@ -4136,6 +4158,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       clearings: placed.map((point) => ({ x: point.x, z: point.z, r: 4.2 })),
       motion,
       pulse: touchContext,
+      contacts: (x, y, z, scale) => kit.contact(scene, x, y, z, Math.max(0.16, 0.34 * (scale || 1))),
     });
   } catch (error) {
     console.error(error);
@@ -4161,7 +4184,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const pause = pauseSlice();
     if (pause) await pause;
   }
+  kit.setContacts(noShadow);
   kit.build(scene);
+  scene.traverse((obj) => {
+    if (obj.isLight && noShadow) obj.castShadow = false;
+  });
   scene.traverse((obj) => {
     const mat = obj.material;
     if (mat && mat.isMeshStandardMaterial && !obj.userData.smooth) {
@@ -4538,6 +4565,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
           tone: toneName,
           toneScale,
           draw: Boolean(post) && drawPost,
+          rung: gfxState.rung,
+          shadow: gfxState.shadow,
+          pending: gfxState.pending,
+          ok: gfxState.ok,
+          stepped: gfxState.stepped,
           exposure: renderer.toneMappingExposure,
           environmentIntensity: scene.environmentIntensity,
           pixelRatio: renderer.getPixelRatio(),
@@ -4622,16 +4654,19 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     });
   }
 
-  import("./post.js")
-    .then((mod) => mod.mountPost({ renderer, scene, camera, tier, deviceClass }))
-    .then((api) => {
-      post = api;
-      resize();
-      applyClock();
-    })
-    .catch(() => {
-      post = null;
-    });
+  if (usePost) {
+    import("./post.js")
+      .then((mod) => mod.mountPost({ renderer, scene, camera, tier, deviceClass }))
+      .then((api) => {
+        post = api;
+        resize();
+        applyClock();
+      })
+      .catch(() => {
+        post = null;
+        drawPost = false;
+      });
+  }
 
   function clearRibbon() {
     if (!ribbon) return;
@@ -4838,7 +4873,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         triangles: renderer.info.render.triangles,
         lost,
         events: (window.__glEvents || []).slice(),
-        quality: "n/a",
+        quality: qualityText(kit.contactInfo().count, kit.contactInfo().visible),
       };
     },
     setSafeRect,

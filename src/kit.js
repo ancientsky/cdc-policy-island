@@ -1,13 +1,17 @@
 // Original implementation for this project. Not derived from third-party source code.
 import {
+  CanvasTexture,
+  CircleGeometry,
   Color,
   DoubleSide,
   DynamicDrawUsage,
   InstancedBufferAttribute,
   InstancedMesh,
   Matrix4,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  SRGBColorSpace,
 } from "three";
 import { glowLamp, trim } from "./palette.js";
 
@@ -123,7 +127,19 @@ export function createKit(motion) {
   const meshes = [];
   const buckets = [];
   const bucketOf = new Map();
+  const contacts = [];
+  let contactMesh = null;
+  let contactsOn = false;
   let built = false;
+
+  function contact(parent, x, y, z, radius) {
+    contacts.push({ parent, x, y, z, radius: Math.max(0.12, radius || 0.2) });
+  }
+
+  function setContacts(on) {
+    contactsOn = Boolean(on);
+    if (contactMesh) contactMesh.visible = contactsOn;
+  }
 
   function bucketFor(parent) {
     let bucket = bucketOf.get(parent);
@@ -210,7 +226,63 @@ export function createKit(motion) {
     return mesh;
   }
 
+  function buildContacts(scene) {
+    if (!contacts.length || contactMesh) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(11,42,53,0.42)");
+    grad.addColorStop(1, "rgba(11,42,53,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+    const tex = new CanvasTexture(canvas);
+    tex.colorSpace = SRGBColorSpace;
+    const geo = new CircleGeometry(1, 12);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
+    contactMesh = new InstancedMesh(geo, mat, contacts.length);
+    contactMesh.name = "kit-contact";
+    contactMesh.frustumCulled = false;
+    contactMesh.castShadow = false;
+    contactMesh.receiveShadow = false;
+    contactMesh.renderOrder = 1;
+    contactMesh.visible = contactsOn;
+    contacts.forEach((rec, index) => {
+      rec.index = index;
+    });
+    scene.add(contactMesh);
+  }
+
+  function syncContacts() {
+    if (!contactMesh) return;
+    let dirty = false;
+    for (const rec of contacts) {
+      const parent = rec.parent;
+      parent.updateWorldMatrix(true, false);
+      const stamp = parent.userData._kitGen || 0;
+      if (rec._gen === stamp && rec._wrote) continue;
+      writeLocal(rec.x, rec.y, rec.z, 0, 0, 0, rec.radius, 1, rec.radius);
+      writeWorld(parent);
+      contactMesh.setMatrixAt(rec.index, world);
+      rec._gen = stamp;
+      rec._wrote = true;
+      dirty = true;
+    }
+    if (dirty) contactMesh.instanceMatrix.needsUpdate = true;
+  }
+
   function build(scene) {
+    buildContacts(scene);
     const groups = new Map();
     for (const rec of records) {
       const list = groups.get(rec.label) || [];
@@ -314,11 +386,24 @@ export function createKit(motion) {
     for (const mesh of glowDirty) {
       if (mesh.userData.glowAttr) mesh.userData.glowAttr.needsUpdate = true;
     }
+    syncContacts();
   }
 
   function instanceCount() {
     return meshes.reduce((sum, mesh) => sum + mesh.count, 0);
   }
 
-  return { geo, part, build, sync, touch, glowMat, instanceCount, meshCount: () => meshes.length };
+  return {
+    geo,
+    part,
+    contact,
+    setContacts,
+    contactInfo: () => ({ count: contactMesh ? contactMesh.count : contacts.length, visible: Boolean(contactMesh?.visible) }),
+    build,
+    sync,
+    touch,
+    glowMat,
+    instanceCount,
+    meshCount: () => meshes.length,
+  };
 }

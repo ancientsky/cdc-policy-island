@@ -47,7 +47,7 @@ npm install
 npm run dev
 ```
 
-開發伺服器在 <http://localhost:5173/>。畫布中斷的檢查：`node scripts/check-webgl-loss.mjs`（開發伺服器要先開著）。診斷面板的檢查：`node scripts/check-debug.mjs`（會先建置，預覽在 4173）。裝置畫質的檢查：`node scripts/check-device-class.mjs`（會先建置，預覽在 4173）。
+開發伺服器在 <http://localhost:5173/>。畫布中斷的檢查：`node scripts/check-webgl-loss.mjs`（開發伺服器要先開著）。診斷面板的檢查：`node scripts/check-debug.mjs`（會先建置，預覽在 4173）。裝置畫質的檢查：`node scripts/check-device-class.mjs`（會先建置，預覽在 4173）。畫質階梯的檢查：`node scripts/check-quality.mjs`（會先建置，預覽在 4173）。
 
 ```bash
 npm run build

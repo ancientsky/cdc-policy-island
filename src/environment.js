@@ -45,7 +45,7 @@ function qualityPlan(quality) {
   return { seg: 200, trees: 6000 };
 }
 
-export async function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null, pulse = null } = {}) {
+export async function createEnvironment(THREE, scene, { quality = "high", camera = null, clearings = [], motion = null, pulse = null, contacts = null } = {}) {
   const plan = qualityPlan(quality);
   function pauseSlice() {
     const pause = step();
@@ -257,6 +257,9 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
     scene.add(mesh);
     meshes.push(mesh);
     return mesh;
+  }
+  if (typeof contacts === "function") {
+    for (const spot of spots) contacts(spot.x, spot.y + 0.05, spot.z, spot.scale);
   }
   const pines = spots.filter((spot) => spot.pine);
   const rounds = spots.filter((spot) => !spot.pine);
