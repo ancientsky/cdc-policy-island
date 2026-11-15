@@ -36,6 +36,9 @@ const _pinWorld = new THREE.Vector3();
 const _pinDir = new THREE.Vector3();
 const _blobAt = new THREE.Vector3();
 const _proj = new THREE.Vector3();
+const _pipiAt = new THREE.Vector3();
+const _pipiAhead = new THREE.Vector3();
+const _pipiDir = new THREE.Vector3();
 const mixA = new THREE.Color();
 const mixB = new THREE.Color();
 const ASLEEP = new THREE.Color(P.k8a8f93);
@@ -1226,7 +1229,25 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
 
   const skinHex = [P.cf0c7a4, P.cd9a57a, P.cc48a6a, P.c8d5a3c];
   let cargoOn = false;
-  const TOOL_KEY = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
+  const TOOL_KEY = {
+    clean: "toolClean",
+    check: "toolCheck",
+    shield: "toolShield",
+    wash: "toolWash",
+    finish: "toolFinish",
+    screen: "toolScreen",
+    rx: "toolRx",
+  };
+
+  function clockHour(mins = minutes) {
+    return ((mins % 1440) + 1440) % 1440 / 60;
+  }
+
+  function hoursOpen(hours, mins = minutes) {
+    if (!hours) return true;
+    const hour = clockHour(mins);
+    return hour >= hours[0] && hour < hours[1];
+  }
 
   function anchorFront(mesh, yHead, nosePos) {
     const head = new THREE.Object3D();
@@ -1267,6 +1288,29 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let birdDir = 1;
   const plateMarks = [];
   let platesDirty = false;
+  const GERM_SUFFIX = {
+    dengue: "Dengue",
+    border: "Border",
+    flu: "Flu",
+    entero: "Entero",
+    tb: "Tb",
+    measles: "Measles",
+    dusk: "Dusk",
+    hepa: "Hepa",
+    amr: "Amr",
+  };
+  const ORIGINAL_FIVE = new Set(["dengue", "border", "flu", "entero", "tb"]);
+  const routedOnce = new Set();
+  let boastReady = false;
+  let boastSpent = false;
+  const eggHits = [];
+  let saucer = null;
+  let pipi = null;
+  let pipiMode = "hide";
+  let pipiU = 0.28;
+  let pipiFlash = 0;
+  let pipiCam = null;
+  let perchLamp = null;
   const crews = [];
   const crewMarks = [];
   const handoffPops = [];
@@ -1442,6 +1486,14 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         if (!crew.applied) noteDefense(crew);
         crew.actDone = true;
       }
+      return;
+    }
+    if (tool === "screen" || tool === "rx") {
+      if (crew.t > 0.35 && threat.dir > 0) threat.dir = -1;
+      if (crew.t >= 0.8) {
+        if (!crew.applied) noteDefense(crew);
+        crew.actDone = true;
+      }
     }
   }
 
@@ -1558,6 +1610,21 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         cell.position.set((i - 3) * 0.05, 0.36, -0.06);
         fx.add(cell);
       }
+    } else if (threat.tool === "screen") {
+      const slip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.015, 0.08),
+        new THREE.MeshStandardMaterial({ color: P.cf4f0e6, roughness: 0.6, flatShading: true }),
+      );
+      slip.position.set(0.1, 0.4, -0.02);
+      fx.add(slip);
+    } else if (threat.tool === "rx") {
+      const pill = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.02, 0.06, 3, 6),
+        new THREE.MeshStandardMaterial({ color: P.c8ed15a, roughness: 0.5, flatShading: true }),
+      );
+      pill.rotation.z = 0.6;
+      pill.position.set(0.1, 0.38, -0.02);
+      fx.add(pill);
     }
     const labelEl = document.createElement("div");
     labelEl.className = "crew-label";
@@ -1665,6 +1732,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       scale0: scale,
       tool,
       islandId,
+      key: islandId,
+      hours: null,
+      plateKey: "",
+      plateMode: "name",
+      doUntil: 0,
+      spin: null,
     };
     const mats = [];
     mesh.traverse((child) => {
@@ -1780,13 +1853,14 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     return mesh;
   }
 
-  function makeMosquito() {
+  function makeMosquito(look = {}) {
     // Wings 0.28 and legs 0.16, then 0.858 so the aligned span stays under 0.66.
     const fit = 0.858;
     const s = (n) => n * fit;
+    const round = Boolean(look.round);
     const group = new THREE.Group();
-    const dark = new THREE.MeshStandardMaterial({ color: P.k2a2630, roughness: 0.62, flatShading: true });
-    const pale = new THREE.MeshStandardMaterial({ color: P.cf2ede2, roughness: 0.55, flatShading: true });
+    const dark = new THREE.MeshStandardMaterial({ color: look.dark || P.k2a2630, roughness: 0.62, flatShading: true });
+    const pale = new THREE.MeshStandardMaterial({ color: look.pale || P.cf2ede2, roughness: 0.55, flatShading: true });
     const darkParts = [];
     const paleParts = [];
     for (let i = 0; i < 5; i += 1) {
@@ -1795,14 +1869,17 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       seg.position.z = s(0.02 + i * 0.07);
       (i % 2 ? paleParts : darkParts).push(seg);
     }
-    const thorax = new THREE.Mesh(new THREE.SphereGeometry(s(0.07), 10, 8), dark);
+    const thorax = new THREE.Mesh(new THREE.SphereGeometry(s(round ? 0.09 : 0.07), 10, 8), round ? pale : dark);
     thorax.position.z = s(-0.07);
+    if (round) thorax.scale.set(1.15, 1.05, 1.2);
     const head = new THREE.Mesh(new THREE.SphereGeometry(s(0.048), 10, 8), dark);
     head.position.z = s(-0.16);
     const beak = new THREE.Mesh(new THREE.CylinderGeometry(s(0.008), s(0.008), s(0.16), 5), dark);
     beak.rotation.x = Math.PI / 2;
     beak.position.set(0, s(-0.012), s(-0.28));
-    darkParts.push(thorax, head, beak);
+    darkParts.push(head, beak);
+    if (round) paleParts.push(thorax);
+    else darkParts.push(thorax);
     const legGeo = new THREE.CylinderGeometry(s(0.012), s(0.012), s(0.16), 5);
     for (const side of [-1, 1]) {
       for (let i = 0; i < 3; i += 1) {
@@ -1814,7 +1891,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       }
     }
     const wingMat = new THREE.MeshStandardMaterial({
-      color: P.kdff3ff,
+      color: look.wing || P.kdff3ff,
       transparent: true,
       opacity: 0.35,
       roughness: 0.12,
@@ -1834,6 +1911,70 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const marks = markFront(group);
     marks.nose.position.set(0, -0.01, -0.4);
     return { group, ...marks };
+  }
+
+  function makeSpots() {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 12, 10),
+      new THREE.MeshStandardMaterial({ color: P.cf2ede2, roughness: 0.55, flatShading: true }),
+    );
+    group.add(body);
+    const spotGeo = new THREE.SphereGeometry(0.032, 6, 5);
+    const spotMat = new THREE.MeshStandardMaterial({ color: P.kc45a3a, roughness: 0.5, flatShading: true });
+    const spots = new THREE.InstancedMesh(spotGeo, spotMat, 8);
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < 8; i += 1) {
+      const y = 1 - (i / 7) * 2;
+      const ring = Math.sqrt(Math.max(0, 1 - y * y));
+      const ang = i * 2.399;
+      const dir = new THREE.Vector3(Math.cos(ang) * ring, y, Math.sin(ang) * ring).normalize();
+      dummy.position.copy(dir).multiplyScalar(0.145);
+      dummy.scale.setScalar(0.85 + (i % 3) * 0.1);
+      dummy.updateMatrix();
+      spots.setMatrixAt(i, dummy.matrix);
+    }
+    spots.instanceMatrix.needsUpdate = true;
+    spots.castShadow = false;
+    spots.receiveShadow = false;
+    group.add(spots);
+    return { group, ...markFront(group) };
+  }
+
+  function makeLantern() {
+    const group = new THREE.Group();
+    const blob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.13, 10, 8),
+      new THREE.MeshStandardMaterial({ color: P.kffcf8a, roughness: 0.86, flatShading: true }),
+    );
+    blob.scale.set(1, 0.82, 1);
+    const cap = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.06, 0.035, 6),
+      new THREE.MeshStandardMaterial({ color: P.k8a7a5c, roughness: 0.7, flatShading: true }),
+    );
+    cap.position.y = 0.12;
+    group.add(blob, cap);
+    return { group, ...markFront(group) };
+  }
+
+  function makeBands() {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 12, 10),
+      new THREE.MeshStandardMaterial({ color: P.c8ed15a, roughness: 0.55, flatShading: true }),
+    );
+    group.add(body);
+    const stripeMat = new THREE.MeshStandardMaterial({ color: P.k2a2630, roughness: 0.5, flatShading: true });
+    const spin = new THREE.Group();
+    spin.name = "bands";
+    for (let i = 0; i < 3; i += 1) {
+      const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.011, 5, 12), stripeMat);
+      stripe.rotation.x = Math.PI / 2;
+      stripe.position.y = (i - 1) * 0.055;
+      spin.add(stripe);
+    }
+    group.add(spin);
+    return { group, spin, ...markFront(group) };
   }
 
   {
@@ -1861,12 +2002,21 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       { make: () => makeVirus(P.kd2694a), id: "flu", tool: "shield", rate: 0.038, plate: "plateFlu" },
       { make: () => makeVirus(P.c5aa86a), id: "entero", tool: "wash", rate: 0.04, plate: "plateEntero" },
       { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034, plate: "plateTb" },
+      { make: () => makeSpots(), id: "vax", key: "measles", tool: "shield", rate: 0.036, plate: "plateMeasles" },
+      { make: () => makeMosquito({ dark: P.k2a2026, pale: P.k8a7a5c, wing: P.k8aa4b4, round: true }), id: "vax", key: "dusk", tool: "shield", rate: 0.032, plate: "plateDusk", hours: [17, 19] },
+      { make: () => makeLantern(), id: "hepa", key: "hepa", tool: "screen", rate: 0.03, plate: "plateHepa" },
+      { make: () => makeBands(), id: "amr", key: "amr", tool: "rx", rate: 0.03, plate: "plateAmr" },
     ];
     roster.forEach((spec, index) => {
       const built = spec.make();
       const raid = approach(index, views.get(spec.id).base);
       addThreat(built.group, built.head, built.nose, raid.home, raid.halt, spec.rate, 1.1, spec.tool, spec.id);
       const threat = threats[threats.length - 1];
+      threat.key = spec.key || spec.id;
+      threat.hours = spec.hours || null;
+      threat.plateKey = spec.plate;
+      threat.spin = built.spin || null;
+      if (threat.hours && !hoursOpen(threat.hours)) threat.mesh.visible = false;
       const plateEl = document.createElement("div");
       plateEl.className = "threat-name";
       plateEl.dataset.plate = spec.plate;
@@ -1875,7 +2025,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       plate.position.set(0, 0.85, 0);
       threat.mesh.add(plate);
       threat.plateEl = plateEl;
-      plateMarks.push({ el: plateEl, key: spec.plate });
+      plateMarks.push({
+        el: plateEl,
+        key: spec.plate,
+        threat,
+        doKey: `germDo${GERM_SUFFIX[threat.key] || ""}`,
+      });
     });
     placeCrews();
   }
@@ -1887,6 +2042,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     shield: "toolShield",
     wash: "toolWash",
     finish: "toolFinish",
+    screen: "toolScreen",
+    rx: "toolRx",
   };
   const sparkColor = {
     clean: P.k7ec8e0,
@@ -1894,6 +2051,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     shield: P.ke1992d,
     finish: P.c8ed15a,
     check: P.k0e8a80,
+    screen: P.kffcf8a,
+    rx: P.c8ed15a,
   };
   const sparkGeo = new THREE.SphereGeometry(0.035, 8, 6);
   const sparkMat = new THREE.MeshBasicMaterial({ color: P.pureWhite, transparent: true, opacity: 1, depthWrite: false });
@@ -2126,6 +2285,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   function cancelFlight() {
     if (!flight) return;
     const celebrate = Boolean(flight.celebrate);
+    if ((flight.pipiOut || flight.pipiBack) && pipiCam) pipiCam.cancelled = true;
     flight = null;
     goal.theta = cam.theta;
     goal.radius = cam.radius;
@@ -2164,6 +2324,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     userPhi = cam.phi;
     if (!done) return;
     const celebrate = Boolean(flight.celebrate);
+    const pipiBack = flight.pipiBack;
     cam.radius = flight.to.radius;
     cam.phi = THREE.MathUtils.clamp(flight.to.phi, 0.32, 1.22);
     cam.theta = flight.from.theta + delta;
@@ -2174,6 +2335,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     goalTarget.copy(cam.target);
     flight = null;
     if (celebrate) finishCelebrate();
+    if (pipiBack) {
+      zoomed = pipiBack.zoomed;
+      bird = pipiBack.bird;
+    }
   }
 
   function frameWide() {
@@ -2643,7 +2808,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     threat.hits = [];
     threat.playerPush = false;
     setThreatOpacity(threat, 0);
-    threat.mesh.visible = true;
+    threat.mesh.visible = !threat.hours || hoursOpen(threat.hours);
+    if (threat.craft) threat.craft.visible = threat.mesh.visible;
   }
 
   function beginSink(threat) {
@@ -2739,6 +2905,15 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       sparks.visible = sparkLife > 0;
     }
     for (const threat of threats) {
+      if (threat.hours && !hoursOpen(threat.hours) && !threat.gone && !threat.sinking && !threat.fading) {
+        threat.mesh.visible = false;
+        if (threat.craft) threat.craft.visible = false;
+        continue;
+      }
+      if (threat.hours && hoursOpen(threat.hours) && !threat.gone && !threat.sinking && !threat.fading && !threat.mesh.visible) {
+        threat.mesh.visible = true;
+        if (threat.craft) threat.craft.visible = true;
+      }
       if (threat.away > 0) {
         threat.away = Math.max(0, threat.away - step);
         if (threat.away <= 0) startRise(threat);
@@ -2786,8 +2961,37 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         setThreatOpacity(threat, k);
         if (k >= 1) threat.rising = false;
       }
+      if (threat.plateMode === "do" && elapsed >= threat.doUntil) {
+        threat.plateMode = "name";
+        if (threat.plateEl) threat.plateEl.textContent = t(threat.plateKey);
+      }
+      if (
+        boastReady
+        && !boastSpent
+        && ORIGINAL_FIVE.has(threat.key)
+        && !threat.gone
+        && !threat.sinking
+        && threat.mesh.visible
+        && threat.u > 0.55
+        && threat.dir >= 0
+      ) {
+        boastSpent = true;
+        threat.freeze = 1.1;
+        threat.plateMode = "do";
+        threat.doUntil = elapsed + 2.6;
+        const doKey = `germDo${GERM_SUFFIX[threat.key] || ""}`;
+        if (threat.plateEl) threat.plateEl.textContent = t(doKey);
+        strikeCb({
+          index: threats.indexOf(threat),
+          islandId: threat.islandId,
+          tool: threat.tool,
+          key: threat.key,
+          routed: false,
+        });
+      }
       if (threat.gone) continue;
       poseThreat(threat);
+      if (threat.spin) threat.spin.rotation.y = elapsed * 0.35;
       if (threat.sinking) {
         const k = Math.min(1, threat.sinkT / 0.7);
         threat.mesh.position.y = THREE.MathUtils.lerp(threat.hover, -1.2, k);
@@ -2851,17 +3055,22 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       threat.hits = [];
       beginSink(threat);
     }
+    if (routed && ORIGINAL_FIVE.has(threat.key)) {
+      routedOnce.add(threat.key);
+      if (routedOnce.size >= ORIGINAL_FIVE.size) boastReady = true;
+    }
     const info = {
       index: threats.indexOf(threat),
       islandId: threat.islandId,
       tool: threat.tool,
+      key: threat.key,
       routed,
     };
     playSfx("hit");
     strikeCb(info);
     if (routed) {
       playSfx("repel");
-      repelCb({ islandId: threat.islandId, tool: threat.tool, routed: true });
+      repelCb({ islandId: threat.islandId, tool: threat.tool, key: threat.key, routed: true });
     }
     holdRender = Math.max(holdRender, 0.45);
   }
@@ -3026,7 +3235,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const idleFor = (performance.now() - lastInput) / 1000;
     const orbitQuiet = pointers.size === 0 && selected.size === 0 && personFocus < 0 && !flight && !coasting;
     if (!reduced && !frozen && orbitQuiet && idleFor >= 6) goal.theta += step * 0.025;
-    if (!frozen) stepThreats(step);
+    if (!frozen) {
+      stepThreats(step);
+      stepPipi(step);
+      stepSaucer(step);
+    }
     if (!frozen && !reduced) stepIsleBits(step);
     if (personFocus >= 0 && !flight) {
       const at = people.spot(personFocus);
@@ -3589,6 +3802,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     raycaster.setFromCamera(point, camera);
     const threatIndex = pickThreat();
     if (threatIndex >= 0) return { kind: "threat", index: threatIndex };
+    const eggHit = raycaster.intersectObjects(eggHits, false)[0];
+    if (eggHit?.object.userData?.kind === "egg") return { kind: "egg", id: eggHit.object.userData.id };
     const personHit = people.pick(raycaster);
     const islandHit = raycaster.intersectObjects(hitboxes, false)[0];
     if (personNear(personHit, islandHit)) return { kind: "person", index: personHit.index };
@@ -3682,7 +3897,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     orbitVel.phi = 0;
     coasting = false;
     let hit = pickHit(event);
-    if (event.pointerType === "touch" && hit?.kind !== "person" && hit?.kind !== "threat") {
+    if (event.pointerType === "touch" && hit?.kind !== "person" && hit?.kind !== "threat" && hit?.kind !== "egg") {
       // The number sits above the mesh, so a ray through the badge often
       // hits the island in front. A badge within 28px is the one that was tapped.
       const pin = nearestPin(event);
@@ -3916,10 +4131,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   function placeImportLanes() {
     const border = views.get("border").base;
     const geom = {
-      "west-air": { aim: [-1, -0.45], bias: { west: true, z: -0.5 }, seats: [{ id: "flu", side: 0.4, hover: 1.62, craft: "plane", craftY: 1.62 }] },
-      "west-sea": { aim: [-1, 0.2], bias: { west: true, z: 0.45 }, seats: [{ id: "border", side: 0.38, hover: 0.55, craft: "ship", craftY: 0.28 }, { id: "tb", side: -0.38, hover: 0.72 }] },
-      "south-dengue": { aim: [0.6, 1], bias: { x: 0.5 }, seats: [{ id: "dengue", side: 0.35, hover: 0.7 }] },
-      "sw-measles": { aim: [-0.35, 1], bias: { x: -0.45 }, seats: [{ id: "entero", side: 0.35, hover: 0.7 }] },
+      "west-air": { aim: [-1, -0.45], bias: { west: true, z: -0.5 }, seats: [{ id: "flu", side: 0.4, hover: 1.62, craft: "plane", craftY: 1.62 }, { id: "amr", side: -0.45, hover: 1.35 }] },
+      "west-sea": { aim: [-1, 0.2], bias: { west: true, z: 0.45 }, seats: [{ id: "border", side: 0.38, hover: 0.55, craft: "ship", craftY: 0.28 }, { id: "tb", side: -0.38, hover: 0.72 }, { id: "hepa", side: 0.72, hover: 0.6 }] },
+      "south-dengue": { aim: [0.6, 1], bias: { x: 0.5 }, seats: [{ id: "dengue", side: 0.35, hover: 0.7 }, { id: "dusk", side: -0.42, hover: 0.95 }] },
+      "sw-measles": { aim: [-0.35, 1], bias: { x: -0.45 }, seats: [{ id: "entero", side: 0.35, hover: 0.7 }, { id: "measles", side: -0.42, hover: 1.15, craft: "plane", craftY: 1.15 }] },
       "north-birds": { aim: [0.05, -1], bias: { z: -0.85 }, seats: [], birds: true },
     };
     function outside(x, z) {
@@ -4117,7 +4332,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       const lane = { ...route, points, line, mat, craft: null, germ: null };
       let craft = null;
       for (const seat of spec.seats) {
-        const threat = threats.find((item) => item.islandId === seat.id);
+        const threat = threats.find((item) => item.key === seat.id);
         if (!threat) continue;
         threat.lane = points;
         threat.home = start;
@@ -4182,7 +4397,250 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const pause = pauseSlice();
     if (pause) await pause;
   }
+  function poseSpoonbill(group, points, u) {
+    writeLane(_pipiAt, points, u);
+    writeLane(_pipiAhead, points, Math.min(1, u + 0.04));
+    _pipiDir.subVectors(_pipiAhead, _pipiAt);
+    _pipiDir.y = 0;
+    const yaw = _pipiDir.lengthSq() > 1e-8 ? Math.atan2(-_pipiDir.x, -_pipiDir.z) : 0;
+    group.position.copy(_pipiAt);
+    group.position.y = 1.15;
+    group.rotation.set(0, yaw, 0);
+    group.updateMatrixWorld(true);
+  }
+
+  function makeSpoonbill() {
+    const group = new THREE.Group();
+    group.name = "pipi";
+    const white = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.7, flatShading: true });
+    const black = new THREE.MeshStandardMaterial({ color: P.k2a2630, roughness: 0.62, flatShading: true });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), white);
+    body.name = "body";
+    body.scale.set(0.9, 0.62, 1.35);
+    const neck = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), white);
+    neck.position.set(0, 0.04, -0.11);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 6), black);
+    head.position.set(0, 0.05, -0.17);
+    const bill = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.012, 0.14), black);
+    bill.name = "bill";
+    bill.position.set(0, 0.038, -0.26);
+    group.add(body, neck, head, bill);
+    group.traverse((child) => {
+      if (!child.isMesh) return;
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
+    const labelEl = document.createElement("div");
+    labelEl.className = "threat-name";
+    labelEl.textContent = t("eggPipiName");
+    const label = new CSS2DObject(labelEl);
+    label.position.set(0, 0.18, 0);
+    group.add(label);
+    group.visible = false;
+    scene.add(group);
+    return { group, labelEl };
+  }
+
+  function makeSaucer(group) {
+    const root = new THREE.Group();
+    root.name = "saucer";
+    root.position.set(0.18, 0.4, MESH_R * 0.82);
+    const dish = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.11, 0.04, 10),
+      new THREE.MeshStandardMaterial({ color: P.cc47a4a, roughness: 0.72, flatShading: true }),
+    );
+    const water = new THREE.Mesh(
+      new THREE.CircleGeometry(0.1, 10),
+      new THREE.MeshStandardMaterial({ color: P.k7ec8e0, roughness: 0.28, flatShading: true }),
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.022;
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 8, 6),
+      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+    );
+    hit.visible = false;
+    hit.userData = { kind: "egg", id: "saucer" };
+    root.add(dish, water, hit);
+    root.traverse((child) => {
+      if (!child.isMesh) return;
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
+    group.add(root);
+    eggHits.push(hit);
+    return { root, water, tipped: false, pour: false };
+  }
+
+  function installEggs() {
+    pipi = makeSpoonbill();
+    const watch = views.get("watch");
+    perchLamp = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 8, 6),
+      new THREE.MeshBasicMaterial({ color: P.kffcf8a }),
+    );
+    perchLamp.position.set(0.02, 1.42, 0.28);
+    perchLamp.visible = false;
+    perchLamp.castShadow = false;
+    perchLamp.receiveShadow = false;
+    watch.group.add(perchLamp);
+    saucer = makeSaucer(views.get("dengue").group);
+  }
+
+  function northLane() {
+    return importLanes.find((item) => item.id === "north-birds");
+  }
+
+  function flyPipi() {
+    if (pipiMode === "fly" || pipiMode === "flash" || !pipi) return false;
+    const lane = northLane();
+    if (!lane?.points?.length) return false;
+    if (pipiMode === "perch") {
+      scene.attach(pipi.group);
+      if (perchLamp) perchLamp.visible = false;
+    }
+    pipi.group.visible = true;
+    pipi.labelEl.textContent = t("eggPipiName");
+    if (reduced) {
+      pipiMode = "flash";
+      pipiFlash = 1.6;
+      poseSpoonbill(pipi.group, lane.points, 0.5);
+      holdRender = Math.max(holdRender, 1.6);
+      return true;
+    }
+    pipiMode = "fly";
+    pipiU = 0.28;
+    poseSpoonbill(pipi.group, lane.points, pipiU);
+    const mid = new THREE.Vector3();
+    writeLane(mid, lane.points, 0.48);
+    pipiCam = {
+      theta: cam.theta,
+      phi: cam.phi,
+      radius: cam.radius,
+      target: cam.target.clone(),
+      zoomed,
+      bird,
+      cancelled: false,
+    };
+    noteInput();
+    bird = false;
+    zoomed = true;
+    stopCoast();
+    beginFlight({
+      theta: cam.theta,
+      phi: 0.5,
+      radius: 16,
+      target: new THREE.Vector3(mid.x, 0.7, mid.z),
+    }, { duration: 900, distance: 0, arc: false });
+    flight.pipiOut = true;
+    holdRender = Math.max(holdRender, 1);
+    return true;
+  }
+
+  function finishPipiFly() {
+    if (!pipi) return;
+    pipiMode = "hide";
+    pipi.group.visible = false;
+    const back = pipiCam;
+    pipiCam = null;
+    if (!back || back.cancelled || reduced) return;
+    noteInput();
+    beginFlight({
+      theta: back.theta,
+      phi: back.phi,
+      radius: back.radius,
+      target: back.target,
+    }, { duration: 900, distance: 0, arc: false });
+    flight.pipiBack = back;
+  }
+
+  function stepPipi(step) {
+    if (!pipi) return;
+    if (pipiMode === "flash") {
+      pipiFlash = Math.max(0, pipiFlash - step);
+      if (pipiFlash <= 0) {
+        pipiMode = "hide";
+        pipi.group.visible = false;
+      }
+      holdRender = Math.max(holdRender, 0.3);
+      return;
+    }
+    if (pipiMode !== "fly") return;
+    const lane = northLane();
+    if (!lane) {
+      finishPipiFly();
+      return;
+    }
+    pipiU = Math.min(0.7, pipiU + step * 0.11);
+    poseSpoonbill(pipi.group, lane.points, pipiU);
+    holdRender = Math.max(holdRender, 0.3);
+    if (pipiU >= 0.7) finishPipiFly();
+  }
+
+  function syncPipi(mins, islandId) {
+    if (!pipi || pipiMode === "fly" || pipiMode === "flash") return false;
+    const hour = clockHour(mins);
+    const want = islandId === "watch" && (hour >= 22 || hour < 5);
+    if (want) {
+      if (pipiMode === "perch") return false;
+      const view = views.get("watch");
+      if (!view) return false;
+      view.group.attach(pipi.group);
+      pipi.group.position.set(0.16, 1.28, 0.55);
+      pipi.group.rotation.set(0, 0, 0);
+      pipi.group.visible = true;
+      pipi.labelEl.textContent = t("eggPipiName");
+      if (perchLamp) perchLamp.visible = true;
+      pipiMode = "perch";
+      holdRender = Math.max(holdRender, 0.6);
+      return true;
+    }
+    if (pipiMode === "perch") {
+      pipiMode = "hide";
+      scene.attach(pipi.group);
+      pipi.group.visible = false;
+      if (perchLamp) perchLamp.visible = false;
+    }
+    return false;
+  }
+
+  function tipSaucer(instant) {
+    if (!saucer || saucer.tipped) return false;
+    saucer.tipped = true;
+    if (instant || reduced) {
+      saucer.root.rotation.z = 0.9;
+      saucer.water.visible = false;
+      saucer.pour = false;
+      return true;
+    }
+    saucer.pour = true;
+    holdRender = Math.max(holdRender, 0.8);
+    return true;
+  }
+
+  function restoreSaucer() {
+    if (!saucer) return;
+    saucer.tipped = false;
+    saucer.pour = false;
+    saucer.root.rotation.z = 0;
+    saucer.water.visible = true;
+  }
+
+  function stepSaucer(step) {
+    if (!saucer?.pour) return;
+    const target = 0.9;
+    saucer.root.rotation.z += (target - saucer.root.rotation.z) * Math.min(1, step * 6);
+    if (saucer.root.rotation.z > 0.55) saucer.water.visible = false;
+    holdRender = Math.max(holdRender, 0.3);
+    if (Math.abs(target - saucer.root.rotation.z) < 0.02) {
+      saucer.root.rotation.z = target;
+      saucer.pour = false;
+      saucer.water.visible = false;
+    }
+  }
+
   placeImportLanes();
+  installEggs();
   if (!reduced) {
     for (const view of views.values()) {
       for (const rec of view.treeRecs) rec.scaleMul = 0;
@@ -4901,7 +5359,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         flow._hay = [flow.title, flow.kidTitle, flow.text, flow.kid, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name, views.get(flow.a).island.nick, views.get(flow.b).island.nick].join(" ");
       }
       for (const mark of crewMarks) mark.el.textContent = t(mark.key);
-      for (const mark of plateMarks) mark.el.textContent = t(mark.key);
+      for (const mark of plateMarks) mark.el.textContent = mark.threat?.plateMode === "do" ? t(mark.doKey) : t(mark.key);
+      if (pipi?.labelEl) pipi.labelEl.textContent = t("eggPipiName");
       people.relabel();
       placeTip();
       refresh();
@@ -4930,6 +5389,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         index,
         islandId: threat.islandId,
         tool: threat.tool,
+        key: threat.key,
         x: rect.left + (at.x * 0.5 + 0.5) * rect.width,
         y: rect.top + (-at.y * 0.5 + 0.5) * rect.height,
       };
@@ -4963,6 +5423,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     },
     onStrike(fn) { strikeCb = fn; },
     onRepel(fn) { repelCb = fn; },
+    flyPipi,
+    syncPipi,
+    tipSaucer,
+    restoreSaucer,
     celebrate,
     getTheta() { return cam.theta; },
     debugState() {
@@ -4994,7 +5458,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         if (route.curve.getPoint(0.5).y > 2.2) errors.push(`flow ${route.flow.id} peaks above 2.2`);
       }
       if (strictFlows !== drawnLines) errors.push(`flows ${strictFlows} disagree with drawn lines ${drawnLines}`);
-      const banned = new Set(["hepa", "amr", "global"]);
+      const banned = new Set(["global"]);
       for (const threat of threats) {
         if (banned.has(threat.islandId)) errors.push(`threat still targets ${threat.islandId}`);
         for (const mat of threat.mats) {
@@ -5002,7 +5466,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
           if (glow && mat.emissiveIntensity > 0 && glow.r + glow.g + glow.b > 0) errors.push(`threat on ${threat.islandId} glows`);
         }
       }
-      if (threats.length !== 5) errors.push(`expected 5 threats, saw ${threats.length}`);
+      if (threats.length !== 9) errors.push(`expected 9 threats, saw ${threats.length}`);
+      const threatKeys = threats.map((threat) => threat.key);
+      if (new Set(threatKeys).size !== threatKeys.length) errors.push("threat keys collide");
       let minHouse = Infinity;
       const seenRecipe = new Set();
       for (const view of views.values()) {
@@ -5024,9 +5490,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
           threat.mesh.updateWorldMatrix(true, true);
         }
         const limit = minHouse * 1.5;
-        if (edge > limit + 0.001) errors.push(`threat ${threat.islandId} spans ${edge.toFixed(3)} over ${limit.toFixed(3)}`);
+        if (edge > limit + 0.001) errors.push(`threat ${threat.key || threat.islandId} spans ${edge.toFixed(3)} over ${limit.toFixed(3)}`);
       }
-      if (plateMarks.length !== 5) errors.push(`expected 5 nameplates, saw ${plateMarks.length}`);
+      if (plateMarks.length !== 9) errors.push(`expected 9 nameplates, saw ${plateMarks.length}`);
       for (const threat of threats) {
         const radius = threat.hit?.geometry?.parameters?.radius ?? 0;
         if (radius * threat.scale0 < 0.499) errors.push(`hit sphere on ${threat.islandId} is under 0.5`);
@@ -5310,7 +5776,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         errors.push("west does not have the most import lanes");
       }
       for (const threat of threats) {
-        if (!threat.lane) errors.push(`threat ${threat.islandId} has no sea lane`);
+        if (!threat.lane) errors.push(`threat ${threat.key || threat.islandId} has no sea lane`);
         else {
           for (const point of threat.lane) {
             if (diskHitsLand(point.x, point.z)) errors.push(`threat ${threat.islandId} lane meets land`);
@@ -5362,6 +5828,45 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         if (birds.germ.position.distanceTo(germBefore) < 0.02) errors.push("flock germ did not move");
         if (diskHitsLand(birds.germ.position.x, birds.germ.position.z)) errors.push("flock germ is on land");
       }
+      const dengueGroup = views.get("dengue")?.group;
+      if (!saucer || saucer.root.parent !== dengueGroup) errors.push("saucer is not on the dengue shore");
+      else if (saucer.root.position.z < 0.6) errors.push("saucer sits on the dengue center");
+      const duskThreat = threats.find((threat) => threat.key === "dusk");
+      if (!duskThreat) errors.push("dusk mosquito is missing");
+      else if (!hoursOpen(duskThreat.hours) && duskThreat.mesh.visible) errors.push("dusk mosquito is visible outside 17:00–19:00");
+      if (pipi && birds?.points) {
+        const parent = pipi.group.parent;
+        const pos = pipi.group.position.clone();
+        const rot = pipi.group.rotation.clone();
+        const vis = pipi.group.visible;
+        scene.attach(pipi.group);
+        poseSpoonbill(pipi.group, birds.points, 0.35);
+        const atA = pipi.group.position.clone();
+        poseSpoonbill(pipi.group, birds.points, 0.55);
+        const atB = pipi.group.position.clone();
+        const travel = atB.clone().sub(atA);
+        travel.y = 0;
+        if (travel.length() < 0.02) errors.push("spoonbill did not move along the north lane");
+        else {
+          const bill = pipi.group.getObjectByName("bill");
+          const body = pipi.group.getObjectByName("body");
+          if (!bill || !body) errors.push("spoonbill bill is missing");
+          else {
+            const billAt = new THREE.Vector3();
+            const bodyAt = new THREE.Vector3();
+            bill.getWorldPosition(billAt);
+            body.getWorldPosition(bodyAt);
+            const nose = billAt.sub(bodyAt);
+            nose.y = 0;
+            const along = nose.normalize().dot(travel.clone().normalize());
+            if (along < 0.85) errors.push(`spoonbill bill faces away (${along.toFixed(2)})`);
+          }
+        }
+        if (parent) parent.attach(pipi.group);
+        pipi.group.position.copy(pos);
+        pipi.group.rotation.copy(rot);
+        pipi.group.visible = vis;
+      } else errors.push("spoonbill is missing");
       threats.forEach((threat, index) => {
         threat.u = savedU[index];
         poseThreat(threat);

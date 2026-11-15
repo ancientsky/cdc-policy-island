@@ -3,7 +3,7 @@
 const KEY = "cdc-island-passport-v1";
 
 function empty() {
-  return { v: 1, islands: {}, items: {}, flows: {}, missions: {}, done: false, welcome: 0 };
+  return { v: 1, islands: {}, items: {}, flows: {}, missions: {}, done: false, welcome: 0, eggs: {} };
 }
 
 function numMap(value) {
@@ -13,6 +13,17 @@ function numMap(value) {
     const n = Number(raw);
     if (!key || !Number.isFinite(n)) continue;
     out[key] = n;
+  }
+  return out;
+}
+
+function flagMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (!key || !raw) continue;
+    const n = Number(raw);
+    out[key] = Number.isFinite(n) && n > 0 ? n : 1;
   }
   return out;
 }
@@ -38,6 +49,7 @@ export function load() {
       missions,
       done: Boolean(raw.done),
       welcome: Number.isFinite(Number(raw.welcome)) ? Number(raw.welcome) : 0,
+      eggs: flagMap(raw.eggs),
     };
   } catch {
     const fresh = empty();
@@ -69,6 +81,11 @@ export function markMission(book, id) {
   return remember(book, book.missions, id);
 }
 
+export function markEgg(book, id) {
+  if (!book.eggs) book.eggs = {};
+  return remember(book, book.eggs, id);
+}
+
 export function progress(book) {
   return {
     islands: Object.keys(book.islands).length,
@@ -85,6 +102,7 @@ export function reset(book) {
   book.flows = {};
   book.missions = {};
   book.done = false;
+  book.eggs = {};
   save(book);
   return book;
 }

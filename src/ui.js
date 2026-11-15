@@ -1,7 +1,7 @@
 import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, importRoutes, itemCount, phaseLabel, phases, pillars, scenarios, SOURCE_INDEX, SOURCE_LINKS } from "./data.js";
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
-import { load as loadPassport, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
+import { load as loadPassport, markEgg, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
 import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
@@ -103,8 +103,8 @@ export function mount({ scene, islands, flows }) {
   germ.hidden = true;
   document.querySelector(".hud").append(germ);
   const GAME_KEY = "cdc-island-game-v1";
-  const toolKey = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
-  const germSuffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb" };
+  const toolKey = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish", screen: "toolScreen", rx: "toolRx" };
+  const germSuffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb", measles: "Measles", dusk: "Dusk", hepa: "Hepa", amr: "Amr" };
   function readGame() {
     try {
       const raw = JSON.parse(localStorage.getItem(GAME_KEY) || "");
@@ -137,7 +137,7 @@ export function mount({ scene, islands, flows }) {
   function showToast(info) {
     toastInfo = info;
     const island = byId.get(info.islandId);
-    const suffix = germSuffix[info.islandId];
+    const suffix = germSuffix[info.key] || germSuffix[info.islandId];
     const action = t(toolKey[info.tool] || "toolClean");
     toast.innerHTML = `<b>${esc(t("repelToast", { action, name: island?.nick || "" }))}</b><span>${esc(suffix ? t(`germDo${suffix}`) : "")}</span>`;
     toast.hidden = false;
@@ -164,6 +164,7 @@ export function mount({ scene, islands, flows }) {
   let lastFocus = null;
   const quiet = new URLSearchParams(location.search).has("quiet");
   let book = loadPassport();
+  if (book.eggs?.saucer) scene.tipSaucer(true);
   let stampFreshId = null;
   let stampTimer = 0;
   let flipping = false;
@@ -310,6 +311,21 @@ export function mount({ scene, islands, flows }) {
     if (q.includes("蚊子") || q.includes("mosquito") || q.includes("蚊")) state.mosquito = true;
   }
 
+  function notePipi(value) {
+    const q = String(value || "").trim().toLowerCase();
+    if (!q) return;
+    const hit = q.includes("琵琵") || q.includes("黑面琵鷺") || q.includes("pipi") || q.includes("ピピ");
+    if (hit && scene.flyPipi()) showMile("eggPipi");
+  }
+
+  function selectedIslandId() {
+    const selected = state.selected;
+    if (!selected) return null;
+    if (selected.type === "island") return selected.id;
+    if (selected.type === "item") return selected.islandId;
+    return null;
+  }
+
   function showMile(key) {
     mile.dataset.key = key;
     mile.hidden = false;
@@ -372,7 +388,8 @@ export function mount({ scene, islands, flows }) {
     paintPins();
     playStamp();
     const seen = Object.keys(book.islands).length;
-    if (seen === 1 || seen === 7) showMile(seen === 1 ? "mile1" : "mile7");
+    const eggOn = !mile.hidden && String(mile.dataset.key || "").startsWith("egg");
+    if ((seen === 1 || seen === 7) && !eggOn) showMile(seen === 1 ? "mile1" : "mile7");
     if (seen === 14 && !book.done) {
       book.done = true;
       savePassport(book);
@@ -615,6 +632,7 @@ export function mount({ scene, islands, flows }) {
     dayNoteEl.textContent = `${t("chapterBy")}${note.title}${gap}${note.text}`;
     status.textContent = t("onDuty", { n: awake });
     scene.setMinutes(state.minutes);
+    if (scene.syncPipi(state.minutes, selectedIslandId())) showMile("eggNight");
     paintTicks();
     const theme = themeFromMinutes(state.minutes);
     document.documentElement.dataset.theme = theme;
@@ -796,7 +814,7 @@ export function mount({ scene, islands, flows }) {
     const info = state.germ;
     if (!info) return;
     const live = scene.threatInfo(info.index) || info;
-    const suffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb" }[live.islandId];
+    const suffix = germSuffix[live.key] || germSuffix[live.islandId];
     if (!suffix) return;
     germ.hidden = false;
     germ.innerHTML = `<button type="button" class="btn x" data-germ-close aria-label="${esc(t("close"))}">×</button><p class="k">${esc(t("germWhatLabel"))}</p><p>${esc(t(`germWhat${suffix}`))}</p><p class="k">${esc(t("germHowLabel"))}</p><p>${esc(t(`germHow${suffix}`))}</p><p class="k">${esc(t("germDoLabel"))}</p><p class="do">${esc(t(`germDo${suffix}`))}</p>`;
@@ -980,6 +998,7 @@ export function mount({ scene, islands, flows }) {
     paintRail();
     armStamp(id);
     advanceMissions();
+    if (scene.syncPipi(state.minutes, id)) showMile("eggNight");
     focusSheetIfNeeded(event);
     announceSelection();
   }
@@ -1002,6 +1021,7 @@ export function mount({ scene, islands, flows }) {
     renderSheet();
     paintRail();
     advanceMissions();
+    if (scene.syncPipi(state.minutes, islandId)) showMile("eggNight");
     focusSheetIfNeeded(event);
     announceSelection();
   }
@@ -1014,6 +1034,7 @@ export function mount({ scene, islands, flows }) {
     closeGerm();
     cancelStamp();
     state.selected = { type: "flow", id, flow };
+    scene.syncPipi(state.minutes, null);
     scene.focusIslands([flow.a, flow.b]);
     scene.setHotItem(null);
     writeHash();
@@ -1034,6 +1055,7 @@ export function mount({ scene, islands, flows }) {
     cancelStamp();
     state.scenario = null;
     state.selected = null;
+    scene.syncPipi(state.minutes, null);
     scene.overview();
     scene.setHotItem(null);
     writeHash();
@@ -1179,9 +1201,10 @@ export function mount({ scene, islands, flows }) {
   const cardAt = new Map();
   scene.onStrike((info) => {
     if (!info) return;
-    const prev = cardAt.get(info.islandId);
+    const cardId = info.key || info.islandId;
+    const prev = cardAt.get(cardId);
     if (prev != null && performance.now() - prev < 20000) return;
-    cardAt.set(info.islandId, performance.now());
+    cardAt.set(cardId, performance.now());
     openGerm(info.index);
   });
   scene.onRepel((info) => {
@@ -1209,6 +1232,13 @@ export function mount({ scene, islands, flows }) {
     }
     if (hit.kind === "person") {
       openPerson(hit.index);
+      return;
+    }
+    if (hit.kind === "egg" && hit.id === "saucer") {
+      if (scene.tipSaucer()) {
+        markEgg(book, "saucer");
+        showMile("eggSaucer");
+      }
       return;
     }
     if (hit.kind === "item") selectItem(hit.islandId, hit.itemId);
@@ -1305,6 +1335,7 @@ export function mount({ scene, islands, flows }) {
   search.addEventListener("input", () => {
     state.query = search.value;
     noteMosquito(search.value);
+    notePipi(search.value);
     scene.setQuery(search.value);
     renderList();
     announceSearch();
@@ -1443,6 +1474,7 @@ export function mount({ scene, islands, flows }) {
     if (modal.dataset.mode !== "grad") return;
     if (!window.confirm(t("gradResetAsk"))) return;
     resetPassport(book);
+    scene.restoreSaucer();
     stampFreshId = null;
     cancelStamp();
     closeModal();
