@@ -170,10 +170,18 @@ export function mount({ scene, islands, flows }) {
   let flipping = false;
   let mileTimer = 0;
   let finaleTimer = 0;
+  let clockSeen = state.minutes;
+  const yawned = new Set();
+  const STICKERS = [
+    ["fly", "stickerFlyMark", "stickerFly"],
+    ["saucer", "stickerSaucerMark", "stickerSaucer"],
+    ["night", "stickerNightMark", "stickerNight"],
+    ["repel", "stickerRepelMark", "stickerRepel"],
+  ];
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
   passportHud.className = "passport-hud";
-  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="passport-bar" id="passport-bar"></span>`;
+  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="passport-bar" id="passport-bar"></span><span class="sticker-row" id="sticker-row"></span>`;
   hud.append(passportHud);
   const guide = document.createElement("section");
   guide.id = "guide";
@@ -247,6 +255,13 @@ export function mount({ scene, islands, flows }) {
     passportHud.querySelector(".passport-bar").innerHTML = ordered.map((island) => (
       book.islands[island.id] ? `<i style="background:${island.accent}"></i>` : "<i></i>"
     )).join("");
+    const eggs = book.eggs || {};
+    const row = passportHud.querySelector(".sticker-row");
+    if (row) {
+      row.innerHTML = STICKERS.filter(([id]) => eggs[id]).map(([, mark, title]) => (
+        `<i class="sticker" title="${esc(t(title))}">${esc(t(mark))}</i>`
+      )).join("");
+    }
     stats.textContent = t("passportStats", {
       items: view.items,
       itemTotal: itemCount(),
@@ -271,9 +286,7 @@ export function mount({ scene, islands, flows }) {
     guide.querySelector("#guide-go").textContent = t("guideGo");
     const capFace = $("caption-face");
     if (capFace) capFace.textContent = t("guideMark");
-    if (!mile.hidden && mile.dataset.key) {
-      mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(t(mile.dataset.key))}</span>`;
-    }
+    if (!mile.hidden && mile.dataset.key) paintMile();
   }
 
   function showGuide() {
@@ -315,7 +328,36 @@ export function mount({ scene, islands, flows }) {
     const q = String(value || "").trim().toLowerCase();
     if (!q) return;
     const hit = q.includes("琵琵") || q.includes("黑面琵鷺") || q.includes("pipi") || q.includes("ピピ");
-    if (hit && scene.flyPipi()) showMile("eggPipi");
+    if (!hit || !scene.flyPipi()) return;
+    if (markEgg(book, "fly")) paintPassport(false);
+    showMile("eggPipi");
+  }
+
+  function firstSentence(text) {
+    const raw = String(text || "").trim();
+    const match = raw.match(/^[^。！？.!?]+[。！？.!?]?/);
+    return match ? match[0] : raw;
+  }
+
+  function mileVars() {
+    if (!mile.dataset.vars) return {};
+    try {
+      const parsed = JSON.parse(mile.dataset.vars);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function paintMile() {
+    const key = mile.dataset.key;
+    if (!key) return;
+    let text = "";
+    if (key === "say") {
+      const island = byId.get(mile.dataset.ask);
+      text = firstSentence(island?.blurbKid || "");
+    } else text = t(key, mileVars());
+    mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(text)}</span>`;
   }
 
   function selectedIslandId() {
@@ -326,12 +368,62 @@ export function mount({ scene, islands, flows }) {
     return null;
   }
 
-  function showMile(key) {
+  function showMile(key, vars) {
     mile.dataset.key = key;
+    delete mile.dataset.ask;
+    if (vars) mile.dataset.vars = JSON.stringify(vars);
+    else delete mile.dataset.vars;
     mile.hidden = false;
-    mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(t(key))}</span>`;
+    paintMile();
     window.clearTimeout(mileTimer);
     mileTimer = window.setTimeout(() => { mile.hidden = true; }, 2400);
+  }
+
+  function showSay(islandId) {
+    mile.dataset.key = "say";
+    mile.dataset.ask = islandId;
+    delete mile.dataset.vars;
+    mile.hidden = false;
+    paintMile();
+    window.clearTimeout(mileTimer);
+    mileTimer = window.setTimeout(() => { mile.hidden = true; }, 4200);
+  }
+
+  function noteNight(islandId) {
+    if (!scene.syncPipi(state.minutes, islandId)) return false;
+    if (markEgg(book, "night")) paintPassport(false);
+    showMile("eggNight");
+    return true;
+  }
+
+  function noteSleep(islandId, nightShown) {
+    if (nightShown || !islandId || yawned.has(islandId)) return;
+    const island = byId.get(islandId);
+    if (!island) return;
+    const hour = state.minutes / 60;
+    if (island.items.some((item) => hourCovers(item.hours, hour))) return;
+    yawned.add(islandId);
+    showMile("eggSleep");
+  }
+
+  function hitHotline(prev, next) {
+    if (!(next > prev) || !(prev < 1162)) return false;
+    if (Math.floor(next) === 1162) return true;
+    return next >= 1162 && next <= 1164 && next - prev <= 4;
+  }
+
+  function crossedDusk(prev, next) {
+    if (!(next > prev)) return false;
+    const prevHour = ((prev % 1440) + 1440) % 1440 / 60;
+    const nextHour = ((next % 1440) + 1440) % 1440 / 60;
+    return prevHour < 17 && nextHour >= 17;
+  }
+
+  function noteClockEggs(prev, next, nightShown) {
+    const hotline = hitHotline(prev, next);
+    if (hotline && markEgg(book, "hotline")) showMile("eggHotline");
+    if (hotline || nightShown) return;
+    if (crossedDusk(prev, next) && markEgg(book, "dusk")) showMile("eggDusk");
   }
 
   function playStamp() {
@@ -352,6 +444,16 @@ export function mount({ scene, islands, flows }) {
     }));
   }
 
+  function watchFirst(list) {
+    const ids = list.map((island) => island.id);
+    const at = ids.indexOf("watch");
+    if (at > 0) {
+      ids.splice(at, 1);
+      ids.unshift("watch");
+    }
+    return ids;
+  }
+
   function beginFinale() {
     cancelStamp();
     state.selected = null;
@@ -360,7 +462,10 @@ export function mount({ scene, islands, flows }) {
     renderList();
     renderSheet();
     paintRail();
-    scene.celebrate(ribbonList(), showGrad);
+    const list = ribbonList();
+    showMile("eggVoyage");
+    scene.celebrate(list, showGrad);
+    scene.startVoyage(watchFirst(list));
   }
 
   function showGrad() {
@@ -388,7 +493,8 @@ export function mount({ scene, islands, flows }) {
     paintPins();
     playStamp();
     const seen = Object.keys(book.islands).length;
-    const eggOn = !mile.hidden && String(mile.dataset.key || "").startsWith("egg");
+    const mileKey = String(mile.dataset.key || "");
+    const eggOn = !mile.hidden && (mileKey.startsWith("egg") || mileKey === "say");
     if ((seen === 1 || seen === 7) && !eggOn) showMile(seen === 1 ? "mile1" : "mile7");
     if (seen === 14 && !book.done) {
       book.done = true;
@@ -631,8 +737,11 @@ export function mount({ scene, islands, flows }) {
     if (capFace) capFace.textContent = t("guideMark");
     dayNoteEl.textContent = `${t("chapterBy")}${note.title}${gap}${note.text}`;
     status.textContent = t("onDuty", { n: awake });
+    const prevMinutes = clockSeen;
     scene.setMinutes(state.minutes);
-    if (scene.syncPipi(state.minutes, selectedIslandId())) showMile("eggNight");
+    const nightShown = noteNight(selectedIslandId());
+    noteClockEggs(prevMinutes, state.minutes, nightShown);
+    clockSeen = state.minutes;
     paintTicks();
     const theme = themeFromMinutes(state.minutes);
     document.documentElement.dataset.theme = theme;
@@ -947,7 +1056,7 @@ export function mount({ scene, islands, flows }) {
     const why = island.id === "border"
       ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p><ul class="why-src">${importRoutes.map((route) => `<li><a href="${esc(route.source)}" target="_blank" rel="noopener noreferrer">${esc(route.label[getLang()] || route.label.zh)}</a></li>`).join("")}</ul></section>`
       : "";
-    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section>${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><h2>${esc(island.nick)}</h2><button type="button" class="btn ask" data-ask="${esc(island.id)}">${esc(t("askPipi"))}</button><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section>${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div><p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;
@@ -979,6 +1088,7 @@ export function mount({ scene, islands, flows }) {
     paintRail();
     armStamp(first);
     advanceMissions();
+    noteSleep(first, noteNight(first));
     focusSheetIfNeeded(event);
     announceSelection();
   }
@@ -998,7 +1108,7 @@ export function mount({ scene, islands, flows }) {
     paintRail();
     armStamp(id);
     advanceMissions();
-    if (scene.syncPipi(state.minutes, id)) showMile("eggNight");
+    noteSleep(id, noteNight(id));
     focusSheetIfNeeded(event);
     announceSelection();
   }
@@ -1021,7 +1131,7 @@ export function mount({ scene, islands, flows }) {
     renderSheet();
     paintRail();
     advanceMissions();
-    if (scene.syncPipi(state.minutes, islandId)) showMile("eggNight");
+    noteSleep(islandId, noteNight(islandId));
     focusSheetIfNeeded(event);
     announceSelection();
   }
@@ -1035,7 +1145,9 @@ export function mount({ scene, islands, flows }) {
     cancelStamp();
     state.selected = { type: "flow", id, flow };
     scene.syncPipi(state.minutes, null);
-    scene.focusIslands([flow.a, flow.b]);
+    const rode = event ? scene.rideFlow(id) : false;
+    if (rode) showMile("eggRide", { what: flow.carried });
+    else if (!event || rode === false) scene.focusIslands([flow.a, flow.b]);
     scene.setHotItem(null);
     writeHash();
     if (stampFlow(book, id)) paintPassport(false);
@@ -1211,6 +1323,7 @@ export function mount({ scene, islands, flows }) {
     if (!info) return;
     game.repelled[info.islandId] = (Number(game.repelled[info.islandId]) || 0) + 1;
     game.total += 1;
+    if (markEgg(book, "repel")) paintPassport(false);
     writeGame(game);
     paintScore();
     advanceMissions();
@@ -1236,7 +1349,7 @@ export function mount({ scene, islands, flows }) {
     }
     if (hit.kind === "egg" && hit.id === "saucer") {
       if (scene.tipSaucer()) {
-        markEgg(book, "saucer");
+        if (markEgg(book, "saucer")) paintPassport(false);
         showMile("eggSaucer");
       }
       return;
@@ -1290,6 +1403,11 @@ export function mount({ scene, islands, flows }) {
     if (event.target.closest("[data-close]")) {
       if (state.person) closePerson();
       else clearSelection();
+      return;
+    }
+    const ask = event.target.closest("[data-ask]");
+    if (ask) {
+      showSay(ask.dataset.ask);
       return;
     }
     const item = event.target.closest("[data-item]");

@@ -2191,6 +2191,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let userPhi = cam.phi;
   const goalTarget = overviewTarget.clone();
   let flight = null;
+  let ride = null;
+  let voyage = null;
+  const _rideAt = new THREE.Vector3();
+  const _rideAhead = new THREE.Vector3();
+  const _rideDir = new THREE.Vector3();
   let coasting = false;
   let lastInput = performance.now();
   let celebrateCb = null;
@@ -2253,6 +2258,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   function beginFlight(to, opts) {
+    ride = null;
     flight = {
       t0: performance.now(),
       dur: opts.duration,
@@ -2283,6 +2289,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   function cancelFlight() {
+    ride = null;
     if (!flight) return;
     const celebrate = Boolean(flight.celebrate);
     if ((flight.pipiOut || flight.pipiBack) && pipiCam) pipiCam.cancelled = true;
@@ -2291,7 +2298,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     goal.radius = cam.radius;
     userPhi = cam.phi;
     goalTarget.copy(cam.target);
-    if (celebrate) finishCelebrate();
+    if (celebrate) {
+      voyage = null;
+      finishCelebrate();
+    }
   }
 
   function easeInOutSine(t) {
@@ -3232,8 +3242,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     if (!frozen) environment.update(step, { hold: reduced });
     life.step(step, { live: !reduced && !frozen, night: lookAtHour(minutes / 60).night });
     stepRibbons();
+    stepVoyage();
     const idleFor = (performance.now() - lastInput) / 1000;
-    const orbitQuiet = pointers.size === 0 && selected.size === 0 && personFocus < 0 && !flight && !coasting;
+    const orbitQuiet = pointers.size === 0 && selected.size === 0 && personFocus < 0 && !flight && !coasting && !ride;
     if (!reduced && !frozen && orbitQuiet && idleFor >= 6) goal.theta += step * 0.025;
     if (!frozen) {
       stepThreats(step);
@@ -3241,11 +3252,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       stepSaucer(step);
     }
     if (!frozen && !reduced) stepIsleBits(step);
-    if (personFocus >= 0 && !flight) {
+    if (personFocus >= 0 && !flight && !ride) {
       const at = people.spot(personFocus);
       if (at) goalTarget.set(at.x, at.y + 0.35, at.z);
     }
     if (flight) stepFlight();
+    else if (ride) stepRide();
     else if (coasting && pointers.size === 0) {
       goal.theta += orbitVel.theta * step;
       userPhi = THREE.MathUtils.clamp(userPhi + orbitVel.phi * step, 0.32, 1.22);
@@ -3399,6 +3411,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       || islandBusy
       || coasting
       || Boolean(flight)
+      || Boolean(ride)
+      || Boolean(voyage)
       || Boolean(ribbon)
       || introLive;
     if (moving) holdRender = 0.3;
@@ -5207,7 +5221,95 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     if (alive === 0 && t > plan.length * 0.08 + 1.7) clearRibbon();
   }
 
+  function revealRoute(route) {
+    selected = new Set([route.flow.a, route.flow.b]);
+    personFocus = -1;
+    spotlight = null;
+    focusHalf = null;
+    stopCoast();
+    refresh();
+  }
+
+  function stepRide() {
+    if (!ride?.route?.curve) {
+      ride = null;
+      return;
+    }
+    const curve = ride.route.curve;
+    const raw = (performance.now() - ride.t0) / 4200;
+    const u = raw >= 1 ? 1 : raw < 0 ? 0 : raw;
+    curve.getPoint(u, _rideAt);
+    const ax = _rideAt.x;
+    const ay = _rideAt.y;
+    const az = _rideAt.z;
+    const sample = u < 0.98 ? Math.min(1, u + 0.04) : Math.max(0, u - 0.04);
+    curve.getPoint(sample, _rideAhead);
+    if (u < 0.98) _rideDir.set(_rideAhead.x - ax, 0, _rideAhead.z - az);
+    else _rideDir.set(ax - _rideAhead.x, 0, az - _rideAhead.z);
+    if (_rideDir.lengthSq() < 1e-8) _rideDir.set(0, 0, -1);
+    // Travel north (0, -1): atan2(0, 1) = 0, so the camera sits on +z.
+    const theta = Math.atan2(-_rideDir.x, -_rideDir.z);
+    const phi = 0.85;
+    const radius = 9;
+    cam.theta = theta;
+    cam.phi = phi;
+    cam.radius = radius;
+    cam.target.set(ax, ay, az);
+    goal.theta = theta;
+    goal.radius = radius;
+    userPhi = phi;
+    goalTarget.set(ax, ay, az);
+    holdRender = Math.max(holdRender, 0.35);
+    if (u >= 1) ride = null;
+  }
+
+  function rideFlow(id) {
+    if (flight?.celebrate || pipiMode === "fly" || pipiMode === "flash") return null;
+    const route = flowViews.find((item) => item.flow.id === id);
+    if (!route?.curve) return false;
+    if (flight) {
+      flight = null;
+      goal.theta = cam.theta;
+      goal.radius = cam.radius;
+      userPhi = cam.phi;
+      goalTarget.copy(cam.target);
+    }
+    revealRoute(route);
+    if (reduced) {
+      ride = null;
+      holdRender = Math.max(holdRender, 0.45);
+      return true;
+    }
+    noteInput();
+    bird = false;
+    zoomed = true;
+    ride = { route, t0: performance.now() };
+    holdRender = Math.max(holdRender, 4.2);
+    stepRide();
+    placeCamera();
+    return true;
+  }
+
+  function startVoyage(ids) {
+    voyage = null;
+    if (reduced || !Array.isArray(ids) || !ids.length) return;
+    voyage = { ids, i: 0, next: 0 };
+    holdRender = Math.max(holdRender, 6);
+  }
+
+  function stepVoyage() {
+    if (!voyage) return;
+    const now = performance.now();
+    if (voyage.next && now < voyage.next) return;
+    const id = voyage.ids[voyage.i];
+    voyage.i += 1;
+    voyage.next = now + 380;
+    if (id) pulse(id);
+    if (voyage.i >= voyage.ids.length) voyage = null;
+  }
+
   function celebrate(list, done) {
+    ride = null;
     celebrateCb = typeof done === "function" ? done : null;
     if (reduced) {
       finishCelebrate();
@@ -5427,6 +5529,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     syncPipi,
     tipSaucer,
     restoreSaucer,
+    rideFlow,
+    startVoyage,
     celebrate,
     getTheta() { return cam.theta; },
     debugState() {
