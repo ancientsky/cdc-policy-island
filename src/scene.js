@@ -1304,6 +1304,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let boastReady = false;
   let boastSpent = false;
   const eggHits = [];
+  const forestEggs = [];
   let saucer = null;
   let pipi = null;
   let pipiMode = "hide";
@@ -3250,6 +3251,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       stepThreats(step);
       stepPipi(step);
       stepSaucer(step);
+      stepForest(step);
     }
     if (!frozen && !reduced) stepIsleBits(step);
     if (personFocus >= 0 && !flight && !ride) {
@@ -4366,6 +4368,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         lane.craft = makeFlock();
         lane.germ = makeVirus(P.kb7a07a).group;
         lane.germ.userData.kind = "import-germ";
+        lane.craft.add(eggBall("flock", 0.7));
+        lane.germ.add(eggBall("flock", 0.45));
+        lane.germ.add(eggAnchor("flock"));
         scene.add(lane.craft, lane.germ);
       }
       importLanes.push(lane);
@@ -4499,6 +4504,121 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     perchLamp.receiveShadow = false;
     watch.group.add(perchLamp);
     saucer = makeSaucer(views.get("dengue").group);
+    installForest();
+  }
+
+  const eggHitGeo = new THREE.SphereGeometry(1, 8, 6);
+  const eggHitMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+
+  function eggBall(id, radius) {
+    const hit = new THREE.Mesh(eggHitGeo, eggHitMat);
+    hit.scale.setScalar(radius);
+    hit.visible = false;
+    hit.castShadow = false;
+    hit.receiveShadow = false;
+    hit.userData = { kind: "egg", id };
+    eggHits.push(hit);
+    return hit;
+  }
+
+  function eggAnchor(id) {
+    const el = document.createElement("div");
+    el.dataset.egg = id;
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText = "width:8px;height:8px;pointer-events:none;opacity:0";
+    return new CSS2DObject(el);
+  }
+
+  function findForestPad(seed) {
+    const bases = [...views.values()].map((view) => view.base);
+    for (let ring = 0; ring <= 10; ring += 1) {
+      const radius = ring * 0.4;
+      const steps = ring === 0 ? 1 : 12;
+      for (let i = 0; i < steps; i += 1) {
+        const ang = (i / steps) * Math.PI * 2;
+        const x = seed.x + Math.cos(ang) * radius;
+        const z = seed.z + Math.sin(ang) * radius;
+        const ground = environment.heightAt(x, z);
+        if (ground < 0.45 || ground > 6) continue;
+        let blocked = false;
+        for (const base of bases) {
+          if (Math.hypot(x - base.x, z - base.z) < 5) blocked = true;
+        }
+        for (const egg of forestEggs) {
+          if (Math.hypot(x - egg.group.position.x, z - egg.group.position.z) < 3) blocked = true;
+        }
+        if (!blocked) return { x, z, ground };
+      }
+    }
+    return null;
+  }
+
+  function addForestEgg(id, nameKey, seed, build) {
+    const pad = findForestPad(seed);
+    if (!pad) return;
+    const group = new THREE.Group();
+    group.name = id;
+    build(group);
+    const hit = eggBall(id, 0.55);
+    group.add(hit);
+    group.add(eggAnchor(id));
+    group.scale.setScalar(2.2);
+    group.position.set(pad.x, pad.ground + 0.28, pad.z);
+    group.traverse((child) => {
+      if (!child.isMesh) return;
+      child.castShadow = false;
+      child.receiveShadow = false;
+    });
+    const labelEl = document.createElement("div");
+    labelEl.className = "threat-name";
+    labelEl.textContent = t(nameKey);
+    const label = new CSS2DObject(labelEl);
+    label.position.set(0, 0.55, 0);
+    group.add(label);
+    scene.add(group);
+    forestEggs.push({
+      id,
+      nameKey,
+      group,
+      labelEl,
+      baseY: group.position.y,
+      phase: pad.x * 0.7,
+    });
+  }
+
+  function installForest() {
+    addForestEgg("mite", "eggMiteName", { x: 1.5, z: -20.2 }, (group) => {
+      const body = new THREE.Mesh(
+        unitSphere,
+        new THREE.MeshStandardMaterial({ color: P.k2a2026, roughness: 0.72, flatShading: true }),
+      );
+      body.scale.set(0.5, 0.28, 0.38);
+      const spot = new THREE.Mesh(
+        unitSphere,
+        new THREE.MeshStandardMaterial({ color: P.k8a7a5c, roughness: 0.6, flatShading: true }),
+      );
+      spot.scale.set(0.12, 0.08, 0.1);
+      spot.position.set(0.16, 0.1, -0.12);
+      group.add(body, spot);
+    });
+    const beside = { x: -6.5, z: -20.2 };
+    addForestEgg("lepto", "eggLeptoName", beside, (group) => {
+      const coil = new THREE.Mesh(
+        unitTorus,
+        new THREE.MeshStandardMaterial({ color: P.c8ed15a, roughness: 0.55, flatShading: true }),
+      );
+      coil.scale.setScalar(0.42);
+      coil.rotation.x = Math.PI / 2.4;
+      group.add(coil);
+    });
+  }
+
+  function stepForest(step) {
+    if (reduced) return;
+    for (const egg of forestEggs) {
+      egg.phase += step;
+      egg.group.position.y = egg.baseY + Math.sin(egg.phase * 1.4) * 0.04;
+    }
   }
 
   function northLane() {
@@ -5463,6 +5583,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       for (const mark of crewMarks) mark.el.textContent = t(mark.key);
       for (const mark of plateMarks) mark.el.textContent = mark.threat?.plateMode === "do" ? t(mark.doKey) : t(mark.key);
       if (pipi?.labelEl) pipi.labelEl.textContent = t("eggPipiName");
+      for (const egg of forestEggs) egg.labelEl.textContent = t(egg.nameKey);
       people.relabel();
       placeTip();
       refresh();
@@ -5978,6 +6099,23 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       birdU = savedBird;
       poseBirds();
       if (Object.keys(widthSum).length < 3) errors.push("import lanes cover fewer than 3 directions");
+      if (forestEggs.length !== 2) errors.push(`expected 2 forest creatures, saw ${forestEggs.length}`);
+      for (const egg of forestEggs) {
+        const ground = environment.heightAt(egg.group.position.x, egg.group.position.z);
+        if (ground < 0.4) errors.push(`${egg.id} is off the forest floor`);
+        for (const view of views.values()) {
+          const dist = Math.hypot(egg.group.position.x - view.base.x, egg.group.position.z - view.base.z);
+          if (dist < 4.5) errors.push(`${egg.id} overlaps ${view.island.id}`);
+        }
+        const hit = egg.group.children.find((child) => child.userData?.id === egg.id);
+        if (!hit || hit.position.lengthSq() > 1e-6) errors.push(`${egg.id} hit left the body`);
+        egg.group.traverse((child) => {
+          const glow = child.material?.emissive;
+          if (glow && child.material.emissiveIntensity > 0 && glow.r + glow.g + glow.b > 0) errors.push(`${egg.id} glows`);
+        });
+      }
+      const flockHits = eggHits.filter((hit) => hit.userData?.id === "flock");
+      if (flockHits.length !== 2) errors.push("flock egg needs the birds and the virus");
       return errors;
     },
   };

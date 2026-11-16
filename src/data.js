@@ -480,7 +480,7 @@ export const islands = [
     items: [
       { id: "amr-steward", name: "人醫抗生素管理", phase: "now", hours: [[9, 17]], keywords: ["抗生素", "管理", "醫院", "消炎藥"], detail: "醫院的抗生素管理計畫，減少不必要的廣效抗生素。管理的輸入來自處方，不是來自口號。" },
       { id: "amr-watch", name: "抗藥性監視", phase: "now", hours: [[9, 18]], keywords: ["抗藥性", "菌株", "THAS"], detail: "臨床分離株的抗藥性比例，按菌種回饋給醫院。沒有持續上傳的藥物敏感性，行動計畫只剩百分比的空格。" },
-      { id: "amr-animal", name: "動物與環境", phase: "near", hours: [[9, 17]], keywords: ["One Health", "動物", "環境"], detail: "與農業、環境部門對齊動物用藥和環境中的抗藥性。近期要做的是把人醫以外的資料接進來。" },
+      { id: "amr-animal", name: "動物與環境", phase: "near", hours: [[9, 17]], keywords: ["One Health", "動物", "環境", "動植物防疫檢疫署"], detail: "與農業、環境部門對齊動物用藥和環境中的抗藥性。近期要做的是把人醫以外的資料接進來。" },
       { id: "amr-joint", name: "同一張跨部會的桌子", phase: "mid", hours: [[9, 17]], keywords: ["政策會報", "聯合行動", "2029", "自評"], detail: "行政院於 2025 年（民國 114 年）4 月 30 日核定國家防疫一體政策會報。聯合行動方案涵蓋 2026 年（民國 115 年）至 2030 年（民國 119 年），把人醫、動物、食品和環境放在同一張桌子，範圍比抗藥性大。抗藥性行動計畫是其中的抗藥性切片，收到 2029，2026 年（民國 115 年）3 月修訂過。核心能力仍是對照國際工具做自評或外部評核。" },
     ],
   },
@@ -542,6 +542,7 @@ export const scenarios = [
   { id: "cough", icon: "mask", islands: ["tb", "flu"] },
   { id: "sex", icon: "ribbon", islands: ["hiv", "hepa"] },
   { id: "drug", icon: "pill", islands: ["amr"] },
+  { id: "health", icon: "health", islands: ["flu", "border", "amr"] },
 ];
 
 export const backstageIds = ["watch", "lab", "ready"];
@@ -602,6 +603,7 @@ export const flows = [
   { id: "f16", a: "global", b: "watch", title: "國際情資換班", carried: "情資", text: "合作對象的事件，要在國內出現病例前就進到值勤畫面。" },
   { id: "f17", a: "lab", b: "global", title: "定序貢獻判斷", carried: "序列", text: "國內流行株的基因體，是對外說明和風險判斷的依據，不只是一則國內新聞。" },
   { id: "f18", a: "vax", b: "ready", title: "冷鏈與緊急調撥", carried: "冷鏈", text: "疫苗基金的常規冷鏈，大流行時要能改成緊急接種的配送網。" },
+  { id: "f19", a: "flu", b: "amr", title: "同一張桌子", carried: "同一健康", text: "噴嚏島的流感和超級細菌島的動物用藥，跟農業部動植物防疫檢疫署是同一張桌子。" },
 ];
 
 applyPlain(islands, flows, plain.zh);
@@ -708,7 +710,7 @@ export function validate() {
   }
   if (islands.length !== 14) errors.push("expected 14 islands");
   const inScenario = new Set();
-  if (scenarios.length !== 8) errors.push("expected 8 scenarios");
+  if (scenarios.length !== 9) errors.push("expected 9 scenarios");
   for (const scenario of scenarios) {
     if (!scenario.islands.length) errors.push(`${scenario.id} empty`);
     for (const id of scenario.islands) {

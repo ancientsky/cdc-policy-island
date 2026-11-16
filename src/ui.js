@@ -17,6 +17,7 @@ const SCENARIO_ICON = {
   mask: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M5 9.5c2.2 1.2 4.4 1.8 7 1.8s4.8-.6 7-1.8v5.2c0 2.4-3.1 4.3-7 4.3s-7-1.9-7-4.3V9.5z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M8 12.2h8"/></svg>`,
   ribbon: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 11c-2.2 0-4-1.7-4-3.8S9.2 4 12 8.2C14.8 4 16 5.1 16 7.2S14.2 11 12 11z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M9.2 10.6 7 20M14.8 10.6 17 20"/></svg>`,
   pill: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4" transform="rotate(-28 12 12)" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 6.2v11.6"/></svg>`,
+  health: `<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="6.5" cy="14" r="2.1" fill="currentColor"/><circle cx="12" cy="7.2" r="2.1" fill="currentColor"/><circle cx="17.5" cy="14" r="2.1" fill="currentColor"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M8.2 12.6 10.4 8.8M13.6 8.8 15.8 12.6"/></svg>`,
 };
 const SCENARIO_KEY = {
   shot: "scenarioShot",
@@ -27,6 +28,7 @@ const SCENARIO_KEY = {
   cough: "scenarioCough",
   sex: "scenarioSex",
   drug: "scenarioDrug",
+  health: "scenarioHealth",
 };
 
 const INTRO_KEY = "cdc-policy-island-intro-v1";
@@ -177,6 +179,7 @@ export function mount({ scene, islands, flows }) {
     ["saucer", "stickerSaucerMark", "stickerSaucer"],
     ["night", "stickerNightMark", "stickerNight"],
     ["repel", "stickerRepelMark", "stickerRepel"],
+    ["flock", "stickerFlockMark", "stickerFlock"],
   ];
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
@@ -331,6 +334,23 @@ export function mount({ scene, islands, flows }) {
     if (!hit || !scene.flyPipi()) return;
     if (markEgg(book, "fly")) paintPassport(false);
     showMile("eggPipi");
+  }
+
+  function openFlock(fromSearch) {
+    const fresh = markEgg(book, "flock");
+    if (fresh) paintPassport(false);
+    if (!fresh && fromSearch) return;
+    if (fresh) selectScenario("health");
+    showMile("eggFlock");
+  }
+
+  function noteFlock(value) {
+    const q = String(value || "").trim().toLowerCase();
+    if (!q) return;
+    const hit = q.includes("候鳥") || q.includes("禽流感") || q.includes("雁鴨") || q.includes("h7")
+      || q.includes("avian") || q.includes("bird flu") || q.includes("渡り鳥");
+    if (!hit) return;
+    openFlock(true);
   }
 
   function firstSentence(text) {
@@ -1354,6 +1374,15 @@ export function mount({ scene, islands, flows }) {
       }
       return;
     }
+    if (hit.kind === "egg" && hit.id === "flock") {
+      openFlock(false);
+      return;
+    }
+    if (hit.kind === "egg" && (hit.id === "mite" || hit.id === "lepto")) {
+      markEgg(book, hit.id);
+      showMile(hit.id === "mite" ? "eggMite" : "eggLepto");
+      return;
+    }
     if (hit.kind === "item") selectItem(hit.islandId, hit.itemId);
     else selectIsland(hit.islandId);
   });
@@ -1454,6 +1483,7 @@ export function mount({ scene, islands, flows }) {
     state.query = search.value;
     noteMosquito(search.value);
     notePipi(search.value);
+    noteFlock(search.value);
     scene.setQuery(search.value);
     renderList();
     announceSearch();
