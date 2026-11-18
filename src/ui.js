@@ -1200,17 +1200,24 @@ export function mount({ scene, islands, flows }) {
   function paintTicks() {
     const host = $("chapter-ticks");
     if (!host) return;
-    if (host.childElementCount !== dayNotes.length) {
-      host.innerHTML = dayNotes.map((_note, index) => `<button type="button" class="btn tick" data-chapter="${index}"></button>`).join("");
+    const decorative = window.matchMedia("(pointer: coarse)").matches;
+    const want = decorative ? "SPAN" : "BUTTON";
+    if (host.childElementCount !== dayNotes.length || host.firstElementChild?.tagName !== want) {
+      host.innerHTML = dayNotes.map((_note, index) => (
+        decorative
+          ? `<span class="tick" aria-hidden="true"></span>`
+          : `<button type="button" class="btn tick" data-chapter="${index}"></button>`
+      )).join("");
     }
     const current = dayNote(state.minutes);
     dayNotes.forEach((note, index) => {
-      const button = host.children[index];
+      const mark = host.children[index];
       const on = current === note;
-      button.style.left = `${(note.from / 24) * 100}%`;
-      button.setAttribute("aria-label", note.title);
-      button.classList.toggle("on", on);
-      button.setAttribute("aria-current", on ? "true" : "false");
+      mark.style.left = `${(note.from / 24) * 100}%`;
+      mark.classList.toggle("on", on);
+      if (decorative) return;
+      mark.setAttribute("aria-label", note.title);
+      mark.setAttribute("aria-current", on ? "true" : "false");
     });
   }
 
@@ -1931,6 +1938,7 @@ export function mount({ scene, islands, flows }) {
   placeBadge();
   window.addEventListener("resize", placePassport);
   window.addEventListener("resize", placeBadge);
+  window.matchMedia("(pointer: coarse)").addEventListener("change", paintTicks);
   if (!quiet && !book.welcome && !deepLink) showGuide();
   else paintMission();
 

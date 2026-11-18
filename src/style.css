@@ -1563,7 +1563,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 
 @media (max-width: 980px) and (pointer: coarse) {
   :root { --sheet-peek: calc(114px + env(safe-area-inset-bottom)); }
-  .dial { height: 52px; padding-block: 4px; }
+  .dial { height: auto; min-height: 68px; padding-block: 4px; }
   .toggles { height: 44px; bottom: calc(var(--sheet-peek) + 8px); }
   .ledger:not(.half):not(.open) .tabs .btn { height: 44px; }
 }
@@ -1676,10 +1676,19 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   .sheet .x, .germ .x { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: var(--fs-xl); }
   .pin button { width: 60px; height: 60px; min-width: 60px; min-height: 60px; padding: 0; }
   .pin b { width: 30px; min-width: 30px; height: 30px; }
-  .track { height: auto; grid-template-rows: 28px 16px; }
-  .tick { width: 16px; height: 16px; min-width: 16px; min-height: 16px; top: 0; transform: translateX(-50%); }
+  .track { height: auto; grid-template-rows: 44px 16px; }
+  .ticks { height: 16px; pointer-events: none; }
+  .tick, .tick:hover, .tick:active {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    top: 0;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
   #day {
-    height: 28px;
+    height: 44px;
     appearance: none;
     background: transparent;
   }
@@ -1722,4 +1731,7 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
     min-width: 44px;
     font-size: var(--fs-md);
   }
+}
+@media (pointer: coarse) and (min-height: 501px) {
+  .dial { height: auto; min-height: 76px; }
 }
