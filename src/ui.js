@@ -232,14 +232,12 @@ export function mount({ scene, islands, flows }) {
     const pop = $("lang-pop");
     const brand = title?.parentElement;
     if (!badge || !tools || !title || !lang || !brand) return;
+    const tight = window.matchMedia("(max-width: 420px)").matches;
     const narrow = window.matchMedia("(max-width: 980px)").matches;
-    if (narrow) {
-      tools.prepend(badge);
-      brand.insertBefore(lang, pop || null);
-    } else {
-      title.after(badge);
-      tools.append(lang);
-    }
+    if (tight || !narrow) title.after(badge);
+    else tools.prepend(badge);
+    if (narrow) brand.insertBefore(lang, pop || null);
+    else tools.append(lang);
   }
 
   function paintPassport(pop) {
