@@ -1164,10 +1164,10 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   min-width: 16px;
   height: 16px;
   padding: 0 3px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--teal) 82%, var(--ink));
-  color: var(--paper);
-  font: 700 10px/16px var(--sans);
+  border-radius: 999px;
+  background: var(--teal);
+  color: var(--on-accent);
+  font: 700 12px/16px var(--sans);
   text-align: center;
   text-shadow: none;
 }
