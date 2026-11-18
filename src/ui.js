@@ -206,6 +206,11 @@ export function mount({ scene, islands, flows }) {
   mile.className = "mile";
   mile.hidden = true;
   hud.append(guide, mission, mile);
+  guide.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || guide.hidden) return;
+    event.preventDefault();
+    $("guide-go").focus();
+  });
   guide.querySelector("#guide-go").addEventListener("click", () => {
     book.welcome = Date.now();
     savePassport(book);
@@ -215,6 +220,7 @@ export function mount({ scene, islands, flows }) {
     paintPins();
     advanceMissions();
     selectIsland("border");
+    focusSheetHeading();
   });
 
   function placePassport() {
