@@ -3,8 +3,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const script = join(dirname(fileURLToPath(import.meta.url)), "subset-fonts.py");
+const checkOnly = process.argv.includes("--check");
 const probe = [
-  "import sys, fontTools, cffsubr",
+  checkOnly ? "import sys, fontTools" : "import sys, fontTools, cffsubr",
   "flags = getattr(sys, 'abiflags', '')",
   "bad = 'free-threading' in sys.version.lower() or str(flags).endswith('t')",
   "raise SystemExit(1 if bad else 0)",
@@ -37,9 +38,11 @@ for (const tag of pyTags()) candidates.push(["py", [`-${tag}`]]);
 
 for (const [command, args] of candidates) {
   if (!works(command, args)) continue;
-  const run = spawnSync(command, [...args, script], { stdio: "inherit", windowsHide: true });
+  const scriptArgs = checkOnly ? [script, "--check"] : [script];
+  const run = spawnSync(command, [...args, ...scriptArgs], { stdio: "inherit", windowsHide: true });
   process.exit(run.status === null ? 1 : run.status);
 }
 
-console.error("No CPython with fontTools and cffsubr. Install them, or set PYTHON to that interpreter.");
+const need = checkOnly ? "fontTools" : "fontTools and cffsubr";
+console.error(`No CPython with ${need}. Install them, or set PYTHON to that interpreter.`);
 process.exit(1);

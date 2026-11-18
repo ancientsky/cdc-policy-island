@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "fonts": "node scripts/run-fonts.mjs"
+    "fonts": "node scripts/run-fonts.mjs",
+    "fonts:check": "node scripts/run-fonts.mjs --check"
   },
   "dependencies": {
     "three": "^0.187.0"

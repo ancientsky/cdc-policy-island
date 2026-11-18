@@ -17,11 +17,10 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import urllib.request
 from pathlib import Path
 
-import cffsubr
-from fontTools.subset import Options, Subsetter
 from fontTools.ttLib import TTFont
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +35,7 @@ URLS = {
     "NotoSansTC-Bold.otf": "https://github.com/notofonts/noto-cjk/raw/refs/heads/main/Sans/SubsetOTF/TC/NotoSansTC-Bold.otf",
     "NotoSerifTC-Bold.otf": "https://github.com/notofonts/noto-cjk/raw/refs/heads/main/Serif/SubsetOTF/TC/NotoSerifTC-Bold.otf",
 }
-FILES = ("src/i18n.js", "src/data.js", "src/plain.js", "src/ui.js", "index.html")
+FILES = ("src/i18n.js", "src/data.js", "src/plain.js", "src/ui.js", "src/debug.js", "index.html")
 EXTRA = "，。、；：？！「」『』（）【】—…・．‧～《》〈〉〔〕｛｝　"
 KANA = ((0x3040, 0x309F), (0x30A0, 0x30FF), (0x31F0, 0x31FF), (0xFF65, 0xFF9F))
 CJK = ((0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xF900, 0xFAFF))
@@ -108,6 +107,7 @@ def zh_text(files: dict[str, str]) -> str:
         strip_comments(drop_locale_keys(drop_locale_blocks(files["src/plain.js"]))),
         strip_comments(drop_locale_keys(files["src/data.js"])),
         strip_comments(drop_locale_keys(files["src/ui.js"])),
+        strip_comments(files["src/debug.js"]),
         strip_comments(files["index.html"]),
     ]
     return "".join(parts)
@@ -146,6 +146,9 @@ def fetch(name: str) -> Path:
 
 
 def subset(src: Path, dest: Path, text: str) -> None:
+    import cffsubr
+    from fontTools.subset import Options, Subsetter
+
     font = TTFont(src)
     options = Options()
     options.hinting = False
@@ -209,6 +212,9 @@ def verify(zh: str) -> None:
 def main() -> None:
     files = read_sources()
     zh = zh_text(files)
+    if "--check" in sys.argv[1:]:
+        verify(zh)
+        return
     text = collect_chars(files, zh, zh_cjk_only=True)
     print(f"chars {len(text)}")
     try:
