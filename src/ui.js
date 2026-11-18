@@ -136,12 +136,14 @@ export function mount({ scene, islands, flows }) {
     if (chip) chip.textContent = t("repelCount", { n: game.total });
     counter.hidden = game.total < 1;
   }
+  function actionLine(islandId) {
+    return byId.get(islandId)?.actions?.[0]?.label || "";
+  }
   function showToast(info) {
     toastInfo = info;
     const island = byId.get(info.islandId);
-    const suffix = germSuffix[info.key] || germSuffix[info.islandId];
     const action = t(toolKey[info.tool] || "toolClean");
-    toast.innerHTML = `<b>${esc(t("repelToast", { action, name: island?.nick || "" }))}</b><span>${esc(suffix ? t(`germDo${suffix}`) : "")}</span>`;
+    toast.innerHTML = `<b>${esc(t("repelToast", { action, name: island?.nick || "" }))}</b><span>${esc(actionLine(info.islandId))}</span>`;
     toast.hidden = false;
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
@@ -950,7 +952,7 @@ export function mount({ scene, islands, flows }) {
     const suffix = germSuffix[live.key] || germSuffix[live.islandId];
     if (!suffix) return;
     germ.hidden = false;
-    germ.innerHTML = `<button type="button" class="btn x" data-germ-close aria-label="${esc(t("close"))}">×</button><p class="k">${esc(t("germWhatLabel"))}</p><p>${esc(t(`germWhat${suffix}`))}</p><p class="k">${esc(t("germHowLabel"))}</p><p>${esc(t(`germHow${suffix}`))}</p><p class="k">${esc(t("germDoLabel"))}</p><p class="do">${esc(t(`germDo${suffix}`))}</p>`;
+    germ.innerHTML = `<button type="button" class="btn x" data-germ-close aria-label="${esc(t("close"))}">×</button><p class="k">${esc(t("germWhatLabel"))}</p><p>${esc(t(`germWhat${suffix}`))}</p><p class="k">${esc(t("germHowLabel"))}</p><p>${esc(t(`germHow${suffix}`))}</p><p class="k">${esc(t("germDoLabel"))}</p><p class="do">${esc(actionLine(live.islandId))}</p>`;
     placeGerm(live);
   }
 

@@ -1024,8 +1024,22 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         holdRender = Math.max(holdRender, 0.3);
       }
     });
+    pinButton.addEventListener("pointerdown", (event) => {
+      if (event.button != null && event.button !== 0) return;
+      const hit = pickHit(event);
+      if (hit?.kind !== "threat") return;
+      event.preventDefault();
+      event.stopPropagation();
+      pinButton.dataset.struck = "1";
+      setTimeout(() => { delete pinButton.dataset.struck; }, 400);
+      strike(threats[hit.index]);
+    });
     pinButton.addEventListener("click", (event) => {
       event.stopPropagation();
+      if (pinButton.dataset.struck) {
+        delete pinButton.dataset.struck;
+        return;
+      }
       pickCb({ kind: "island", islandId: island.id });
     });
     pinEl.querySelector("em").textContent = island.pin;
@@ -1286,16 +1300,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let birdDir = 1;
   const plateMarks = [];
   let platesDirty = false;
-  const GERM_SUFFIX = {
-    dengue: "Dengue",
-    border: "Border",
-    flu: "Flu",
-    entero: "Entero",
-    tb: "Tb",
-    measles: "Measles",
-    dusk: "Dusk",
-  };
   const ORIGINAL_FIVE = new Set(["dengue", "border", "flu", "entero", "tb"]);
+  function actionLine(islandId) {
+    return views.get(islandId)?.island.actions?.[0]?.label || "";
+  }
   const routedOnce = new Set();
   let boastReady = false;
   let boastSpent = false;
@@ -1966,7 +1974,6 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         el: plateEl,
         key: spec.plate,
         threat,
-        doKey: `germDo${GERM_SUFFIX[threat.key] || ""}`,
       });
     });
     placeCrews();
@@ -2922,8 +2929,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         threat.freeze = 1.1;
         threat.plateMode = "do";
         threat.doUntil = elapsed + 2.6;
-        const doKey = `germDo${GERM_SUFFIX[threat.key] || ""}`;
-        if (threat.plateEl) threat.plateEl.textContent = t(doKey);
+        if (threat.plateEl) threat.plateEl.textContent = actionLine(threat.islandId);
         strikeCb({
           index: threats.indexOf(threat),
           islandId: threat.islandId,
@@ -5518,7 +5524,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         flow._hay = [flow.title, flow.kidTitle, flow.text, flow.kid, flow.carried, flow._alias, views.get(flow.a).island.name, views.get(flow.b).island.name, views.get(flow.a).island.nick, views.get(flow.b).island.nick].join(" ");
       }
       for (const mark of crewMarks) mark.el.textContent = t(mark.key);
-      for (const mark of plateMarks) mark.el.textContent = mark.threat?.plateMode === "do" ? t(mark.doKey) : t(mark.key);
+      for (const mark of plateMarks) mark.el.textContent = mark.threat?.plateMode === "do" ? actionLine(mark.threat.islandId) : t(mark.key);
       if (pipi?.labelEl) pipi.labelEl.textContent = t("eggPipiName");
       for (const egg of forestEggs) egg.labelEl.textContent = t(egg.nameKey);
       people.relabel();
