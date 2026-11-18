@@ -1,7 +1,7 @@
 import "./errors.js";
 import "./style.css";
 import { beginSlice, paintFirst } from "./pace.js";
-import { bootQuality, requestReload } from "./quality.js";
+import { bootQuality, manualQualityReload } from "./quality.js";
 
 const serifFont = new URL("./fonts/NotoSerifTC-Bold.subset.woff2", import.meta.url);
 const preloadFont = document.createElement("link");
@@ -230,7 +230,7 @@ function hideLossCard() {
 }
 
 document.querySelector("#gl-lost-reload")?.addEventListener("click", () => {
-  if (!requestReload()) return;
+  manualQualityReload();
   location.reload();
 });
 document.querySelector("#gl-lost-list")?.addEventListener("click", () => {

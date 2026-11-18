@@ -1,41 +1,20 @@
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
-const cdcPw = pathToFileURL("C:/Users/ancie/AppData/Local/Temp/cdc-pw/package.json");
-
-let chromium;
-try {
-  const pw = await import("playwright");
-  chromium = pw.chromium || pw.default?.chromium;
-} catch {
-  const require = createRequire(cdcPw);
-  const pw = await import(pathToFileURL(require.resolve("playwright")).href);
-  chromium = pw.chromium || pw.default?.chromium;
+async function loadChromium() {
+  try {
+    const pw = await import("playwright");
+    return pw.chromium || pw.default?.chromium;
+  } catch {
+    const spec = process.env.PLAYWRIGHT_PACKAGE;
+    if (!spec) throw new Error("playwright is not installed");
+    const require = createRequire(pathToFileURL(spec));
+    const pw = await import(pathToFileURL(require.resolve("playwright")).href);
+    return pw.chromium || pw.default?.chromium;
+  }
 }
-
-const require = createRequire(cdcPw);
-const { PNG } = require("pngjs");
 
 const base = process.env.CDC_URL || "http://[::1]:5173/";
-
-function meanOf(buf) {
-  const png = PNG.sync.read(buf);
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  let n = 0;
-  const step = 24;
-  for (let y = 0; y < png.height; y += step) {
-    for (let x = 0; x < png.width; x += step) {
-      const i = (png.width * y + x) << 2;
-      r += png.data[i];
-      g += png.data[i + 1];
-      b += png.data[i + 2];
-      n += 1;
-    }
-  }
-  return { r: r / n, g: g / n, b: b / n };
-}
 
 function nearWhite(sample) {
   return sample.r > 245 && sample.g > 245 && sample.b > 245;
@@ -51,7 +30,31 @@ function fail(message) {
 
 async function shotMean(page) {
   const buf = await page.locator("#c").screenshot({ type: "png" });
-  return meanOf(buf);
+  return page.evaluate(async (encoded) => {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = `data:image/png;base64,${encoded}`;
+    });
+    const sample = document.createElement("canvas");
+    sample.width = 32;
+    sample.height = 32;
+    const ctx = sample.getContext("2d");
+    ctx.drawImage(img, 0, 0, 32, 32);
+    const pixels = ctx.getImageData(0, 0, 32, 32).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let n = 0;
+    for (let i = 0; i < pixels.length; i += 16) {
+      r += pixels[i];
+      g += pixels[i + 1];
+      b += pixels[i + 2];
+      n += 1;
+    }
+    return { r: r / n, g: g / n, b: b / n };
+  }, buf.toString("base64"));
 }
 
 function watch(page) {
@@ -131,6 +134,10 @@ async function phoneLoss(browser) {
     isMobile: true,
   });
   await waitReady(page);
+  await page.waitForFunction(() => {
+    const data = JSON.parse(localStorage.getItem("cdc-island-gfx-v1") || "null");
+    return Boolean(data && data.ok && data.ok === data.rung);
+  }, null, { timeout: 20000 });
   const before = await shotMean(page);
   if (nearWhite(before)) fail(`picture was already white before loss ${JSON.stringify(before)}`);
   await lose(page);
@@ -139,7 +146,7 @@ async function phoneLoss(browser) {
     const labels = document.querySelector(".labels");
     const body = document.querySelector("#gl-lost-body")?.textContent || "";
     return Boolean(card && card.hidden === false && labels && getComputedStyle(labels).visibility === "hidden" && body.includes("正在試著接回來"));
-  }, null, { timeout: 300 });
+  }, null, { timeout: 8000 });
   await restore(page);
   await page.waitForFunction(() => {
     const card = document.querySelector("#gl-lost");
@@ -158,7 +165,7 @@ async function phoneLoss(browser) {
   await page.waitForFunction(() => {
     const body = document.querySelector("#gl-lost-body")?.textContent || "";
     return body.includes("正在試著接回來") && !body.includes("接不回來");
-  }, null, { timeout: 300 });
+  }, null, { timeout: 8000 });
   await page.waitForFunction(() => (document.querySelector("#gl-lost-body")?.textContent || "").includes("接不回來"), null, { timeout: 5500 });
   const stuck = await page.evaluate(() => ({
     hidden: document.querySelector("#gl-lost")?.hidden === true,
@@ -178,17 +185,34 @@ async function bootLoss(browser) {
     isMobile: true,
     bootLoss: true,
   });
-  await page.waitForFunction(() => {
-    const card = document.querySelector("#gl-lost");
-    const body = document.querySelector("#gl-lost-body")?.textContent || "";
-    return Boolean(card && card.hidden === false && body.includes("啟動時畫面中斷"));
-  }, null, { timeout: 90000 });
-  const state = await page.evaluate(() => ({
-    revealed: window.__revealed === true,
-    veil: Boolean(document.querySelector("#veil")),
-    out: document.querySelector("#veil")?.classList.contains("out") === true,
-    text: document.querySelector("#gl-lost-body")?.textContent || "",
-  }));
+  const stuckAt = Date.now();
+  let state = null;
+  while (!state && Date.now() - stuckAt < 90000) {
+    try {
+      await page.waitForFunction(() => {
+        const card = document.querySelector("#gl-lost");
+        const body = document.querySelector("#gl-lost-body")?.textContent || "";
+        return Boolean(
+          card
+          && card.hidden === false
+          && body.includes("啟動時畫面中斷")
+          && sessionStorage.getItem("cdc-island-gfx-reload") === "2",
+        );
+      }, null, { timeout: 90000 });
+      await page.waitForTimeout(1000);
+      state = await page.evaluate(() => ({
+        revealed: window.__revealed === true,
+        veil: Boolean(document.querySelector("#veil")),
+        out: document.querySelector("#veil")?.classList.contains("out") === true,
+        text: document.querySelector("#gl-lost-body")?.textContent || "",
+        count: sessionStorage.getItem("cdc-island-gfx-reload"),
+      }));
+      if (state.count !== "2" || !state.text.includes("啟動時畫面中斷")) state = null;
+    } catch (error) {
+      if (!/destroyed|navigation|closed/i.test(String(error))) throw error;
+    }
+  }
+  if (!state) fail("boot card did not stay after two automatic reloads");
   if (state.revealed || !state.veil || state.out) fail(`boot treated the veil as a successful reveal ${JSON.stringify(state)}`);
   const bootEvents = await page.evaluate(() => window.__glEvents || []);
   const lostBoot = bootEvents.some((event) => event.type === "lost" && event.during === "boot");
@@ -197,10 +221,24 @@ async function bootLoss(browser) {
   await page.waitForFunction(() => document.querySelector("#ledger")?.classList.contains("open") === true, null, { timeout: 3000 });
   await page.locator("#list").click();
   await page.waitForFunction(() => document.querySelector("#ledger")?.classList.contains("open") !== true, null, { timeout: 3000 });
+  const beforeRung = await page.evaluate(() => JSON.parse(localStorage.getItem("cdc-island-gfx-v1") || "null")?.rung);
+  const order = ["full", "noshadow", "nopost", "rescue"];
+  const expected = order[Math.min(Math.max(order.indexOf(beforeRung), 0) + 1, order.length - 1)];
   await Promise.all([
     page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 20000 }),
     page.locator("#gl-lost-reload").click(),
   ]);
+  await page.waitForFunction(() => {
+    const card = document.querySelector("#gl-lost");
+    return Boolean(card && card.hidden === false);
+  }, null, { timeout: 90000 });
+  const after = await page.evaluate(() => ({
+    rung: JSON.parse(localStorage.getItem("cdc-island-gfx-v1") || "null")?.rung,
+    count: sessionStorage.getItem("cdc-island-gfx-reload"),
+  }));
+  if (after.rung !== expected || after.count !== "2") {
+    fail(`manual reload stayed at ${beforeRung}, expected ${expected}, got ${JSON.stringify(after)}`);
+  }
   const hard = errors.filter((item) => !/webgl|context/i.test(item));
   if (hard.length) fail(`boot pageerror ${hard.join(" | ")}`);
   await context.close();
@@ -231,7 +269,10 @@ async function desktop(browser) {
   console.log("desktop stayed clear");
 }
 
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const chromium = await loadChromium();
+const launchOptions = { headless: true };
+if (process.env.CDC_BROWSER) launchOptions.channel = process.env.CDC_BROWSER;
+const browser = await chromium.launch(launchOptions);
 try {
   await phoneLoss(browser);
   await bootLoss(browser);

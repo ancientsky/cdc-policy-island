@@ -105,20 +105,44 @@ export function markQualityOk() {
   writeStored(live);
 }
 
+function stepStored(from, gpu) {
+  const rung = nextRung(from);
+  const next = {
+    v: 1,
+    rung,
+    pending: null,
+    ok: null,
+    gpu: gpu || "",
+    at: stamp(),
+  };
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    // Private mode keeps no record. The reload still happens.
+  }
+  return rung;
+}
+
 export function noteQualityLoss() {
   if (!live) return { reload: false };
   if (live.ok === live.rung) return { reload: false };
+  if (!requestReload()) return { reload: false };
   const from = live.rung;
-  live.rung = nextRung(from);
+  live.rung = stepStored(from, live.gpu);
   live.pending = null;
   live.ok = null;
   live.stepped = from;
   live.shadow = false;
   live.post = live.rung === "full" || live.rung === "noshadow";
   live.at = stamp();
-  writeStored(live);
   console.error(`quality: stepped down from ${from} (context lost before ok)`);
-  return { reload: requestReload() };
+  return { reload: true };
+}
+
+export function manualQualityReload() {
+  const record = live || read();
+  const from = record && ORDER.includes(record.rung) ? record.rung : "full";
+  stepStored(from, record?.gpu || "");
 }
 
 export function requestReload() {
