@@ -83,7 +83,7 @@ export const importRoutes = [
     label: {
       zh: "2026-04-02 新聞稿寫多年在雁鴨科野鳥監測到 A 型 H7。稿內沒有陽性樣本數，所以這條用最細的線，不拿例數比粗細。",
       en: "The 2 Apr 2026 bulletin says H7 has been found for years in wild ducks and geese. It gives no positive-sample count, so this line stays the thinnest and is not compared as a case total.",
-      ja: "2026-04-02の発表は、カモ科の野鳥で多年にわたりA型H7を監視していると書いている。陽性数はないので、この線はいちばん細く、症例数では比べない。",
+      ja: "2026-04-02の発表では、カモ科の野鳥で何年もA型H7を見張っています。陽性の数は出ていないので、この線はいちばん細くして、症例数とは比べません。",
     },
   },
 ];
