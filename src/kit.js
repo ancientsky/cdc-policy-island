@@ -5,6 +5,7 @@ import {
   Color,
   DoubleSide,
   DynamicDrawUsage,
+  LinearFilter,
   InstancedBufferAttribute,
   InstancedMesh,
   Matrix4,
@@ -232,12 +233,18 @@ export function createKit(motion) {
     const { canvas, g: ctx } = textureCanvas(64, 64);
     if (!ctx) return;
     const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, "rgba(11,42,53,0.42)");
+    // The roof covers the middle. Hold the ink out to that ring, then fade.
+    grad.addColorStop(0, "rgba(11,42,53,0.50)");
+    grad.addColorStop(0.58, "rgba(11,42,53,0.32)");
+    grad.addColorStop(0.82, "rgba(11,42,53,0.14)");
     grad.addColorStop(1, "rgba(11,42,53,0)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 64, 64);
     const tex = new CanvasTexture(canvas);
     tex.colorSpace = SRGBColorSpace;
+    tex.generateMipmaps = false;
+    tex.minFilter = LinearFilter;
+    tex.magFilter = LinearFilter;
     const geo = new CircleGeometry(1, 12);
     geo.rotateX(-Math.PI / 2);
     const mat = new MeshBasicMaterial({
@@ -266,14 +273,14 @@ export function createKit(motion) {
     let dirty = false;
     for (const rec of contacts) {
       const parent = rec.parent;
-      parent.updateWorldMatrix(true, false);
-      const stamp = parent.userData._kitGen || 0;
-      if (rec._gen === stamp && rec._wrote) continue;
+      parent.updateWorldMatrix(true, false, true);
+      const e = parent.matrixWorld.elements;
+      const sig = e[12] + e[13] * 17 + e[14] * 31 + e[0] + e[5] + e[10];
+      if (rec._sig === sig) continue;
       writeLocal(rec.x, rec.y, rec.z, 0, 0, 0, rec.radius, 1, rec.radius);
       writeWorld(parent);
       contactMesh.setMatrixAt(rec.index, world);
-      rec._gen = stamp;
-      rec._wrote = true;
+      rec._sig = sig;
       dirty = true;
     }
     if (dirty) contactMesh.instanceMatrix.needsUpdate = true;

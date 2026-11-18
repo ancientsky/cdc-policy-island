@@ -798,7 +798,7 @@ export function addIslandDecor(group, island, kit, lamps, placed, houseSpots) {
       return rec;
     };
     placeTree(mark, form, x, z, scale, ry);
-    kit.contact(group, x, 0.41, z, Math.max(0.2, 0.28 * scale));
+    kit.contact(group, x, GROUND + 0.01, z, Math.max(0.24, 0.36 * scale));
     forms.add(form);
     trees += 1;
   }

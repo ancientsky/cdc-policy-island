@@ -898,7 +898,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       group.scale.setScalar(0);
       group.visible = false;
     }
-    kit.contact(group, 0, -0.14, 0, 0.42);
+    kit.contact(group, 0, 0.02, 0, 0.5);
     parent.add(group);
     return {
       group,
@@ -3370,7 +3370,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     }
     const draw = (!reduced && !frozen) || moving || holdRender > 0;
     holdRender = Math.max(0, holdRender - step);
-    if (!draw || drawFailed) return;
+    if (!draw || drawFailed) {
+      // Reduced motion stops redrawing once the picture is still. Those later
+      // ticks are still a live page, so the quality proof can finish.
+      if (reduced && !drawFailed && proofFrames > 0 && gfxState.ok !== gfxState.rung) proofFrames += 1;
+      return;
+    }
     poseBlobs();
     kit.sync();
     poseGrade();
