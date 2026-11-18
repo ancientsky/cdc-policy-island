@@ -105,8 +105,8 @@ export function mount({ scene, islands, flows }) {
   germ.hidden = true;
   document.querySelector(".hud").append(germ);
   const GAME_KEY = "cdc-island-game-v1";
-  const toolKey = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish", screen: "toolScreen", rx: "toolRx" };
-  const germSuffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb", measles: "Measles", dusk: "Dusk", hepa: "Hepa", amr: "Amr" };
+  const toolKey = { clean: "toolClean", check: "toolCheck", shield: "toolShield", wash: "toolWash", finish: "toolFinish" };
+  const germSuffix = { dengue: "Dengue", border: "Border", flu: "Flu", entero: "Entero", tb: "Tb", measles: "Measles", dusk: "Dusk" };
   function readGame() {
     try {
       const raw = JSON.parse(localStorage.getItem(GAME_KEY) || "");
