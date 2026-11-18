@@ -118,13 +118,14 @@ export async function mountPost({ renderer, scene, camera, tier, deviceClass = "
     return complete;
   }
 
-  let rt = makeTarget(samples, depthOn);
-  if (!boundTargetOk(rt)) {
-    rt.dispose();
+  const probe = makeTarget(samples, depthOn);
+  const probeOk = boundTargetOk(probe);
+  probe.dispose();
+  if (!probeOk) {
     samples = 0;
     depthOn = false;
-    rt = makeTarget(0, false);
   }
+  const rt = makeTarget(samples, depthOn);
   renderer.state.reset();
   const composer = new EffectComposer(renderer, rt);
   const kinds = ["render"];
