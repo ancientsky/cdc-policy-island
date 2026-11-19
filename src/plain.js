@@ -245,7 +245,7 @@ export const plain = {
       f16: { title: "國外的警報", text: "其他國家發生疫情，世界電台島會第一時間通知瞭望塔。" },
       f17: { title: "基因幫大家判斷", text: "檢驗員讀出國內病毒的基因。這份結果也用來向其他國家說明。" },
       f18: { title: "冰著的疫苗也能緊急送", text: "平常把疫苗一路冰著送。大疫情時，同一條路可以改送緊急的疫苗。" },
-      f19: { title: "人、動物、環境一起看", text: "人生病、動物生病、草地和泥巴裡的病菌，要放在同一張桌子。動物和植物的檢疫，是農業部動植物防疫檢疫署在做。" },
+      f19: { title: "人、動物、環境一起看", text: "家禽、豬和野鳥的檢驗結果，要跟醫院的資料放在一起看，這就是同一健康。" },
     },
   },
   en: {
@@ -489,7 +489,7 @@ export const plain = {
       f16: { title: "Warnings from abroad", text: "A wave starts in another land. The radio island tells the lookout at once." },
       f17: { title: "Genes help the judgment", text: "Technicians read the genes of a virus found here. That result is also what gets explained to other countries." },
       f18: { title: "The cold road can rush", text: "On ordinary days the vaccine stays cold the whole way. In a big outbreak, the same road can carry an urgent vaccine." },
-      f19: { title: "People, animals, and the ground", text: "Sick people, sick animals, and germs in grass and mud belong on one table. Checking animals and plants is the agriculture agency's job." },
+      f19: { title: "People, animals, and the ground", text: "Test results from poultry, pigs, and wild birds are read with hospital records. That is One Health." },
     },
   },
   ja: {
@@ -733,7 +733,7 @@ export const plain = {
       f16: { title: "外国からの警報", text: "他の国で流行が起きたら、世界の電波の島が、最初に見張り塔へ知らせます。" },
       f17: { title: "遺伝子が判断を助ける", text: "検査員は、国内のウイルスの遺伝子を読みます。その結果は、他の国への説明にも使います。" },
       f18: { title: "冷たい道は急いでも使える", text: "ふだん、ワクチンは冷えたまま届きます。大きな流行では、同じ道で急ぐワクチンも運べます。" },
-      f19: { title: "人、動物、環境を一緒に", text: "人が病気になること、動物が病気になること、草や泥の中の菌は、同じ席で見ます。動物と植物の検疫は、農業部の動植物防疫検疫署がしています。" },
+      f19: { title: "人、動物、環境を一緒に", text: "家禽、豚、野鳥の検査結果は、病院の資料と一緒に見ます。これがワンヘルスです。" },
     },
   },
 };

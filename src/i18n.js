@@ -1278,7 +1278,7 @@ const flowCopy = {
     f16: ["Warnings from abroad", "report", "When an outbreak starts in another country, World Radio Island tells Lookout Island right away."],
     f17: ["Sequences inform the judgment", "sequence", "The genome of a domestic strain is the basis for what is said outward and for the risk judgment, not only a domestic news item."],
     f18: ["Cold chain, then emergency allocation", "cold chain", "The vaccine fund’s ordinary cold chain has to be able to become the distribution net for emergency vaccination in a pandemic."],
-    f19: ["One table", "one health", "Flu on the sneeze island and animal medicine on the superbug island share one table with the Ministry of Agriculture animal and plant health inspection agency."],
+    f19: ["People, animals, and the ground", "animal test results", "Test results from poultry, pigs, and wild birds are read with hospital records. That is One Health. Checking animals and plants is the job of the Ministry of Agriculture Animal and Plant Health Inspection Agency."],
   },
   ja: {
     f01: ["入国の合図を見はりへ", "渡航歴の名簿", "水際の熱と渡航歴は、その日のうちに感染症情報センターが見られる合図になります。"],
@@ -1299,7 +1299,7 @@ const flowCopy = {
     f16: ["外国からの警報", "情報", "他の国で流行が始まると、世界とつながる電波の島が、見張り塔の島へすぐ知らせます。"],
     f17: ["配列が判断を支える", "配列", "国内の流行株の遺伝子は、外への説明と危険の判断の根拠です。国内のニュース一つだけではありません。"],
     f18: ["コールドチェーンと緊急の配送", "コールドチェーン", "ワクチン基金のふだんのコールドチェーンは、大流行のとき、緊急接種の配送網に変えられます。"],
-    f19: ["同じ一つの席", "ワンヘルス", "くしゃみの島のインフルエンザと、スーパー耐性菌の島の動物の薬は、農業部の動植物防疫検疫署と、同じ席です。"],
+    f19: ["人、動物、環境を一緒に", "動物の検査結果", "家禽、豚、野鳥の検査結果は、病院の資料と一緒に見ます。これがワンヘルスです。動物と植物の検疫は、農業部動植物防疫検疫署がしています。"],
   },
 };
 
