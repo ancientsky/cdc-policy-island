@@ -182,6 +182,8 @@ export function mount({ scene, islands, flows }) {
     ["night", "stickerNightMark", "stickerNight"],
     ["repel", "stickerRepelMark", "stickerRepel"],
     ["flock", "stickerFlockMark", "stickerFlock"],
+    ["mite", "stickerMiteMark", "stickerMite"],
+    ["lepto", "stickerLeptoMark", "stickerLepto"],
   ];
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
@@ -1404,6 +1406,8 @@ export function mount({ scene, islands, flows }) {
     }
     if (hit.kind === "egg" && (hit.id === "mite" || hit.id === "lepto")) {
       markEgg(book, hit.id);
+      paintPassport(false);
+      scene.revealForest(hit.id);
       showMile(hit.id === "mite" ? "eggMite" : "eggLepto");
       return;
     }

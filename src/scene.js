@@ -1310,6 +1310,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let boastSpent = false;
   const eggHits = [];
   const forestEggs = [];
+  const _forestAt = new THREE.Vector3();
+  const _forestDir = new THREE.Vector3();
   let saucer = null;
   let pipi = null;
   let pipiMode = "hide";
@@ -4577,16 +4579,48 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     labelEl.textContent = t(nameKey);
     const label = new CSS2DObject(labelEl);
     label.position.set(0, 0.55, 0);
+    label.visible = false;
     group.add(label);
     scene.add(group);
     forestEggs.push({
       id,
       nameKey,
       group,
+      label,
       labelEl,
+      named: false,
+      seen: new THREE.Vector3(),
       baseY: group.position.y,
       phase: pad.x * 0.7,
     });
+  }
+
+  function forestClose(egg) {
+    egg.group.getWorldPosition(_forestAt);
+    const dist = camera.position.distanceTo(_forestAt);
+    if (dist >= 12) return false;
+    _forestDir.copy(_forestAt).sub(camera.position);
+    if (_forestDir.dot(camera.getWorldDirection(_forestAt)) <= 0) return false;
+    egg.group.getWorldPosition(_forestAt);
+    _forestAt.project(camera);
+    return _forestAt.z >= -1 && _forestAt.z <= 1 && _forestAt.x >= -1 && _forestAt.x <= 1 && _forestAt.y >= -1 && _forestAt.y <= 1;
+  }
+
+  function poseForestNames() {
+    for (const egg of forestEggs) {
+      const close = forestClose(egg);
+      if (egg.named && egg.seen.distanceTo(camera.position) > 1.2 && !close) egg.named = false;
+      egg.label.visible = egg.named || close;
+    }
+  }
+
+  function revealForest(id) {
+    const egg = forestEggs.find((item) => item.id === id);
+    if (!egg) return;
+    egg.named = true;
+    egg.seen.copy(camera.position);
+    egg.label.visible = true;
+    holdRender = Math.max(holdRender, 0.3);
   }
 
   function installForest() {
@@ -4617,11 +4651,13 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   function stepForest(step) {
-    if (reduced) return;
-    for (const egg of forestEggs) {
-      egg.phase += step;
-      egg.group.position.y = egg.baseY + Math.sin(egg.phase * 1.4) * 0.04;
+    if (!reduced) {
+      for (const egg of forestEggs) {
+        egg.phase += step;
+        egg.group.position.y = egg.baseY + Math.sin(egg.phase * 1.4) * 0.04;
+      }
     }
+    poseForestNames();
   }
 
   function northLane() {
@@ -5591,6 +5627,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       placeTip();
       refresh();
     },
+    revealForest,
     setPhase(value) { phase = value; refresh(); },
     setPillars(value) { pillarSet = value; refresh(); },
     setQuery(value) { query = norm(value); refresh(); },
@@ -6129,6 +6166,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         }
         const hit = egg.group.children.find((child) => child.userData?.id === egg.id);
         if (!hit || hit.position.lengthSq() > 1e-6) errors.push(`${egg.id} hit left the body`);
+        egg.group.getWorldPosition(_forestAt);
+        const dist = camera.position.distanceTo(_forestAt);
+        if (egg.label.visible) errors.push(`${egg.id} name is visible at overview (${dist.toFixed(1)})`);
         egg.group.traverse((child) => {
           const glow = child.material?.emissive;
           if (glow && child.material.emissiveIntensity > 0 && glow.r + glow.g + glow.b > 0) errors.push(`${egg.id} glows`);
