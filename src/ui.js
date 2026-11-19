@@ -1287,9 +1287,9 @@ export function mount({ scene, islands, flows, setPaused }) {
       ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p></section>`
       : "";
     const whyAdult = island.id === "border" ? `<ul class="why-src">${whySources}</ul>` : "";
-    const challengeKey = island.id === "dengue" ? "water" : island.id === "flu" ? "sneeze" : "";
+    const challengeKey = island.id === "dengue" ? "water" : island.id === "flu" ? "sneeze" : island.id === "amr" ? "rx" : "";
     const earned = challengeKey ? (bestOf(challengeKey)?.stars || 0) : 0;
-    const challengeGo = challengeKey === "sneeze" ? "arcadeSneezeGo" : "arcadeWaterGo";
+    const challengeGo = challengeKey === "sneeze" ? "arcadeSneezeGo" : challengeKey === "rx" ? "arcadeRxGo" : "arcadeWaterGo";
     const challenge = challengeKey
       ? `<div class="challenge-row"><button type="button" class="btn challenge" data-challenge="${challengeKey}">${esc(t(challengeGo))}</button><span class="challenge-stars" aria-label="${esc(t("arcadeStars", { n: earned }))}">${"★".repeat(earned)}${"☆".repeat(3 - earned)}</span></div>`
       : "";

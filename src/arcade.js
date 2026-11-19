@@ -26,9 +26,19 @@ import {
   starsFor as sneezeStars,
   windMs,
 } from "./arcade/sneeze.js";
+import {
+  CARDS,
+  RX,
+  cardMs,
+  createRx,
+  dealRound,
+  scoreFor as rxScore,
+  starsFor as rxStars,
+  swipeCall,
+} from "./arcade/rx.js";
 
 const KEY = "cdc-island-arcade-v1";
-const CHALLENGES = [WATER, SNEEZE];
+const CHALLENGES = [WATER, SNEEZE, RX];
 const POLITE = /です|ます|ください|ました/;
 
 function empty() {
@@ -159,7 +169,7 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
     toast(key) {
       const node = root.querySelector(".arcade-toast");
       if (!node) return;
-      node.textContent = t(key);
+      node.textContent = key ? t(key) : "";
     },
     onFinish(result) {
       const saved = record(result.id, result.score, result.stars);
@@ -170,8 +180,21 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
   };
   const water = createWater(board, hooks);
   const sneeze = createSneeze(board, hooks);
+  const rx = createRx(board, hooks);
   let active = water;
   let activeMeta = WATER;
+
+  function choose(id) {
+    if (id === "sneeze") return { meta: SNEEZE, game: sneeze };
+    if (id === "rx") return { meta: RX, game: rx };
+    return { meta: WATER, game: water };
+  }
+
+  function stopGames() {
+    water.stop();
+    sneeze.stop();
+    rx.stop();
+  }
 
   function show(name) {
     for (const panel of root.querySelectorAll("[data-panel]")) {
@@ -195,15 +218,15 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
     root.querySelector("[data-arcade=start]").textContent = t("arcadeStart");
     root.querySelector("[data-arcade=resume]").textContent = t("arcadePause");
     root.querySelector("[data-arcade=again]").textContent = t("arcadeAgain");
-    root.querySelector("[data-arcade=back]").textContent = t("arcadeBack");
+    root.querySelector("[data-panel=result] [data-arcade=back]").textContent = t("arcadeBack");
     root.querySelector(".guide-face").textContent = t("guideMark");
   }
 
   function open(id) {
-    activeMeta = id === "sneeze" ? SNEEZE : WATER;
-    active = id === "sneeze" ? sneeze : water;
-    water.stop();
-    sneeze.stop();
+    const picked = choose(id);
+    activeMeta = picked.meta;
+    active = picked.game;
+    stopGames();
     setPaused?.(true);
     returnFocus = document.activeElement;
     lastInfo = null;
@@ -217,8 +240,7 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
 
   function close() {
     window.clearInterval(countTimer);
-    water.stop();
-    sneeze.stop();
+    stopGames();
     show("closed");
     phase = "closed";
     root.hidden = true;
@@ -255,8 +277,9 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
   function beginPlay() {
     paused = false;
     show("play");
-    water.stop();
-    sneeze.stop();
+    const next = active;
+    stopGames();
+    active = next;
     active.start();
   }
 
@@ -438,6 +461,45 @@ export function selfTest() {
     const all = host.querySelectorAll("svg, svg *").length;
     game.stop();
     if (all > 150) errors.push(`sneeze svg ${all}`);
+  }
+  if (CARDS.length !== 12) errors.push(`rx cards ${CARDS.length}`);
+  const yesCards = CARDS.filter((card) => card.ok).length;
+  if (yesCards !== 6) errors.push(`rx yes cards ${yesCards}`);
+  if (cardMs(false) !== 3000 || cardMs(true) !== 4500) errors.push("rx card time");
+  if (rxScore(3000) !== 250 || rxScore(100) !== 105 || rxScore(0) !== 100 || rxScore(50) !== 100) errors.push("rx score");
+  if (rxStars(8, 0) !== 3 || rxStars(7, 1) !== 2 || rxStars(5, 3) !== 1 || rxStars(4, 4) !== 0) errors.push("rx stars");
+  if (rxStars(8, 1) !== 2) errors.push("a new stripe still scored 3");
+  if (swipeCall(81, 1000) !== "right" || swipeCall(-81, 1000) !== "left") errors.push("rx swipe distance");
+  if (swipeCall(10, 10) !== "right" || swipeCall(-10, 10) !== "left") errors.push("rx swipe speed");
+  if (swipeCall(40, 200) !== "" || swipeCall(80, 1000) !== "") errors.push("rx swipe ignored a short drag");
+  for (let seed = 0; seed < 20; seed += 1) {
+    let n = seed;
+    const round = dealRound(() => {
+      n = (n * 17 + 3) % 97;
+      return n / 97;
+    });
+    if (round.length !== 8) errors.push("rx deal length");
+    if (round.filter((card) => card.ok).length !== 4) errors.push("rx deal balance");
+    if (new Set(round.map((card) => card.id)).size !== 8) errors.push("rx deal repeat");
+  }
+  for (const card of CARDS) {
+    for (const code of ["zh", "en", "ja"]) {
+      if (!uiText(code, `rxCard${card.id}`) || !uiText(code, `rxWhy${card.id}`)) errors.push(`rx ${code} ${card.id}`);
+    }
+    if (!POLITE.test(uiText("ja", `rxWhy${card.id}`))) errors.push(`arcade ja rxWhy${card.id} is not polite`);
+  }
+  for (const key of ["arcadeRxRule", "arcadeRxClose", "arcadeRxTimeout", "arcadeRxTrick"]) {
+    if (!POLITE.test(uiText("ja", key))) errors.push(`arcade ja ${key} is not polite`);
+  }
+  if (typeof document !== "undefined") {
+    const host = document.createElement("div");
+    const game = createRx(host, { play() {}, toast() {}, reduced: false, onFinish() {} });
+    game.start();
+    const cards = host.querySelectorAll(".arcade-rx-card");
+    if (cards.length !== 3) errors.push(`rx dom cards ${cards.length}`);
+    const rings = host.querySelectorAll(".arcade-rx-germ ellipse");
+    if (rings.length < 3) errors.push("rx germ has no rings");
+    game.stop();
   }
   return errors;
 }
