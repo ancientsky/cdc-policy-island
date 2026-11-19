@@ -531,6 +531,8 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
 .sheet-name h2 { margin: 0; min-width: 0; }
 .sheet .ask { margin: 0; flex: none; background: var(--field); font-weight: 700; }
 .ask-row { margin: 8px 0 10px; display: grid; gap: 8px; justify-items: start; width: 100%; }
+.challenge-row { margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.challenge-stars { font: 700 var(--fs-md)/1 var(--sans); letter-spacing: 1px; }
 .quiz { display: grid; gap: 8px; width: 100%; }
 .quiz-q { margin: 0; font: 700 var(--fs-md)/1.55 var(--sans); }
 .quiz-choices { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1799,4 +1801,132 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 }
 @media (pointer: coarse) and (min-height: 501px) {
   .dial { height: auto; min-height: 76px; }
+}
+
+#arcade {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 12px;
+  background: var(--paper-solid);
+  color: var(--ink);
+}
+#arcade[hidden] { display: none !important; }
+.arcade-x {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 700 var(--fs-xl)/1 var(--sans);
+}
+.arcade-stage {
+  width: min(92vw, 60vh);
+  aspect-ratio: 360 / 480;
+  display: grid;
+  position: relative;
+  touch-action: none;
+}
+.arcade-panel {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+.arcade-panel[hidden] { display: none !important; }
+.arcade-panel h2 { margin: 0; font: 700 var(--fs-xl)/1.3 var(--serif); }
+.arcade-rule, .arcade-note, .arcade-best, .arcade-close-line, .arcade-toast { margin: 0; }
+.arcade-gestures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.arcade-gestures li {
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 4px 8px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+}
+.arcade-count { font: 700 var(--fs-2xl)/1 var(--serif); text-align: center; }
+.arcade-panel[data-panel="play"] { position: relative; display: block; }
+.arcade-board { position: absolute; inset: 0; }
+.arcade-board svg { width: 100%; height: 100%; display: block; touch-action: none; }
+.arcade-hud {
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+  font: 700 var(--fs-sm)/1.3 var(--sans);
+  color: var(--ink);
+}
+.arcade-hearts { display: inline-flex; gap: 4px; }
+.arcade-hearts i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--teal);
+  display: block;
+}
+.arcade-hearts i.off { opacity: 0.25; }
+.arcade-toast {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+}
+.arcade-panel[data-panel="pause"] {
+  z-index: 2;
+  align-items: center;
+  background: var(--paper-solid);
+}
+.arcade-result-stars { margin: 0; font: 700 var(--fs-xl)/1 var(--serif); letter-spacing: 2px; }
+.arcade-stars { font: 700 var(--fs-sm)/1 var(--sans); }
+.is-clear { opacity: 0.45; }
+.arcade-wiggle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: arcade-wiggle 0.35s ease-in-out infinite alternate;
+}
+.arcade-rain { animation: arcade-rain 0.45s linear infinite; }
+.arcade-bug.fly { animation: arcade-bug 0.6s linear forwards; }
+@keyframes arcade-wiggle {
+  from { transform: rotate(-10deg); }
+  to { transform: rotate(10deg); }
+}
+@keyframes arcade-rain {
+  from { transform: translateY(0); }
+  to { transform: translateY(12px); }
+}
+@keyframes arcade-bug {
+  from { transform: translate(0, 0); opacity: 1; }
+  to { transform: translate(18px, -70px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arcade-wiggle, .arcade-rain, .arcade-bug.fly { animation: none; }
+  .arcade-bug.fly { opacity: 0; }
 }

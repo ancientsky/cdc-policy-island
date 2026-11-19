@@ -2,6 +2,7 @@ import { DATA_AS_OF, backstageIds, dayNote, dayNotes, hourCovers, importRoutes, 
 import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js";
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markEgg, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
+import { bestOf, clearArcade, createArcade, starSum } from "./arcade.js";
 import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
@@ -74,7 +75,7 @@ function pillarChips(ids) {
   }).join("");
 }
 
-export function mount({ scene, islands, flows }) {
+export function mount({ scene, islands, flows, setPaused }) {
   const byId = new Map(islands.map((island) => [island.id, island]));
   const ordered = [...islands].sort((a, b) => a.no.localeCompare(b.no));
   const state = {
@@ -186,12 +187,13 @@ export function mount({ scene, islands, flows }) {
     ["dusk", "stickerDuskMark", "stickerDuskLine"],
     ["mite", "stickerMiteMark", "stickerMiteLine"],
     ["lepto", "stickerLeptoMark", "stickerLeptoLine"],
+    ["challenge", "stickerChallengeMark", "stickerChallengeLine"],
   ];
   let stickerShown = "";
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
   passportHud.className = "passport-hud";
-  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="sticker-chip" id="sticker-chip"></span><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
+  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="arcade-stars" id="arcade-stars"></span><span class="sticker-chip" id="sticker-chip"></span><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
   hud.append(passportHud);
   const stickerPack = passportHud.querySelector("#sticker-pack");
   stickerPack.addEventListener("click", (event) => {
@@ -326,6 +328,8 @@ export function mount({ scene, islands, flows }) {
     const chip = document.getElementById("sticker-chip");
     const line = document.getElementById("sticker-line");
     if (total) total.textContent = t("stickerTotal", { n: got.length });
+    const starReadout = document.getElementById("arcade-stars");
+    if (starReadout) starReadout.textContent = t("arcadeStars", { n: starSum() });
     if (chip) {
       chip.textContent = `★${got.length}`;
       chip.setAttribute("aria-label", t("stickerTotal", { n: got.length }));
@@ -1283,7 +1287,11 @@ export function mount({ scene, islands, flows }) {
       ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p></section>`
       : "";
     const whyAdult = island.id === "border" ? `<ul class="why-src">${whySources}</ul>` : "";
-    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><div class="sheet-name"><h2>${esc(island.nick)}</h2></div><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><div class="ask-row"><button type="button" class="btn ask" data-ask="${esc(island.id)}">${esc(t("askPipi"))}</button></div>${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div>${whyAdult}<p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const earned = island.id === "dengue" ? (bestOf("water")?.stars || 0) : 0;
+    const challenge = island.id === "dengue"
+      ? `<div class="challenge-row"><button type="button" class="btn challenge" data-challenge="water">${esc(t("arcadeWaterGo"))}</button><span class="challenge-stars" aria-label="${esc(t("arcadeStars", { n: earned }))}">${"★".repeat(earned)}${"☆".repeat(3 - earned)}</span></div>`
+      : "";
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><div class="sheet-name"><h2>${esc(island.nick)}</h2></div><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><div class="ask-row"><button type="button" class="btn ask" data-ask="${esc(island.id)}">${esc(t("askPipi"))}</button></div>${challenge}${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div>${whyAdult}<p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;
@@ -1647,6 +1655,18 @@ export function mount({ scene, islands, flows }) {
     const island = event.target.closest("[data-island]");
     if (island) selectIsland(island.dataset.island, event);
   });
+  const arcade = createArcade({
+    setPaused,
+    saucer: () => Boolean(book.eggs?.saucer),
+    onReward(info) {
+      if (info.firstStar) markEgg(book, "challenge");
+      paintPassport(Boolean(info.firstStar));
+    },
+    onClose(info) {
+      if (info?.firstStar) showMile("arcadeWaterExtend");
+      if (state.selected) renderSheet(false);
+    },
+  });
   sheet.addEventListener("click", (event) => {
     if (event.target.closest("[data-close]")) {
       if (state.person) closePerson();
@@ -1661,6 +1681,11 @@ export function mount({ scene, islands, flows }) {
     const ask = event.target.closest("[data-ask]");
     if (ask) {
       openQuiz(ask.dataset.ask);
+      return;
+    }
+    const challenge = event.target.closest("[data-challenge]");
+    if (challenge) {
+      arcade.open(challenge.dataset.challenge);
       return;
     }
     const item = event.target.closest("[data-item]");
@@ -1847,6 +1872,7 @@ export function mount({ scene, islands, flows }) {
     if (modal.dataset.mode !== "grad") return;
     if (!window.confirm(t("gradResetAsk"))) return;
     resetPassport(book);
+    clearArcade();
     scene.restoreSaucer();
     stampFreshId = null;
     cancelStamp();
@@ -1891,6 +1917,7 @@ export function mount({ scene, islands, flows }) {
       toggleSound();
       paintSound();
     } else if (event.key === "Escape") {
+      if (arcade.isOpen()) return;
       if (!$("lang-pop").hidden) {
         $("lang-pop").hidden = true;
         paintLangButton();

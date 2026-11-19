@@ -14,6 +14,7 @@ document.head.appendChild(preloadFont);
 import { flows, islands, validate } from "./data.js";
 import { assertHexFrame } from "./hex.js";
 import { applyLocale, savedLang, t } from "./i18n.js";
+import { selfTest as arcadeSelfTest } from "./arcade.js";
 import { mount } from "./ui.js";
 
 assertHexFrame();
@@ -102,7 +103,16 @@ const scene = new Proxy({}, {
   },
 });
 
-const ui = mount({ scene, islands, flows });
+let arcadeHold = false;
+document.documentElement.dataset.cdcFrames = "0";
+let frameCount = 0;
+
+function setArcadeHold(on) {
+  arcadeHold = Boolean(on);
+  if (!arcadeHold) startLoop();
+}
+
+const ui = mount({ scene, islands, flows, setPaused: setArcadeHold });
 window.addEventListener("resize", () => scene.resize());
 
 let last = performance.now();
@@ -110,15 +120,17 @@ let onScreen = true;
 let looping = false;
 
 function loop(now) {
-  if (!onScreen) {
+  if (!onScreen || arcadeHold) {
     looping = false;
     return;
   }
+  frameCount += 1;
+  document.documentElement.dataset.cdcFrames = String(frameCount);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   ui.tick(dt);
   scene.tick(dt);
-  if (!onScreen) {
+  if (!onScreen || arcadeHold) {
     looping = false;
     return;
   }
@@ -126,7 +138,7 @@ function loop(now) {
 }
 
 function startLoop() {
-  if (looping || !onScreen) return;
+  if (looping || !onScreen || arcadeHold) return;
   looping = true;
   last = performance.now();
   requestAnimationFrame(loop);
@@ -155,7 +167,7 @@ document.addEventListener("visibilitychange", () => {
 startLoop();
 
 function writeDiag() {
-  const errors = scene.selfTest();
+  const errors = [...scene.selfTest(), ...arcadeSelfTest()];
   const info = scene.debugState();
   const diag = document.querySelector("#diag");
   if (!diag) return;

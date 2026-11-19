@@ -242,6 +242,60 @@ export function play(name, id) {
     [523, 659, 784, 1047].forEach((freq, index) => {
       tone({ type: "triangle", freq, dur: 0.08, gain: 0.1, delay: index * 0.08 });
     });
+    return;
+  }
+  if (name === "tick") {
+    count(name);
+    tone({ type: "square", freq: 880, dur: 0.03, gain: 0.04 });
+    return;
+  }
+  if (name === "good") {
+    count(name);
+    const scale = [523, 587, 659, 784, 1047];
+    const step = Math.max(0, Math.min(4, (Number(id) || 1) - 1));
+    tone({ type: "triangle", freq: scale[step], dur: 0.12, gain: 0.1 });
+    return;
+  }
+  if (name === "miss") {
+    count(name);
+    tone({ type: "sine", freq: 220, freqTo: 90, dur: 0.12, gain: 0.12 });
+    return;
+  }
+  if (name === "star") {
+    count(name);
+    [523, 659, 784].forEach((freq, index) => {
+      tone({ type: "triangle", freq, dur: 0.08, gain: 0.09, delay: index * 0.09 });
+    });
+    return;
+  }
+  if (name === "clear") {
+    count(name);
+    [392, 494, 587, 784].forEach((freq, index) => {
+      tone({ type: "triangle", freq, dur: 0.06, gain: 0.08, delay: index * 0.06 });
+    });
+    return;
+  }
+  if (name === "rustle") {
+    count(name);
+    noise({ dur: 0.12, gain: 0.08, band: 2400, q: 0.7 });
+    return;
+  }
+  if (name === "splash") {
+    count(name);
+    noise({ dur: 0.1, gain: 0.1, band: 900, q: 0.8 });
+    tone({ type: "sine", freq: 520, freqTo: 180, dur: 0.12, gain: 0.06 });
+    return;
+  }
+  if (name === "thud") {
+    count(name);
+    tone({ type: "sine", freq: 140, dur: 0.08, gain: 0.16 });
+    noise({ dur: 0.06, gain: 0.08, band: 400, q: 1 });
+    return;
+  }
+  if (name === "scrub") {
+    count(name);
+    noise({ dur: 0.16, gain: 0.07, band: 1800, q: 2 });
+    tone({ type: "triangle", freq: 320, dur: 0.1, gain: 0.05 });
   }
 }
 
