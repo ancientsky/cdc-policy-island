@@ -209,6 +209,8 @@ export function mount({ scene, islands, flows }) {
   mile.id = "mile";
   mile.className = "mile";
   mile.hidden = true;
+  mile.setAttribute("role", "status");
+  mile.setAttribute("aria-live", "polite");
   hud.append(guide, mission, mile);
   mile.addEventListener("click", (event) => {
     const button = event.target.closest("[data-flock-health]");
@@ -381,18 +383,37 @@ export function mount({ scene, islands, flows }) {
     }
   }
 
-  function paintMile() {
+  function mileWait(text) {
+    const count = Array.from(text || "").length;
+    const per = getLang() === "en" ? 55 : 160;
+    return Math.min(9000, Math.max(3500, count * per));
+  }
+
+  function mileCopy() {
     const key = mile.dataset.key;
-    if (!key) return;
-    let text = "";
+    if (!key) return "";
     if (key === "say") {
       const island = byId.get(mile.dataset.ask);
-      text = firstSentence(island?.blurbKid || "");
-    } else text = t(key, mileVars());
+      let text = firstSentence(island?.blurbKid || "");
+      if (island?.id === "dengue") {
+        const hint = t("eggSaucerHint");
+        const gap = /[A-Za-z0-9.!?]$/.test(text) ? " " : "";
+        text = `${text}${gap}${hint}`;
+      }
+      return text;
+    }
+    return t(key, mileVars());
+  }
+
+  function paintMile() {
+    const key = mile.dataset.key;
+    if (!key) return "";
+    const text = mileCopy();
     const action = key === "eggFlock"
       ? `<button type="button" class="btn btn--solid" data-flock-health>${esc(t("flockHealth"))}</button>`
       : "";
     mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(text)}</span>${action}`;
+    return text;
   }
 
   function selectedIslandId() {
@@ -409,10 +430,9 @@ export function mount({ scene, islands, flows }) {
     if (vars) mile.dataset.vars = JSON.stringify(vars);
     else delete mile.dataset.vars;
     mile.hidden = false;
-    paintMile();
+    const text = paintMile();
     window.clearTimeout(mileTimer);
-    const wait = key === "eggFlock" ? 7000 : 2400;
-    mileTimer = window.setTimeout(() => { mile.hidden = true; }, wait);
+    mileTimer = window.setTimeout(() => { mile.hidden = true; }, mileWait(text));
   }
 
   function showSay(islandId) {
@@ -420,9 +440,9 @@ export function mount({ scene, islands, flows }) {
     mile.dataset.ask = islandId;
     delete mile.dataset.vars;
     mile.hidden = false;
-    paintMile();
+    const text = paintMile();
     window.clearTimeout(mileTimer);
-    mileTimer = window.setTimeout(() => { mile.hidden = true; }, 4200);
+    mileTimer = window.setTimeout(() => { mile.hidden = true; }, mileWait(text));
   }
 
   function noteNight(islandId) {
@@ -499,7 +519,8 @@ export function mount({ scene, islands, flows }) {
     renderSheet();
     paintRail();
     const list = ribbonList();
-    showMile("eggVoyage");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    showMile(still ? "eggVoyageStill" : "eggVoyage");
     scene.celebrate(list, showGrad);
     scene.startVoyage(watchFirst(list));
   }
@@ -1185,8 +1206,7 @@ export function mount({ scene, islands, flows }) {
     state.selected = { type: "flow", id, flow };
     scene.syncPipi(state.minutes, null);
     const rode = event ? scene.rideFlow(id) : false;
-    if (rode) showMile("eggRide", { what: flow.carried });
-    else if (!event || rode === false) scene.focusIslands([flow.a, flow.b]);
+    if (!event || rode === false) scene.focusIslands([flow.a, flow.b]);
     scene.setHotItem(null);
     writeHash();
     if (stampFlow(book, id)) paintPassport(false);
@@ -1421,6 +1441,10 @@ export function mount({ scene, islands, flows }) {
     state.log.unshift({ time: fmt(state.minutes), text });
     if (state.log.length > 12) state.log.length = 12;
     if (state.tab === "log") renderList();
+  });
+  scene.onRide((carried) => {
+    if (!carried) return;
+    showMile("eggRide", { what: carried });
   });
   scene.onArrive((event) => {
     if (!event) return;

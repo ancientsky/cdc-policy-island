@@ -36,6 +36,7 @@ const _pinWorld = new THREE.Vector3();
 const _pinDir = new THREE.Vector3();
 const _blobAt = new THREE.Vector3();
 const _proj = new THREE.Vector3();
+const _saucerAt = new THREE.Vector3();
 const _pipiAt = new THREE.Vector3();
 const _pipiAhead = new THREE.Vector3();
 const _pipiDir = new THREE.Vector3();
@@ -2112,6 +2113,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
 
   let pickCb = () => {};
   let arriveCb = () => {};
+  let rideCb = () => {};
   let dutyCb = () => {};
   let glowReady = false;
   const wakeQueue = [];
@@ -3305,6 +3307,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       }
     }
     placeCamera();
+    noteSaucerFrame(step);
     scene.fog.density = 0.32 / cam.radius;
     people.update(step, { frozen: frozen || !actorsLive(), reduced, cargoOn, camera, present: actorsLive() });
     const bubbleSize = viewSize();
@@ -3385,6 +3388,18 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
           assignHover(picked.islandId);
           refresh();
           holdRender = Math.max(holdRender, 0.3);
+        }
+        canvas.style.cursor = "pointer";
+      } else if (picked?.kind === "egg") {
+        people.setHover(-1);
+        if (hotIndex >= 0) holdRender = 0.3;
+        hotIndex = -1;
+        for (const threat of threats) threat.hot = false;
+        if (hoverId || hoverItem) {
+          hoverItem = null;
+          assignHover(null);
+          refresh();
+          holdRender = 0.3;
         }
         canvas.style.cursor = "pointer";
       } else {
@@ -3885,9 +3900,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const threatIndex = pickThreat();
     if (threatIndex >= 0) return { kind: "threat", index: threatIndex };
     const eggHit = raycaster.intersectObjects(eggHits, false)[0];
-    if (eggHit?.object.userData?.kind === "egg") return { kind: "egg", id: eggHit.object.userData.id };
     const personHit = people.pick(raycaster);
     const islandHit = raycaster.intersectObjects(hitboxes, false)[0];
+    const eggBehind = eggHit && islandHit && eggHit.distance > islandHit.distance + 0.05;
+    if (eggHit?.object.userData?.kind === "egg" && !eggBehind) return { kind: "egg", id: eggHit.object.userData.id };
     if (personNear(personHit, islandHit)) return { kind: "person", index: personHit.index };
     const itemHit = pickItem();
     if (itemHit) return itemHit;
@@ -4546,7 +4562,15 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     );
     hit.visible = false;
     hit.userData = { kind: "egg", id: "saucer" };
-    root.add(dish, water, hit);
+    const ripple = new THREE.Mesh(
+      new THREE.RingGeometry(0.05, 0.08, 16),
+      new THREE.MeshBasicMaterial({ color: P.k7ec8e0, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    ripple.rotation.x = -Math.PI / 2;
+    ripple.position.y = 0.03;
+    ripple.visible = false;
+    ripple.raycast = () => {};
+    root.add(dish, water, hit, ripple);
     root.traverse((child) => {
       if (!child.isMesh) return;
       child.castShadow = false;
@@ -4554,7 +4578,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     });
     group.add(root);
     eggHits.push(hit);
-    return { root, water, tipped: false, pour: false };
+    return { root, water, ripple, tipped: false, pour: false, rippled: false, rippleT: 0 };
   }
 
   function installEggs() {
@@ -4858,6 +4882,28 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     saucer.pour = false;
     saucer.root.rotation.z = 0;
     saucer.water.visible = true;
+  }
+
+  function noteSaucerFrame(step) {
+    if (!saucer?.ripple) return;
+    if (!reduced && !saucer.rippled) {
+      saucer.root.getWorldPosition(_saucerAt);
+      _saucerAt.project(camera);
+      const onScreen = _saucerAt.z < 1 && Math.abs(_saucerAt.x) < 1 && Math.abs(_saucerAt.y) < 1;
+      if (onScreen) {
+        saucer.rippled = true;
+        saucer.rippleT = 0;
+        saucer.ripple.visible = true;
+        holdRender = Math.max(holdRender, 0.7);
+      }
+    }
+    if (!saucer.ripple.visible) return;
+    saucer.rippleT += step;
+    const k = Math.min(1, saucer.rippleT / 0.6);
+    saucer.ripple.scale.setScalar(1 + k * 2.2);
+    saucer.ripple.material.opacity = 0.65 * (1 - k);
+    if (k >= 1) saucer.ripple.visible = false;
+    else holdRender = Math.max(holdRender, 0.15);
   }
 
   function stepSaucer(step) {
@@ -5480,7 +5526,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     userPhi = phi;
     goalTarget.set(ax, ay, az);
     holdRender = Math.max(holdRender, 0.35);
-    if (u >= 1) ride = null;
+    if (u >= 1) {
+      const carried = ride.route.flow?.carried || "";
+      ride = null;
+      rideCb(carried);
+    }
   }
 
   function rideFlow(id) {
@@ -5498,6 +5548,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     if (reduced) {
       ride = null;
       holdRender = Math.max(holdRender, 0.45);
+      rideCb(route.flow?.carried || "");
       return true;
     }
     noteInput();
@@ -5745,6 +5796,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     setHotItem(id) { hotItem = id; },
     onPick(fn) { pickCb = fn; },
     onArrive(fn) { arriveCb = fn; },
+    onRide(fn) { rideCb = typeof fn === "function" ? fn : () => {}; },
     onDuty(fn) { dutyCb = typeof fn === "function" ? fn : () => {}; },
     wakeState() {
       return { live: liveWakes.map((job) => job.name), queued: wakeQueue.length };
