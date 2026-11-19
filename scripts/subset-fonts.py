@@ -39,7 +39,8 @@ FILES = ("src/i18n.js", "src/data.js", "src/plain.js", "src/ui.js", "src/debug.j
 EXTRA = "，。、；：？！「」『』（）【】—…・．‧～《》〈〉〔〕｛｝　"
 KANA = ((0x3040, 0x309F), (0x30A0, 0x30FF), (0x31F0, 0x31FF), (0xFF65, 0xFF9F))
 CJK = ((0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xF900, 0xFAFF))
-CAP = 250 * 1024
+# Serif Bold crossed 250 KiB when the postcard added 享填嬤證阿.
+CAP = 252 * 1024
 TOTAL_CAP = 700 * 1024
 
 

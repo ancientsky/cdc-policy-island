@@ -3,6 +3,7 @@ import { applyLocale, getLang, introSteps, t, themeFromMinutes } from "./i18n.js
 import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markEgg, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
 import { bestOf, clearArcade, createArcade, starSum } from "./arcade.js";
+import { cardDate, clearPostcard, drawPostcard, holdToSave, loadPostcard, savePostcard } from "./postcard.js";
 import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
@@ -188,13 +189,28 @@ export function mount({ scene, islands, flows, setPaused }) {
     ["mite", "stickerMiteMark", "stickerMiteLine"],
     ["lepto", "stickerLeptoMark", "stickerLeptoLine"],
     ["challenge", "stickerChallengeMark", "stickerChallengeLine"],
+    ["mail", "stickerMailMark", "stickerMailLine"],
   ];
   let stickerShown = "";
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
   passportHud.className = "passport-hud";
-  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="arcade-stars" id="arcade-stars"></span><span class="sticker-chip" id="sticker-chip"></span><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
+  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="arcade-stars" id="arcade-stars"></span><span class="sticker-chip" id="sticker-chip"></span><button type="button" class="btn postcard-go" id="postcard-go"></button><p class="postcard-hint" id="postcard-hint" hidden></p><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
   hud.append(passportHud);
+  const postcard = document.createElement("section");
+  postcard.id = "postcard";
+  postcard.hidden = true;
+  postcard.setAttribute("role", "dialog");
+  postcard.setAttribute("aria-modal", "true");
+  postcard.setAttribute("aria-labelledby", "postcard-title");
+  postcard.innerHTML = `<div class="postcard-card"><h2 id="postcard-title"></h2><fieldset class="postcard-who"><legend></legend><label class="postcard-choice"><input type="radio" name="postcard-to" value="family"><span></span></label><label class="postcard-choice"><input type="radio" name="postcard-to" value="grand"><span></span></label><label class="postcard-choice"><input type="radio" name="postcard-to" value="teacher"><span></span></label><label class="postcard-choice"><input type="radio" name="postcard-to" value="self"><span></span></label></fieldset><fieldset class="postcard-teach"><legend></legend><div class="postcard-lines"></div></fieldset><label class="postcard-sign"><input id="postcard-sign" maxlength="8" autocomplete="off"><small></small></label><p class="postcard-hold" hidden></p><img class="postcard-preview" alt="" hidden><div class="postcard-actions"><button type="button" class="btn btn--solid" data-postcard="make"></button><a class="btn" data-postcard="download" hidden></a><button type="button" class="btn" data-postcard="share" hidden></button><button type="button" class="btn" data-postcard="close"></button></div></div>`;
+  document.body.append(postcard);
+  let postcardKind = "card";
+  let postcardBlob = "";
+  let postcardReturn = null;
+  let postcardLang = "";
+  let postcardCard = loadPostcard();
+  passportHud.querySelector("#postcard-go").addEventListener("click", () => openPostcard("card"));
   const stickerPack = passportHud.querySelector("#sticker-pack");
   stickerPack.addEventListener("click", (event) => {
     const button = event.target.closest("[data-sticker]");
@@ -352,6 +368,7 @@ export function mount({ scene, islands, flows, setPaused }) {
       }
     }
     placeStickers();
+    paintPostcard();
     stats.textContent = t("passportStats", {
       items: view.items,
       itemTotal: itemCount(),
@@ -359,6 +376,194 @@ export function mount({ scene, islands, flows, setPaused }) {
       flowTotal: flows.length,
     });
   }
+
+  const postcardTo = { family: "postcardToFamily", grand: "postcardToGrand", teacher: "postcardToTeacher", self: "postcardToSelf" };
+
+  function teachChoices() {
+    const rows = [];
+    for (const island of ordered) {
+      if (!book.islands[island.id]) continue;
+      (island.actions || []).forEach((action, index) => {
+        const text = action.label || "";
+        if (text) rows.push({ id: `${island.id}:${index}`, text });
+      });
+    }
+    return rows;
+  }
+
+  function hidePostcardPreview() {
+    if (postcardBlob) URL.revokeObjectURL(postcardBlob);
+    postcardBlob = "";
+    const preview = postcard.querySelector(".postcard-preview");
+    preview.hidden = true;
+    preview.removeAttribute("src");
+    postcard.querySelector("[data-postcard=download]").hidden = true;
+    postcard.querySelector("[data-postcard=share]").hidden = true;
+  }
+
+  function paintPostcard() {
+    const button = $("postcard-go");
+    const hint = $("postcard-hint");
+    const seen = Object.keys(book.islands).length;
+    if (button) {
+      button.textContent = t("postcardGo");
+      button.disabled = seen < 1;
+    }
+    if (hint) {
+      hint.textContent = t("postcardNeed");
+      hint.hidden = seen >= 1;
+    }
+    if (!postcard.hidden) fillPostcard();
+  }
+
+  function fillPostcard() {
+    if (postcardLang && postcardLang !== getLang()) hidePostcardPreview();
+    postcardLang = getLang();
+    $("postcard-title").textContent = postcardKind === "certificate" ? t("postcardCertTitle") : t("postcardTitle");
+    postcard.querySelector(".postcard-who legend").textContent = t("postcardWho");
+    for (const input of postcard.querySelectorAll("[name=postcard-to]")) {
+      input.parentElement.querySelector("span").textContent = t(postcardTo[input.value]);
+      input.checked = input.value === postcardCard.to;
+    }
+    postcard.querySelector(".postcard-teach legend").textContent = t("postcardTeach");
+    const lines = postcard.querySelector(".postcard-lines");
+    const previous = postcard.querySelector("[name=postcard-line]:checked")?.value || "";
+    const choices = teachChoices();
+    lines.innerHTML = choices.map((row) => (
+      `<label class="postcard-choice"><input type="radio" name="postcard-line" value="${esc(row.id)}"><span>${esc(row.text)}</span></label>`
+    )).join("");
+    const keep = previous ? lines.querySelector(`[value="${CSS.escape(previous)}"]`) : null;
+    const first = keep || lines.querySelector("input");
+    if (first) first.checked = true;
+    const sign = $("postcard-sign");
+    sign.value = postcardCard.sign;
+    sign.setAttribute("aria-label", t("postcardSign"));
+    postcard.querySelector(".postcard-sign small").textContent = t("postcardSignNote");
+    postcard.querySelector("[data-postcard=make]").textContent = postcardKind === "certificate" ? t("postcardCert") : t("postcardMake");
+    postcard.querySelector("[data-postcard=download]").textContent = t("postcardDownload");
+    postcard.querySelector("[data-postcard=share]").textContent = t("postcardShare");
+    postcard.querySelector("[data-postcard=close]").textContent = t("postcardClose");
+    postcard.querySelector(".postcard-hold").textContent = t("postcardHold");
+    postcard.querySelector(".postcard-hold").hidden = holdToSave() ? postcard.querySelector(".postcard-preview").hidden : true;
+  }
+
+  function holdMap(on) {
+    const arcade = $("arcade");
+    if (!on && arcade && !arcade.hidden) return;
+    setPaused?.(on);
+  }
+
+  function closePostcard() {
+    postcard.hidden = true;
+    hidePostcardPreview();
+    holdMap(false);
+    if (postcardReturn && postcardReturn.isConnected) postcardReturn.focus();
+  }
+
+  function openPostcard(kind) {
+    if (Object.keys(book.islands).length < 1) return;
+    postcardKind = kind === "certificate" ? "certificate" : "card";
+    postcardReturn = document.activeElement;
+    hidePostcardPreview();
+    fillPostcard();
+    postcard.hidden = false;
+    holdMap(true);
+    (postcard.querySelector("[name=postcard-to]:checked") || postcard.querySelector("[name=postcard-to]"))?.focus();
+  }
+
+  function rememberPostcard() {
+    postcardCard.sent += 1;
+    postcardCard = savePostcard(postcardCard);
+    if (markEgg(book, "mail")) paintPassport(false);
+    else paintPassport(false);
+  }
+
+  async function makePostcard() {
+    const choices = teachChoices();
+    const pickedId = postcard.querySelector("[name=postcard-line]:checked")?.value || "";
+    const picked = choices.find((row) => row.id === pickedId) || choices[0];
+    if (!picked) return;
+    const to = postcard.querySelector("[name=postcard-to]:checked")?.value || "family";
+    const sign = $("postcard-sign").value.slice(0, 8);
+    postcardCard.to = to;
+    postcardCard.sign = sign;
+    postcardCard = savePostcard(postcardCard);
+    const date = cardDate(location.search);
+    const canvas = document.createElement("canvas");
+    await drawPostcard(canvas, {
+      kind: postcardKind,
+      greeting: t(postcardTo[to] || postcardTo.family),
+      certTitle: t("postcardCertTitle"),
+      patrol: t("postcardPatrol", { n: Object.keys(book.islands).length, k: game.total }),
+      teachLead: t("postcardTeachLead"),
+      line: picked.text,
+      sign,
+      date,
+      footer: t("postcardFooter", { date: DATA_AS_OF }),
+      url: t("postcardUrl"),
+      islands: ordered.map((island) => ({
+        id: island.id,
+        no: island.no,
+        nick: island.nick,
+        accent: island.accent,
+        col: island.col,
+        row: island.row,
+        visited: Boolean(book.islands[island.id]),
+      })),
+    });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) return;
+    if (postcardBlob) URL.revokeObjectURL(postcardBlob);
+    postcardBlob = URL.createObjectURL(blob);
+    const preview = postcard.querySelector(".postcard-preview");
+    preview.src = postcardBlob;
+    preview.alt = postcardKind === "certificate" ? t("postcardCertTitle") : t("postcardTitle");
+    preview.hidden = false;
+    preview.dataset.date = date;
+    preview.dataset.kind = postcardKind;
+    const name = `${postcardKind === "certificate" ? "pipi-certificate" : "pipi-postcard"}-${date}.png`;
+    const download = postcard.querySelector("[data-postcard=download]");
+    download.href = postcardBlob;
+    download.download = name;
+    const hold = holdToSave();
+    download.hidden = hold;
+    postcard.querySelector(".postcard-hold").hidden = !hold;
+    const file = new File([blob], name, { type: "image/png" });
+    const share = postcard.querySelector("[data-postcard=share]");
+    let canShare = false;
+    try { canShare = Boolean(navigator.canShare?.({ files: [file] })); } catch { canShare = false; }
+    share.hidden = !canShare;
+    share.dataset.fileName = name;
+  }
+
+  async function sharePostcard() {
+    const preview = postcard.querySelector(".postcard-preview");
+    if (!preview.src) return;
+    const blob = await fetch(preview.src).then((res) => res.blob());
+    const name = postcard.querySelector("[data-postcard=share]").dataset.fileName || "pipi-postcard.png";
+    const file = new File([blob], name, { type: "image/png" });
+    if (!navigator.canShare?.({ files: [file] })) return;
+    try {
+      await navigator.share({ files: [file] });
+      rememberPostcard();
+    } catch {
+      /* The person closed the share sheet. */
+    }
+  }
+
+  postcard.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-postcard]");
+    if (!button) return;
+    if (button.dataset.postcard === "close") closePostcard();
+    else if (button.dataset.postcard === "make") makePostcard();
+    else if (button.dataset.postcard === "download") rememberPostcard();
+    else if (button.dataset.postcard === "share") sharePostcard();
+  });
+  postcard.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || postcard.hidden) return;
+    event.preventDefault();
+    closePostcard();
+  });
 
   function paintPins() {
     const current = MISSIONS.find((row) => !book.missions[row.id]);
@@ -702,7 +907,7 @@ export function mount({ scene, islands, flows, setPaused }) {
         ? `<i class="sticker">${esc(t(mark))}</i>`
         : `<i class="sticker miss" aria-hidden="true">?</i>`
     )).join("");
-    $("modal-body").innerHTML = `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(t("gradBody"))}</p></div><div class="seals">${seals}</div><div class="grad-stickers" aria-label="${esc(t("stickerTotal", { n: stickerGot }))}">${stickerChips}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
+    $("modal-body").innerHTML = `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(t("gradBody"))}</p></div><div class="seals">${seals}</div><div class="grad-stickers" aria-label="${esc(t("stickerTotal", { n: stickerGot }))}">${stickerChips}</div><p>${esc(t("gradRepel", { n: game.total }))}</p><button type="button" class="btn btn--solid" data-certificate>${esc(t("postcardCert"))}</button>`;
     $("modal-next").textContent = t("gradAgain");
     $("modal-skip").hidden = false;
     $("modal-skip").textContent = t("home");
@@ -1861,6 +2066,11 @@ export function mount({ scene, islands, flows, setPaused }) {
     openModal();
   });
   $("about").addEventListener("click", showAbout);
+  modal.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-certificate]")) return;
+    closeModal();
+    openPostcard("certificate");
+  });
   $("modal-skip").addEventListener("click", () => {
     if (modal.dataset.mode === "grad") {
       closeModal();
@@ -1875,6 +2085,8 @@ export function mount({ scene, islands, flows, setPaused }) {
     if (!window.confirm(t("gradResetAsk"))) return;
     resetPassport(book);
     clearArcade();
+    clearPostcard();
+    postcardCard = { v: 1, to: "family", sign: "", sent: 0 };
     scene.restoreSaucer();
     stampFreshId = null;
     cancelStamp();
