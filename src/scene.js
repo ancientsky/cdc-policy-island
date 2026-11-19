@@ -1258,7 +1258,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   function hoursOpen(hours, mins = minutes) {
     if (!hours) return true;
     const hour = clockHour(mins);
-    return hour >= hours[0] && hour < hours[1];
+    const spans = Array.isArray(hours[0]) ? hours : [hours];
+    return spans.some((span) => hour >= span[0] && hour < span[1]);
   }
 
   function anchorFront(mesh, yHead, nosePos) {
@@ -1330,6 +1331,19 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
 
   function poseThreat(threat) {
+    if (threat.local && threat.pad) {
+      const ang = elapsed * 0.7 + threat.phase;
+      const bob = actorsLive() ? Math.sin(elapsed * 1.15 + threat.phase) * 0.04 : 0;
+      threat.mesh.position.set(
+        threat.pad.x + Math.cos(ang) * threat.pad.radius,
+        threat.pad.y + bob,
+        threat.pad.z + Math.sin(ang) * threat.pad.radius,
+      );
+      threat.mesh.rotation.y = ang + Math.PI / 2;
+      threat.mesh.updateWorldMatrix(true, true);
+      platesDirty = true;
+      return;
+    }
     const bob = actorsLive() ? Math.sin(elapsed * 1.15 + threat.phase) * 0.06 : 0;
     if (threat.lane) {
       writeLane(_laneA, threat.lane, threat.u);
@@ -1655,6 +1669,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   function placeCrews() {
     const groups = new Map();
     for (const threat of threats) {
+      if (threat.local) continue;
       const list = groups.get(threat.islandId) ?? [];
       list.push(threat);
       groups.set(threat.islandId, list);
@@ -1950,8 +1965,33 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       { make: () => makeVirus(P.c5aa86a), id: "entero", tool: "wash", rate: 0.04, plate: "plateEntero" },
       { make: () => makeRod(), id: "tb", tool: "finish", rate: 0.034, plate: "plateTb" },
       { make: () => makeSpots(), id: "vax", key: "measles", tool: "shield", rate: 0.036, plate: "plateMeasles" },
-      { make: () => makeMosquito({ dark: P.k2a2026, pale: P.k8a7a5c, wing: P.k8aa4b4, round: true }), id: "vax", key: "dusk", tool: "shield", rate: 0.032, plate: "plateDusk", hours: [17, 19] },
+      { make: () => makeMosquito({ dark: P.k2a2026, pale: P.k8a7a5c, wing: P.k8aa4b4, round: true }), id: "vax", key: "dusk", tool: null, rate: 0, plate: "plateDusk", hours: [[5, 6.5], [17, 19]], local: true },
     ];
+    function makePaddy(group) {
+      const root = new THREE.Group();
+      root.name = "paddy";
+      root.position.set(0.15, 0.56, 1.12);
+      const field = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.46, 0.32),
+        new THREE.MeshStandardMaterial({ color: P.k6e9a66, roughness: 0.86 }),
+      );
+      const water = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.28, 0.16),
+        new THREE.MeshStandardMaterial({ color: P.k98e7da, roughness: 0.28 }),
+      );
+      field.rotation.x = -Math.PI / 2;
+      water.rotation.x = -Math.PI / 2;
+      water.position.y = 0.015;
+      field.castShadow = false;
+      water.castShadow = false;
+      field.receiveShadow = false;
+      water.receiveShadow = false;
+      field.raycast = () => {};
+      water.raycast = () => {};
+      root.add(field, water);
+      group.add(root);
+      return root;
+    }
     roster.forEach((spec, index) => {
       const built = spec.make();
       const raid = approach(index, views.get(spec.id).base);
@@ -1961,6 +2001,14 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       threat.hours = spec.hours || null;
       threat.plateKey = spec.plate;
       threat.spin = built.spin || null;
+      if (spec.local) {
+        threat.local = true;
+        threat.pad = { x: 0.15, y: 0.96, z: 1.12, radius: 0.16 };
+        const view = views.get(spec.id);
+        view.group.add(threat.mesh);
+        if (!view.group.getObjectByName("paddy")) makePaddy(view.group);
+        poseThreat(threat);
+      }
       if (threat.hours && !hoursOpen(threat.hours)) threat.mesh.visible = false;
       const plateEl = document.createElement("div");
       plateEl.className = "threat-name";
@@ -2969,6 +3017,18 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
 
   function strike(threat) {
     if (!threat || threat.gone || threat.sinking || threat.away > 0) return;
+    if (threat.local) {
+      playSfx("hit");
+      strikeCb({
+        index: threats.indexOf(threat),
+        islandId: threat.islandId,
+        tool: threat.tool,
+        key: threat.key,
+        routed: false,
+      });
+      holdRender = Math.max(holdRender, 0.3);
+      return;
+    }
     threat.taps += 1;
     const now = performance.now();
     if (now < threat.coolUntil) {
@@ -4092,7 +4152,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const geom = {
       "west-air": { aim: [-1, -0.45], bias: { west: true, z: -0.5 }, seats: [{ id: "flu", side: 0.4, hover: 1.62, craft: "plane", craftY: 1.62 }] },
       "west-sea": { aim: [-1, 0.2], bias: { west: true, z: 0.45 }, seats: [{ id: "border", side: 0.38, hover: 0.55, craft: "ship", craftY: 0.28 }, { id: "tb", side: -0.38, hover: 0.72 }] },
-      "south-dengue": { aim: [0.6, 1], bias: { x: 0.5 }, seats: [{ id: "dengue", side: 0.35, hover: 0.7 }, { id: "dusk", side: -0.42, hover: 0.95 }] },
+      "south-dengue": { aim: [0.6, 1], bias: { x: 0.5 }, seats: [{ id: "dengue", side: 0.35, hover: 0.7 }] },
       "sw-measles": { aim: [-0.35, 1], bias: { x: -0.45 }, seats: [{ id: "entero", side: 0.35, hover: 0.7 }, { id: "measles", side: -0.42, hover: 1.15, craft: "plane", craftY: 1.15 }] },
       "north-birds": { aim: [0.05, -1], bias: { z: -0.85 }, seats: [], birds: true },
     };
@@ -5944,6 +6004,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
         errors.push("west does not have the most import lanes");
       }
       for (const threat of threats) {
+        if (threat.local) {
+          if (threat.lane) errors.push(`local threat ${threat.key} has a sea lane`);
+          continue;
+        }
         if (!threat.lane) errors.push(`threat ${threat.key || threat.islandId} has no sea lane`);
         else {
           for (const point of threat.lane) {
@@ -6001,7 +6065,20 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       else if (saucer.root.position.z < 0.6) errors.push("saucer sits on the dengue center");
       const duskThreat = threats.find((threat) => threat.key === "dusk");
       if (!duskThreat) errors.push("dusk mosquito is missing");
-      else if (!hoursOpen(duskThreat.hours) && duskThreat.mesh.visible) errors.push("dusk mosquito is visible outside 17:00–19:00");
+      else {
+        if (duskThreat.lane) errors.push("dusk mosquito is on a sea lane");
+        if (!duskThreat.local) errors.push("dusk mosquito is not on the vaccine paddy");
+        const paddy = views.get("vax")?.group.getObjectByName("paddy");
+        if (!paddy || paddy.parent !== views.get("vax").group) errors.push("vaccine paddy is missing");
+        if (crews.some((crew) => crew.threat === duskThreat)) errors.push("dusk mosquito has a shield crew");
+        if (hoursOpen(duskThreat.hours, 5.5 * 60) !== true) errors.push("dusk is closed at 05:30");
+        if (hoursOpen(duskThreat.hours, 6.5 * 60) !== false) errors.push("dusk is open at 06:30");
+        if (hoursOpen(duskThreat.hours, 12 * 60) !== false) errors.push("dusk is open at 12:00");
+        if (hoursOpen(duskThreat.hours, 18 * 60) !== true) errors.push("dusk is closed at 18:00");
+        if (hoursOpen(duskThreat.hours, 19 * 60) !== false) errors.push("dusk is open at 19:00");
+        if (hoursOpen(duskThreat.hours, 8 * 60 + 20) !== false) errors.push("dusk is open at 08:20");
+        if (duskThreat.mesh.visible) errors.push("dusk mosquito is visible at 08:20");
+      }
       if (pipi && birds?.points) {
         const parent = pipi.group.parent;
         const pos = pipi.group.position.clone();
