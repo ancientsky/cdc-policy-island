@@ -1150,7 +1150,7 @@ export function mount({ scene, islands, flows }) {
     const suffix = germSuffix[live.key] || germSuffix[live.islandId];
     if (!suffix) return;
     germ.hidden = false;
-    const doLine = live.key === "dusk" ? t("germDoDusk") : actionLine(live.islandId);
+    const doLine = live.key === "dusk" ? t("germDoDusk") : live.key === "measles" ? t("germDoMeasles") : actionLine(live.islandId);
     germ.innerHTML = `<button type="button" class="btn x" data-germ-close aria-label="${esc(t("close"))}">×</button><p class="k">${esc(t("germWhatLabel"))}</p><p>${esc(t(`germWhat${suffix}`))}</p><p class="k">${esc(t("germHowLabel"))}</p><p>${esc(t(`germHow${suffix}`))}</p><p class="k">${esc(t("germDoLabel"))}</p><p class="do">${esc(doLine)}</p>`;
     placeGerm(live);
   }
