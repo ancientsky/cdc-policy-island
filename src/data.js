@@ -603,7 +603,7 @@ export const flows = [
   { id: "f16", a: "global", b: "watch", title: "國際情資換班", carried: "情資", text: "合作對象的事件，要在國內出現病例前就進到值勤畫面。" },
   { id: "f17", a: "lab", b: "global", title: "定序貢獻判斷", carried: "序列", text: "國內流行株的基因體，是對外說明和風險判斷的依據，不只是一則國內新聞。" },
   { id: "f18", a: "vax", b: "ready", title: "冷鏈與緊急調撥", carried: "冷鏈", text: "疫苗基金的常規冷鏈，大流行時要能改成緊急接種的配送網。" },
-  { id: "f19", a: "flu", b: "amr", title: "人、動物、環境一起看", carried: "動物的檢驗結果", text: "家禽、豬和野鳥的檢驗結果，要跟醫院的資料放在一起看，這就是同一健康。動物和植物的檢疫，是農業部動植物防疫檢疫署在做。" },
+  { id: "f19", a: "flu", b: "amr", title: "人、動物、環境一起看", carried: "動物的檢驗結果", text: "家禽、豬和野鳥的檢驗結果，要跟醫院的資料放在一起看，這就是防疫一體。動物和植物的檢疫，是農業部動植物防疫檢疫署在做。" },
 ];
 
 applyPlain(islands, flows, plain.zh);
