@@ -175,7 +175,7 @@ export function mount({ scene, islands, flows }) {
   let mileTimer = 0;
   let finaleTimer = 0;
   let clockSeen = state.minutes;
-  const yawned = new Set();
+  let slept = false;
   const STICKERS = [
     ["fly", "stickerFlyMark", "stickerFlyLine"],
     ["saucer", "stickerSaucerMark", "stickerSaucerLine"],
@@ -518,13 +518,107 @@ export function mount({ scene, islands, flows }) {
     return true;
   }
 
+  const QUIZ_STOP = new Set("the and with your from that this when have been they them then into over also just than such only very more some what who where were was are for you not but its out after before about there their".split(" "));
+
+  function quizSpans(text) {
+    const spans = [];
+    let start = -1;
+    const isBreak = (ch) => "，。、；：！？,.!?;:「」『』\"'()（）【】 \t".includes(ch);
+    for (let i = 0; i <= text.length; i += 1) {
+      const brk = i === text.length || isBreak(text[i]);
+      if (!brk && start < 0) start = i;
+      if (brk && start >= 0) {
+        const token = text.slice(start, i);
+        if (token.length >= 2 && !token.includes("＿")) spans.push({ text: token, start, end: i });
+        start = -1;
+      }
+    }
+    return spans;
+  }
+
+  function quizKeywordOk(text) {
+    if (/[\u3040-\u30ff\u3400-\u9fff]/.test(text)) return text.length >= 2 && text.length <= 16;
+    if (!/[A-Za-z]/.test(text) || text.length < 4 || text.length > 16) return false;
+    return !QUIZ_STOP.has(text.toLowerCase());
+  }
+
+  function quizDistractors(island, label, correct) {
+    const found = [];
+    const take = (rows) => {
+      for (const action of rows) {
+        for (const span of quizSpans(`${action.label || ""} ${action.detail || ""}`)) {
+          if (!quizKeywordOk(span.text) || span.text === correct || label.includes(span.text)) continue;
+          found.push(span.text);
+        }
+      }
+    };
+    take((island.actions ?? []).filter((action) => action.label !== label));
+    if (found.length) return found;
+    for (const other of islands) {
+      if (other.id === island.id) continue;
+      take(other.actions ?? []);
+    }
+    return found;
+  }
+
+  function makeQuiz(island) {
+    const pool = [];
+    for (const action of island.actions ?? []) {
+      const label = action.label || "";
+      for (const span of quizSpans(label)) {
+        if (quizKeywordOk(span.text)) pool.push({ label, span });
+      }
+    }
+    if (!pool.length) return null;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    const wrongs = quizDistractors(island, picked.label, picked.span.text);
+    if (!wrongs.length) return null;
+    const wrong = wrongs[Math.floor(Math.random() * wrongs.length)];
+    const { start, end, text } = picked.span;
+    return {
+      prompt: `${picked.label.slice(0, start)}＿＿${picked.label.slice(end)}`,
+      correct: text,
+      wrong,
+      label: picked.label,
+    };
+  }
+
+  function openQuiz(islandId) {
+    const island = byId.get(islandId);
+    const row = sheet.querySelector(".ask-row");
+    if (!island || !row) return;
+    const quiz = makeQuiz(island);
+    if (!quiz) return;
+    row.querySelector(".quiz")?.remove();
+    const choices = Math.random() < 0.5 ? [quiz.correct, quiz.wrong] : [quiz.wrong, quiz.correct];
+    const box = document.createElement("div");
+    box.className = "quiz";
+    box.innerHTML = `<p class="quiz-q">${esc(quiz.prompt)}</p><div class="quiz-choices">${choices.map((text) => `<button type="button" class="btn" data-quiz-choice="${text === quiz.correct ? "right" : "wrong"}">${esc(text)}</button>`).join("")}</div><p class="quiz-note" role="status" hidden></p>`;
+    row.append(box);
+  }
+
+  function answerQuiz(button) {
+    const box = button.closest(".quiz");
+    if (!box || box.dataset.answered) return;
+    box.dataset.answered = "1";
+    const right = button.dataset.quizChoice === "right";
+    const note = box.querySelector(".quiz-note");
+    if (note) {
+      note.hidden = false;
+      note.textContent = right ? `${t("quizRight")} ★` : t("quizWrong");
+      note.classList.toggle("star", right);
+    }
+    if (right) button.append(document.createTextNode(" ★"));
+    for (const choice of box.querySelectorAll("[data-quiz-choice]")) choice.disabled = true;
+  }
+
   function noteSleep(islandId, nightShown) {
-    if (nightShown || !islandId || yawned.has(islandId)) return;
+    if (nightShown || !islandId || slept) return;
     const island = byId.get(islandId);
     if (!island) return;
     const hour = state.minutes / 60;
     if (island.items.some((item) => hourCovers(item.hours, hour))) return;
-    yawned.add(islandId);
+    slept = true;
     showMile("eggSleep");
   }
 
@@ -1189,7 +1283,7 @@ export function mount({ scene, islands, flows }) {
       ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p></section>`
       : "";
     const whyAdult = island.id === "border" ? `<ul class="why-src">${whySources}</ul>` : "";
-    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><div class="sheet-name"><h2>${esc(island.nick)}</h2><button type="button" class="btn ask" data-ask="${esc(island.id)}">${esc(t("askPipi"))}</button></div><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section>${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div>${whyAdult}<p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
+    const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><div class="sheet-name"><h2>${esc(island.nick)}</h2></div><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><div class="ask-row"><button type="button" class="btn ask" data-ask="${esc(island.id)}">${esc(t("askPipi"))}</button></div>${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div>${whyAdult}<p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
     if (fresh) {
       stampFreshId = null;
@@ -1559,9 +1653,14 @@ export function mount({ scene, islands, flows }) {
       else clearSelection();
       return;
     }
+    const choice = event.target.closest("[data-quiz-choice]");
+    if (choice) {
+      answerQuiz(choice);
+      return;
+    }
     const ask = event.target.closest("[data-ask]");
     if (ask) {
-      showSay(ask.dataset.ask);
+      openQuiz(ask.dataset.ask);
       return;
     }
     const item = event.target.closest("[data-item]");
