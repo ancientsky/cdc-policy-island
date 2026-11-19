@@ -1319,6 +1319,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let pipiU = 0.28;
   let pipiFlash = 0;
   let pipiCam = null;
+  let pipiWingT = 0;
   let perchLamp = null;
   const crews = [];
   const crewMarks = [];
@@ -4525,7 +4526,24 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     const bill = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.012, 0.14), black);
     bill.name = "bill";
     bill.position.set(0, 0.038, -0.26);
-    group.add(body, neck, head, bill);
+    const spoon = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.01, 8), black);
+    spoon.name = "spoon";
+    spoon.position.set(0, 0, -0.07);
+    bill.add(spoon);
+    const wingMat = new THREE.MeshStandardMaterial({ color: P.cffffff, roughness: 0.7, flatShading: true, side: THREE.DoubleSide });
+    const wingL = new THREE.Group();
+    wingL.name = "wingL";
+    wingL.position.set(-0.05, 0.03, -0.01);
+    const wingR = new THREE.Group();
+    wingR.name = "wingR";
+    wingR.position.set(0.05, 0.03, -0.01);
+    for (const [pivot, side] of [[wingL, -1], [wingR, 1]]) {
+      const wing = new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.1), wingMat);
+      wing.position.set(side * 0.14, 0, 0);
+      wing.rotation.x = -Math.PI / 2;
+      pivot.add(wing);
+    }
+    group.add(body, neck, head, bill, wingL, wingR);
     group.traverse((child) => {
       if (!child.isMesh) return;
       child.castShadow = false;
@@ -4539,7 +4557,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     group.add(label);
     group.visible = false;
     scene.add(group);
-    return { group, labelEl };
+    return { group, labelEl, wingL, wingR };
   }
 
   function makeSaucer(group) {
@@ -4749,6 +4767,29 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     return importLanes.find((item) => item.id === "north-birds");
   }
 
+  function restPipiBody() {
+    if (!pipi) return;
+    pipi.group.scale.setScalar(1);
+    pipi.wingL.rotation.z = 0;
+    pipi.wingR.rotation.z = 0;
+  }
+
+  function followPipi() {
+    const at = pipi.group.position;
+    if (flight && flight.pipiOut) {
+      flight.to.target.set(at.x, at.y, at.z);
+      flight.to.phi = 0.95;
+      flight.to.radius = 7;
+      return;
+    }
+    goalTarget.set(at.x, at.y, at.z);
+    goal.radius = 7;
+    userPhi = 0.95;
+    cam.target.set(at.x, at.y, at.z);
+    cam.radius = 7;
+    cam.phi = 0.95;
+  }
+
   function flyPipi() {
     if (pipiMode === "fly" || pipiMode === "flash" || !pipi) return false;
     const lane = northLane();
@@ -4759,6 +4800,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     }
     pipi.group.visible = true;
     pipi.labelEl.textContent = t("eggPipiName");
+    restPipiBody();
     if (reduced) {
       pipiMode = "flash";
       pipiFlash = 1.6;
@@ -4768,9 +4810,9 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     }
     pipiMode = "fly";
     pipiU = 0.28;
+    pipiWingT = 0;
+    pipi.group.scale.setScalar(1.8);
     poseSpoonbill(pipi.group, lane.points, pipiU);
-    const mid = new THREE.Vector3();
-    writeLane(mid, lane.points, 0.48);
     pipiCam = {
       theta: cam.theta,
       phi: cam.phi,
@@ -4784,11 +4826,12 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     bird = false;
     zoomed = true;
     stopCoast();
+    environment.setCloudHold(0.25);
     beginFlight({
       theta: cam.theta,
-      phi: 0.5,
-      radius: 16,
-      target: new THREE.Vector3(mid.x, 0.7, mid.z),
+      phi: 0.95,
+      radius: 7,
+      target: pipi.group.position.clone(),
     }, { duration: 900, distance: 0, arc: false });
     flight.pipiOut = true;
     holdRender = Math.max(holdRender, 1);
@@ -4799,6 +4842,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     if (!pipi) return;
     pipiMode = "hide";
     pipi.group.visible = false;
+    restPipiBody();
+    environment.setCloudHold(null);
     const back = pipiCam;
     pipiCam = null;
     if (!back || back.cancelled || reduced) return;
@@ -4831,6 +4876,11 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     }
     pipiU = Math.min(0.7, pipiU + step * 0.11);
     poseSpoonbill(pipi.group, lane.points, pipiU);
+    pipiWingT += step;
+    const flap = Math.sin(pipiWingT * 8) * 0.5;
+    pipi.wingL.rotation.z = -flap;
+    pipi.wingR.rotation.z = flap;
+    followPipi();
     holdRender = Math.max(holdRender, 0.3);
     if (pipiU >= 0.7) finishPipiFly();
   }
@@ -4844,6 +4894,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       const view = views.get("watch");
       if (!view) return false;
       view.group.attach(pipi.group);
+      restPipiBody();
       pipi.group.position.set(0.16, 1.28, 0.55);
       pipi.group.rotation.set(0, 0, 0);
       pipi.group.visible = true;

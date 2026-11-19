@@ -469,7 +469,7 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
     lamps.visible = night > 0.02;
     // Stacked day-white puffs cross the night bloom threshold and wash out. Pull them toward the haze.
     cloudMat.color.copy(cloudBase).lerp(haze, 0.18 + night * 0.62);
-    cloudMat.opacity = 1 - night * 0.65;
+    cloudMat.opacity = cloudHold == null ? 1 - night * 0.65 : cloudHold;
   }
 
   function update(dt, opts = {}) {
@@ -481,6 +481,11 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
     }
     writeClouds();
     writeShadows();
+  }
+
+  let cloudHold = null;
+  function setCloudHold(value) {
+    cloudHold = Number.isFinite(value) ? value : null;
   }
 
   function cloudSample() {
@@ -502,5 +507,5 @@ export async function createEnvironment(THREE, scene, { quality = "high", camera
     };
   }
 
-  return { setTime, update, heightAt, info, cloudSample };
+  return { setTime, update, heightAt, info, cloudSample, setCloudHold };
 }
