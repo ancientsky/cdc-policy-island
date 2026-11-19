@@ -1926,6 +1926,8 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   from { transform: translate(0, 0); opacity: 1; }
   to { transform: translate(18px, -70px); opacity: 0; }
 }
+.arcade-seat:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.arcade-flydrop { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   .arcade-wiggle, .arcade-rain, .arcade-bug.fly { animation: none; }
   .arcade-bug.fly { opacity: 0; }

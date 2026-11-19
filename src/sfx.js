@@ -296,6 +296,25 @@ export function play(name, id) {
     count(name);
     noise({ dur: 0.16, gain: 0.07, band: 1800, q: 2 });
     tone({ type: "triangle", freq: 320, dur: 0.1, gain: 0.05 });
+    return;
+  }
+  if (name === "inhale") {
+    count(name);
+    const scale = [330, 440, 554];
+    const step = Math.max(0, Math.min(2, Number(id) || 0));
+    tone({ type: "sine", freq: scale[step], dur: 0.12, gain: 0.05 });
+    return;
+  }
+  if (name === "muff") {
+    count(name);
+    noise({ dur: 0.1, gain: 0.05, band: 700, q: 1.2 });
+    tone({ type: "sine", freq: 280, dur: 0.08, gain: 0.04 });
+    return;
+  }
+  if (name === "achoo") {
+    count(name);
+    noise({ dur: 0.16, gain: 0.14, band: 1400, q: 0.8 });
+    tone({ type: "triangle", freq: 520, freqTo: 180, dur: 0.18, gain: 0.08 });
   }
 }
 

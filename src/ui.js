@@ -1287,9 +1287,11 @@ export function mount({ scene, islands, flows, setPaused }) {
       ? `<section class="why-west"><h3>${esc(t("whyTitle"))}</h3><p>${esc(t("whyLead"))}</p><p>${esc(t("whyDo"))}</p><p>${esc(t("whyYou"))}</p></section>`
       : "";
     const whyAdult = island.id === "border" ? `<ul class="why-src">${whySources}</ul>` : "";
-    const earned = island.id === "dengue" ? (bestOf("water")?.stars || 0) : 0;
-    const challenge = island.id === "dengue"
-      ? `<div class="challenge-row"><button type="button" class="btn challenge" data-challenge="water">${esc(t("arcadeWaterGo"))}</button><span class="challenge-stars" aria-label="${esc(t("arcadeStars", { n: earned }))}">${"★".repeat(earned)}${"☆".repeat(3 - earned)}</span></div>`
+    const challengeKey = island.id === "dengue" ? "water" : island.id === "flu" ? "sneeze" : "";
+    const earned = challengeKey ? (bestOf(challengeKey)?.stars || 0) : 0;
+    const challengeGo = challengeKey === "sneeze" ? "arcadeSneezeGo" : "arcadeWaterGo";
+    const challenge = challengeKey
+      ? `<div class="challenge-row"><button type="button" class="btn challenge" data-challenge="${challengeKey}">${esc(t(challengeGo))}</button><span class="challenge-stars" aria-label="${esc(t("arcadeStars", { n: earned }))}">${"★".repeat(earned)}${"☆".repeat(3 - earned)}</span></div>`
       : "";
     const body = `<button type="button" class="btn x" data-close aria-label="${esc(t("close"))}">×</button>${seal}<p class="eyebrow">${esc(island.no)}　${pillarChips(island.pillars)}</p><div class="sheet-name"><h2>${esc(island.nick)}</h2></div><section class="todo"><h3>${esc(t("youCan"))}</h3><ol>${actions}</ol></section><div class="ask-row"><button type="button" class="btn ask" data-ask="${esc(island.id)}">${esc(t("askPipi"))}</button></div>${challenge}${why}<p class="official">${esc(island.name)}</p>${say}<aside class="fact"><h3>${esc(t("didYouKnow"))}</h3><p>${esc(island.fact)}</p></aside><p class="kid-blurb">${esc(island.blurbKid)}</p><div class="detail-items">${items}</div><h3 class="out-title">${esc(t("outTitle"))}</h3><div class="related">${links}</div><details class="adult"><summary>${esc(t("adultSummary"))}</summary><p class="asof">${esc(t("dataAsOf", { date: DATA_AS_OF }))}</p><p>${esc(island.blurb)}</p><p class="source">${linkedSource(island)}</p><div class="adult-items">${adultItems}</div>${whyAdult}<p class="jump"><a href="${esc(island.href)}" target="_blank" rel="noopener noreferrer">${esc(island.hrefLabel)}</a></p></details>`;
     sheet.innerHTML = `<div class="sheet-scroll">${body}</div><a class="hotline" href="tel:1922">${ICON_PHONE}<span>${esc(t("hotline"))}</span></a>`;
@@ -1663,7 +1665,7 @@ export function mount({ scene, islands, flows, setPaused }) {
       paintPassport(Boolean(info.firstStar));
     },
     onClose(info) {
-      if (info?.firstStar) showMile("arcadeWaterExtend");
+      if (info?.firstStar && info.id === "water") showMile("arcadeWaterExtend");
       if (state.selected) renderSheet(false);
     },
   });

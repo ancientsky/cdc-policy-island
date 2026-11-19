@@ -13,9 +13,22 @@ import {
   releaseDue,
   starsFor,
 } from "./arcade/water.js";
+import {
+  SNEEZE,
+  coneTargets,
+  createSneeze,
+  feverDelay,
+  gapFor,
+  pickReady,
+  resolveTap,
+  rollKind,
+  scoreFor,
+  starsFor as sneezeStars,
+  windMs,
+} from "./arcade/sneeze.js";
 
 const KEY = "cdc-island-arcade-v1";
-const CHALLENGES = [WATER];
+const CHALLENGES = [WATER, SNEEZE];
 const POLITE = /です|ます|ください|ました/;
 
 function empty() {
@@ -139,7 +152,7 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
   let returnFocus = null;
   const parked = [];
 
-  const water = createWater(board, {
+  const hooks = {
     reduced,
     saucer,
     play,
@@ -154,7 +167,11 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
       onReward?.(lastInfo);
       showResult(lastInfo);
     },
-  });
+  };
+  const water = createWater(board, hooks);
+  const sneeze = createSneeze(board, hooks);
+  let active = water;
+  let activeMeta = WATER;
 
   function show(name) {
     for (const panel of root.querySelectorAll("[data-panel]")) {
@@ -164,13 +181,13 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
   }
 
   function fillCover() {
-    root.querySelector("#arcade-title").textContent = t(WATER.titleKey);
-    root.querySelector(".arcade-rule").textContent = t(WATER.ruleKey);
-    root.querySelector(".arcade-gestures").innerHTML = ["arcadeLook", "arcadeTip", "arcadeToss", "arcadeScrub"]
+    root.querySelector("#arcade-title").textContent = t(activeMeta.titleKey);
+    root.querySelector(".arcade-rule").textContent = t(activeMeta.ruleKey);
+    root.querySelector(".arcade-gestures").innerHTML = (activeMeta.gestureKeys || [])
       .map((key) => `<li><b>${esc(t(key))}</b></li>`)
       .join("");
     const note = root.querySelector("[data-saucer]");
-    const tipped = Boolean(saucer?.());
+    const tipped = activeMeta.id === "water" && Boolean(saucer?.());
     note.hidden = !tipped;
     note.textContent = tipped ? t("arcadeWaterSaucer") : "";
     root.querySelector(".arcade-x").textContent = "×";
@@ -182,7 +199,11 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
     root.querySelector(".guide-face").textContent = t("guideMark");
   }
 
-  function open() {
+  function open(id) {
+    activeMeta = id === "sneeze" ? SNEEZE : WATER;
+    active = id === "sneeze" ? sneeze : water;
+    water.stop();
+    sneeze.stop();
     setPaused?.(true);
     returnFocus = document.activeElement;
     lastInfo = null;
@@ -197,6 +218,7 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
   function close() {
     window.clearInterval(countTimer);
     water.stop();
+    sneeze.stop();
     show("closed");
     phase = "closed";
     root.hidden = true;
@@ -233,7 +255,9 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
   function beginPlay() {
     paused = false;
     show("play");
-    water.start();
+    water.stop();
+    sneeze.stop();
+    active.start();
   }
 
   function showResult(info) {
@@ -245,7 +269,7 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
       stars: info.best?.stars || 0,
       score: info.best?.score || 0,
     });
-    root.querySelector(".arcade-close-line").textContent = t(WATER.closeKey);
+    root.querySelector(".arcade-close-line").textContent = t(activeMeta.closeKey);
     if (info.stars >= 1) play("star");
     root.querySelector("[data-arcade=again]").focus();
   }
@@ -255,14 +279,14 @@ export function createArcade({ setPaused, onReward, onClose, saucer }) {
     paused = on;
     if (on) {
       window.clearInterval(countTimer);
-      water.pause(true);
+      active.pause(true);
       root.querySelector("[data-panel=pause]").hidden = false;
       root.querySelector("[data-arcade=resume]").focus();
       return;
     }
     root.querySelector("[data-panel=pause]").hidden = true;
     if (phase === "count") countTimer = window.setInterval(stepCount, 400);
-    else water.pause(false);
+    else active.pause(false);
   }
 
   function park(on) {
@@ -371,6 +395,49 @@ export function selfTest() {
     const count = host.querySelectorAll("svg, svg *").length;
     game.stop();
     if (count > 150) errors.push(`svg nodes ${count}`);
+  }
+  if (windMs(false) !== 900 || windMs(true) !== 1350) errors.push("sneeze wind window");
+  if (gapFor(false, () => 0) !== 1200 || gapFor(false, () => 1) !== 2500) errors.push("sneeze calm gap");
+  if (gapFor(true, () => 0) !== 800 || gapFor(true, () => 1) !== 1600) errors.push("sneeze sprayed gap");
+  if (feverDelay(() => 0) !== 7000 || feverDelay(() => 1) !== 9000) errors.push("sneeze fever gap");
+  if (rollKind(() => 0) !== "yawn" || rollKind(() => 0.2) !== "wind") errors.push("sneeze yawn roll");
+  if (coneTargets(0).join(",") !== "1" || coneTargets(1).join(",") !== "0") errors.push("sneeze cone");
+  if (coneTargets(0).includes(2) || coneTargets(0).includes(3)) errors.push("sneeze cone hit a bystander");
+  const readyPick = pickReady([
+    { id: 0, mode: "idle", readyAt: 0, sprayed: false },
+    { id: 1, mode: "idle", readyAt: 0, sprayed: true },
+  ], () => 0);
+  if (readyPick !== 1) errors.push("sprayed seat was not next");
+  if (scoreFor("block", 1) !== 100 || scoreFor("block", 2) !== 110) errors.push("sneeze block score");
+  if (scoreFor("clutch", 1) !== 150 || scoreFor("fever", 1) !== 200) errors.push("sneeze special score");
+  const yawnTap = resolveTap({ mode: "yawn" }, 0, 4);
+  if (yawnTap.gain !== 0 || yawnTap.combo !== 0) errors.push("yawn changed the score");
+  const clutchTap = resolveTap({ mode: "wind", until: 1000 }, 850, 0);
+  if (clutchTap.kind !== "clutch" || clutchTap.gain !== 150) errors.push("clutch window");
+  const earlyTap = resolveTap({ mode: "wind", until: 1000 }, 100, 0);
+  if (earlyTap.kind !== "block" || earlyTap.gain !== 100) errors.push("early block");
+  if (sneezeStars({ blocked: 7, sprayed: 0, feverSeen: 0, feverSent: 0 }) !== 0) errors.push("sneeze star 0");
+  if (sneezeStars({ blocked: 8, sprayed: 3, feverSeen: 0, feverSent: 0 }) !== 1) errors.push("sneeze star 1");
+  if (sneezeStars({ blocked: 12, sprayed: 1, feverSeen: 1, feverSent: 0 }) !== 2) errors.push("sneeze star 2");
+  if (sneezeStars({ blocked: 16, sprayed: 0, feverSeen: 2, feverSent: 2 }) !== 3) errors.push("sneeze star 3");
+  if (sneezeStars({ blocked: 16, sprayed: 0, feverSeen: 1, feverSent: 0 }) !== 2) errors.push("missed fever still scored 3");
+  if (sneezeStars({ blocked: 16, sprayed: 1, feverSeen: 0, feverSent: 0 }) !== 2) errors.push("one spray scored 3");
+  for (const key of ["arcadeSneezeRule", "arcadeSneezeClose", "arcadeSneezeYawn", "arcadeSneezeFever"]) {
+    if (!POLITE.test(uiText("ja", key))) errors.push(`arcade ja ${key} is not polite`);
+  }
+  if (typeof document !== "undefined") {
+    const host = document.createElement("div");
+    const game = createSneeze(host, { play() {}, toast() {}, reduced: false, onFinish() {} });
+    game.start();
+    const seats = host.querySelectorAll("[data-seat]");
+    if (seats.length !== 6) errors.push(`sneeze seats ${seats.length}`);
+    for (const seat of seats) {
+      const count = seat.querySelectorAll("*").length + 1;
+      if (count > 12) errors.push(`sneeze nodes ${count}`);
+    }
+    const all = host.querySelectorAll("svg, svg *").length;
+    game.stop();
+    if (all > 150) errors.push(`sneeze svg ${all}`);
   }
   return errors;
 }

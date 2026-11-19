@@ -34,6 +34,7 @@ export const WATER = {
   titleKey: "arcadeWaterTitle",
   ruleKey: "arcadeWaterRule",
   closeKey: "arcadeWaterClose",
+  gestureKeys: ["arcadeLook", "arcadeTip", "arcadeToss", "arcadeScrub"],
   gates: [6, 9, 10],
 };
 
