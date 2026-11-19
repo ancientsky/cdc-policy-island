@@ -6029,9 +6029,17 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       }
       const dirCount = {};
       let widthSum = {};
+      if (importLanes.length !== importRoutes.length) errors.push(`import lanes ${importLanes.length} do not match the published routes`);
       for (const lane of importLanes) {
         dirCount[lane.dir] = (dirCount[lane.dir] || 0) + 1;
         widthSum[lane.dir] = (widthSum[lane.dir] || 0) + lane.mat.linewidth;
+        const published = importWidth(lane.cases);
+        if (typeof lane.cases !== "number" || !Number.isFinite(lane.cases) || !lane.source) {
+          errors.push(`lane ${lane.id} is missing a count or a source`);
+        }
+        if (Math.abs(lane.mat.linewidth - published) > 0.05) {
+          errors.push(`lane ${lane.id} width ${lane.mat.linewidth} is not ${published}`);
+        }
         if (lane.points.length < 2) errors.push(`lane ${lane.id} is short`);
         for (const point of lane.points) {
           if (diskHitsLand(point.x, point.z)) errors.push(`lane ${lane.id} meets land`);
@@ -6040,6 +6048,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       if (!(dirCount.west > (dirCount.south || 0) && dirCount.west > (dirCount.southwest || 0) && dirCount.west > (dirCount.north || 0))) {
         errors.push("west does not have the most import lanes");
       }
+      // Width follows the published count, so the south dengue line stays thicker than the two west lines together.
+      if (!(widthSum.south > widthSum.west)) errors.push("south import line is not thicker than the west lines together");
       for (const threat of threats) {
         if (threat.local) {
           if (threat.lane) errors.push(`local threat ${threat.key} has a sea lane`);
