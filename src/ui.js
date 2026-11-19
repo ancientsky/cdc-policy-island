@@ -177,19 +177,31 @@ export function mount({ scene, islands, flows }) {
   let clockSeen = state.minutes;
   const yawned = new Set();
   const STICKERS = [
-    ["fly", "stickerFlyMark", "stickerFly"],
-    ["saucer", "stickerSaucerMark", "stickerSaucer"],
-    ["night", "stickerNightMark", "stickerNight"],
-    ["repel", "stickerRepelMark", "stickerRepel"],
-    ["flock", "stickerFlockMark", "stickerFlock"],
-    ["mite", "stickerMiteMark", "stickerMite"],
-    ["lepto", "stickerLeptoMark", "stickerLepto"],
+    ["fly", "stickerFlyMark", "stickerFlyLine"],
+    ["saucer", "stickerSaucerMark", "stickerSaucerLine"],
+    ["night", "stickerNightMark", "stickerNightLine"],
+    ["repel", "stickerRepelMark", "stickerRepelLine"],
+    ["flock", "stickerFlockMark", "stickerFlockLine"],
+    ["hotline", "stickerHotlineMark", "stickerHotlineLine"],
+    ["dusk", "stickerDuskMark", "stickerDuskLine"],
+    ["mite", "stickerMiteMark", "stickerMiteLine"],
+    ["lepto", "stickerLeptoMark", "stickerLeptoLine"],
   ];
+  let stickerShown = "";
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
   passportHud.className = "passport-hud";
-  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="passport-bar" id="passport-bar"></span><span class="sticker-row" id="sticker-row"></span>`;
+  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="sticker-chip" id="sticker-chip"></span><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
   hud.append(passportHud);
+  const stickerPack = passportHud.querySelector("#sticker-pack");
+  stickerPack.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-sticker]");
+    if (button) openSticker(button.dataset.sticker);
+  });
+  stickerPack.addEventListener("focusin", (event) => {
+    const button = event.target.closest("[data-sticker]");
+    if (button) openSticker(button.dataset.sticker);
+  });
   const guide = document.createElement("section");
   guide.id = "guide";
   guide.className = "guide";
@@ -241,6 +253,39 @@ export function mount({ scene, islands, flows }) {
     const head = document.querySelector(".ledger-head");
     if (narrow && head) head.prepend(passportHud);
     else hud.insertBefore(passportHud, hud.querySelector(".disclaimer-short") || hud.children[1] || null);
+    placeStickers();
+  }
+
+  function placeStickers() {
+    const pack = document.getElementById("sticker-pack");
+    if (!pack) return;
+    const portrait = window.matchMedia("(max-width: 980px) and (orientation: portrait)").matches;
+    const expanded = ledger.classList.contains("open") || ledger.classList.contains("half");
+    if (portrait && expanded) {
+      const statsEl = $("stats");
+      if (statsEl) statsEl.after(pack);
+      pack.hidden = false;
+      return;
+    }
+    if (portrait) {
+      hud.append(pack);
+      pack.hidden = true;
+      return;
+    }
+    passportHud.append(pack);
+    pack.hidden = false;
+  }
+
+  function openSticker(id) {
+    const row = STICKERS.find(([key]) => key === id);
+    const line = document.getElementById("sticker-line");
+    if (!row || !line || !(book.eggs || {})[id]) return;
+    stickerShown = id;
+    line.hidden = false;
+    line.textContent = t(row[2]);
+    for (const button of document.querySelectorAll("#sticker-row [data-sticker]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.sticker === id));
+    }
   }
 
   function placeBadge() {
@@ -276,12 +321,33 @@ export function mount({ scene, islands, flows }) {
       book.islands[island.id] ? `<i style="background:${island.accent}"></i>` : "<i></i>"
     )).join("");
     const eggs = book.eggs || {};
-    const row = passportHud.querySelector(".sticker-row");
+    const got = STICKERS.filter(([id]) => eggs[id]);
+    const total = document.getElementById("sticker-total");
+    const chip = document.getElementById("sticker-chip");
+    const line = document.getElementById("sticker-line");
+    if (total) total.textContent = t("stickerTotal", { n: got.length });
+    if (chip) {
+      chip.textContent = `★${got.length}`;
+      chip.setAttribute("aria-label", t("stickerTotal", { n: got.length }));
+    }
+    const row = document.getElementById("sticker-row");
     if (row) {
-      row.innerHTML = STICKERS.filter(([id]) => eggs[id]).map(([, mark, title]) => (
-        `<i class="sticker" title="${esc(t(title))}">${esc(t(mark))}</i>`
+      row.innerHTML = got.map(([id, mark]) => (
+        `<button type="button" class="sticker" data-sticker="${esc(id)}" aria-pressed="${id === stickerShown}">${esc(t(mark))}</button>`
       )).join("");
     }
+    if (line) {
+      const open = got.find(([id]) => id === stickerShown);
+      if (open) {
+        line.hidden = false;
+        line.textContent = t(open[2]);
+      } else {
+        stickerShown = "";
+        line.hidden = true;
+        line.textContent = "";
+      }
+    }
+    placeStickers();
     stats.textContent = t("passportStats", {
       items: view.items,
       itemTotal: itemCount(),
@@ -531,7 +597,14 @@ export function mount({ scene, islands, flows }) {
     $("modal-kicker").textContent = t("guideName");
     $("modal-title").textContent = t("gradTitle");
     const seals = ordered.map((island) => `<i class="seal" style="${toneStyle(island)}">${esc(island.pin)}</i>`).join("");
-    $("modal-body").innerHTML = `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(t("gradBody"))}</p></div><div class="seals">${seals}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
+    const eggs = book.eggs || {};
+    const stickerGot = STICKERS.filter(([id]) => eggs[id]).length;
+    const stickerChips = STICKERS.map(([id, mark]) => (
+      eggs[id]
+        ? `<i class="sticker">${esc(t(mark))}</i>`
+        : `<i class="sticker miss" aria-hidden="true">?</i>`
+    )).join("");
+    $("modal-body").innerHTML = `<div class="sheet-say"><div class="guide-face">${esc(t("guideMark"))}</div><p class="guide-say">${esc(t("gradBody"))}</p></div><div class="seals">${seals}</div><div class="grad-stickers" aria-label="${esc(t("stickerTotal", { n: stickerGot }))}">${stickerChips}</div><p>${esc(t("gradRepel", { n: game.total }))}</p>`;
     $("modal-next").textContent = t("gradAgain");
     $("modal-skip").hidden = false;
     $("modal-skip").textContent = t("home");
@@ -1617,6 +1690,7 @@ export function mount({ scene, islands, flows }) {
     }
     syncDrawerButton();
     measureSafe();
+    placeStickers();
   });
   $("rail").addEventListener("click", (event) => {
     const button = event.target.closest("[data-rail]");
@@ -1943,6 +2017,7 @@ export function mount({ scene, islands, flows }) {
     } else return;
     syncDrawerButton();
     measureSafe();
+    placeStickers();
   });
   document.addEventListener("pointerdown", (event) => {
     if (!$("lang-pop").hidden && !event.target.closest("#lang-pop, #lang-btn")) {
