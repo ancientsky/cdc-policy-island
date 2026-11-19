@@ -661,6 +661,8 @@ html[data-theme="night"] .rail .btn.on { background: var(--teal); color: var(--o
   white-space: nowrap;
   pointer-events: none;
 }
+.threat-name.plate-hidden,
+.crew-label.plate-hidden { display: none !important; }
 .item-tip {
   font-size: var(--fs-sm);
   line-height: 1.3;
