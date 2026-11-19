@@ -321,7 +321,7 @@ export const islands = [
     href: "https://www.cdc.gov.tw/",
     hrefLabel: "疾管署首頁（查詢流感）",
     items: [
-      { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別", "感冒", "發燒", "咳嗽"], detail: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
+      { id: "flu-severe", name: "併發重症監視", phase: "now", hours: [[8, 18]], keywords: ["流感", "重症", "型別", "感冒", "發燒", "咳嗽", "候鳥", "禽流感", "雁鴨", "bird flu", "avian", "渡り鳥"], detail: "追蹤重症、死亡和病毒型別，判斷這一季的嚴重度，而不是只看門診擁擠。" },
       { id: "flu-drug", name: "抗病毒藥物", phase: "now", hours: [[9, 17]], keywords: ["抗病毒", "合約醫院", "庫存"], detail: "合約醫院的藥劑存量和效期要在流行期調得動。藥和疫苗是兩條補給線，不能互相替代。" },
       { id: "flu-cluster", name: "機構群聚", phase: "now", hours: [[9, 18]], keywords: ["護理之家", "群聚", "學校"], detail: "護理之家、學校和矯正機關出現群聚時，給採檢、給藥和隔離建議，並回報監測。" },
       { id: "flu-novel", name: "新型呼吸道腳本", phase: "near", hours: [[9, 17]], keywords: ["大流行", "新興", "腳本"], detail: "為流感大流行或新的呼吸道病毒預留監視、藥品和溝通腳本。整備計畫收到 2027，腳本要在那之前寫得能演練。" },

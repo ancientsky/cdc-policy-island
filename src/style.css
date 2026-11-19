@@ -1243,9 +1243,15 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   padding: 10px 12px;
   pointer-events: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   font: 700 var(--fs-md)/1.45 var(--sans);
+}
+.mile span { flex: 1; min-width: 0; }
+.mile .btn {
+  pointer-events: auto;
+  flex: 1 0 100%;
 }
 .sheet .stamp {
   position: absolute;

@@ -203,11 +203,18 @@ export function mount({ scene, islands, flows }) {
   mission.hidden = true;
   mission.setAttribute("aria-live", "polite");
   mission.innerHTML = `<div class="mission-rotator"><div class="mission-face mission-front"><b class="mission-kicker"></b><p class="mission-text"></p></div><div class="mission-face mission-back"><b class="mission-done"></b><p class="mission-next"></p></div></div>`;
-  const mile = document.createElement("p");
+  const mile = document.createElement("div");
   mile.id = "mile";
   mile.className = "mile";
   mile.hidden = true;
   hud.append(guide, mission, mile);
+  mile.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-flock-health]");
+    if (!button) return;
+    window.clearTimeout(mileTimer);
+    mile.hidden = true;
+    selectScenario("health", event);
+  });
   guide.addEventListener("keydown", (event) => {
     if (event.key !== "Tab" || guide.hidden) return;
     event.preventDefault();
@@ -342,21 +349,18 @@ export function mount({ scene, islands, flows }) {
     showMile("eggPipi");
   }
 
-  function openFlock(fromSearch) {
-    const fresh = markEgg(book, "flock");
-    if (fresh) paintPassport(false);
-    if (!fresh && fromSearch) return;
-    if (fresh) selectScenario("health");
+  function openFlock() {
+    if (markEgg(book, "flock")) paintPassport(false);
     showMile("eggFlock");
   }
 
   function noteFlock(value) {
     const q = String(value || "").trim().toLowerCase();
     if (!q) return;
-    const hit = q.includes("候鳥") || q.includes("禽流感") || q.includes("雁鴨") || q.includes("h7")
+    const hit = q.includes("候鳥") || q.includes("禽流感") || q.includes("雁鴨")
       || q.includes("avian") || q.includes("bird flu") || q.includes("渡り鳥");
     if (!hit) return;
-    openFlock(true);
+    openFlock();
   }
 
   function firstSentence(text) {
@@ -383,7 +387,10 @@ export function mount({ scene, islands, flows }) {
       const island = byId.get(mile.dataset.ask);
       text = firstSentence(island?.blurbKid || "");
     } else text = t(key, mileVars());
-    mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(text)}</span>`;
+    const action = key === "eggFlock"
+      ? `<button type="button" class="btn btn--solid" data-flock-health>${esc(t("flockHealth"))}</button>`
+      : "";
+    mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(text)}</span>${action}`;
   }
 
   function selectedIslandId() {
@@ -402,7 +409,8 @@ export function mount({ scene, islands, flows }) {
     mile.hidden = false;
     paintMile();
     window.clearTimeout(mileTimer);
-    mileTimer = window.setTimeout(() => { mile.hidden = true; }, 2400);
+    const wait = key === "eggFlock" ? 7000 : 2400;
+    mileTimer = window.setTimeout(() => { mile.hidden = true; }, wait);
   }
 
   function showSay(islandId) {
@@ -1391,7 +1399,7 @@ export function mount({ scene, islands, flows }) {
       return;
     }
     if (hit.kind === "egg" && hit.id === "flock") {
-      openFlock(false);
+      openFlock();
       return;
     }
     if (hit.kind === "egg" && (hit.id === "mite" || hit.id === "lepto")) {
