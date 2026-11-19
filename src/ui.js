@@ -4,6 +4,7 @@ import { MISSIONS } from "./missions.js";
 import { load as loadPassport, markEgg, markFlow as stampFlow, markItem as stampItem, markMission, reset as resetPassport, save as savePassport, stampIsland } from "./passport.js";
 import { bestOf, clearArcade, createArcade, starSum } from "./arcade.js";
 import { cardDate, clearPostcard, drawPostcard, holdToSave, loadPostcard, savePostcard } from "./postcard.js";
+import { clearSeason, isoDate, loadSeason, parseDay, pipiHome, saveSeason, seasonBoard, seasonById, seasonDone, seasonNoteKey, yearKey } from "./season.js";
 import { isOn, play as playSfx, toggle as toggleSound } from "./sfx.js";
 
 const SOUND_ON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M4 9.5h3.2L12 5.2v13.6l-4.8-4.3H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.2 9.2a3.6 3.6 0 0 1 0 5.6M17.6 7a6.4 6.4 0 0 1 0 10"/></svg>`;
@@ -195,7 +196,7 @@ export function mount({ scene, islands, flows, setPaused }) {
   const hud = document.querySelector(".hud");
   const passportHud = document.createElement("div");
   passportHud.className = "passport-hud";
-  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="arcade-stars" id="arcade-stars"></span><span class="sticker-chip" id="sticker-chip"></span><button type="button" class="btn postcard-go" id="postcard-go"></button><p class="postcard-hint" id="postcard-hint" hidden></p><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
+  passportHud.innerHTML = `<b class="passport-count" id="passport-count"></b><span class="arcade-stars" id="arcade-stars"></span><span class="sticker-chip" id="sticker-chip"></span><button type="button" class="btn postcard-go" id="postcard-go"></button><p class="postcard-hint" id="postcard-hint" hidden></p><span class="passport-bar" id="passport-bar"></span><span class="sticker-pack" id="sticker-pack"><span class="sticker-total" id="sticker-total"></span><span class="sticker-row" id="sticker-row"></span><span class="season-row" id="season-row"></span><span class="sticker-line" id="sticker-line" role="status" hidden></span></span>`;
   hud.append(passportHud);
   const postcard = document.createElement("section");
   postcard.id = "postcard";
@@ -210,13 +211,26 @@ export function mount({ scene, islands, flows, setPaused }) {
   let postcardReturn = null;
   let postcardLang = "";
   let postcardCard = loadPostcard();
+  const seasonDate = parseDay(cardDate(location.search)) || new Date();
+  const board = seasonBoard(seasonDate);
+  let seasonCard = loadSeason();
   passportHud.querySelector("#postcard-go").addEventListener("click", () => openPostcard("card"));
   const stickerPack = passportHud.querySelector("#sticker-pack");
   stickerPack.addEventListener("click", (event) => {
+    const seasonMark = event.target.closest("[data-season-sticker]");
+    if (seasonMark) {
+      openSeasonSticker(seasonMark.dataset.seasonSticker);
+      return;
+    }
     const button = event.target.closest("[data-sticker]");
     if (button) openSticker(button.dataset.sticker);
   });
   stickerPack.addEventListener("focusin", (event) => {
+    const seasonMark = event.target.closest("[data-season-sticker]");
+    if (seasonMark) {
+      openSeasonSticker(seasonMark.dataset.seasonSticker);
+      return;
+    }
     const button = event.target.closest("[data-sticker]");
     if (button) openSticker(button.dataset.sticker);
   });
@@ -234,7 +248,7 @@ export function mount({ scene, islands, flows, setPaused }) {
   mission.className = "mission";
   mission.hidden = true;
   mission.setAttribute("aria-live", "polite");
-  mission.innerHTML = `<div class="mission-rotator"><div class="mission-face mission-front"><b class="mission-kicker"></b><p class="mission-text"></p></div><div class="mission-face mission-back"><b class="mission-done"></b><p class="mission-next"></p></div></div>`;
+  mission.innerHTML = `<div class="mission-rotator"><div class="mission-face mission-front"><b class="mission-kicker"></b><p class="mission-text"></p></div><div class="mission-face mission-back"><b class="mission-done"></b><p class="mission-next"></p></div></div><p class="season-line" hidden></p>`;
   const mile = document.createElement("div");
   mile.id = "mile";
   mile.className = "mile";
@@ -242,13 +256,29 @@ export function mount({ scene, islands, flows, setPaused }) {
   mile.setAttribute("role", "status");
   mile.setAttribute("aria-live", "polite");
   hud.append(guide, mission, mile);
+  const seasonBtn = document.createElement("button");
+  seasonBtn.type = "button";
+  seasonBtn.id = "season-go";
+  seasonBtn.className = "btn";
+  seasonBtn.hidden = !board.theme;
+  hud.append(seasonBtn);
   mile.addEventListener("click", (event) => {
+    const look = event.target.closest("[data-season-look]");
+    if (look) {
+      const id = mile.dataset.island;
+      window.clearTimeout(mileTimer);
+      mile.hidden = true;
+      mile.classList.remove("is-season");
+      if (id) selectIsland(id);
+      return;
+    }
     const button = event.target.closest("[data-flock-health]");
     if (!button) return;
     window.clearTimeout(mileTimer);
     mile.hidden = true;
     selectScenario("health", event);
   });
+  seasonBtn.addEventListener("click", () => showSeasonMile(true));
   guide.addEventListener("keydown", (event) => {
     if (event.key !== "Tab" || guide.hidden) return;
     event.preventDefault();
@@ -262,6 +292,7 @@ export function mount({ scene, islands, flows, setPaused }) {
     paintMission();
     paintPins();
     advanceMissions();
+    showSeasonMile(false);
     selectIsland("border");
     focusSheetHeading();
   });
@@ -294,11 +325,40 @@ export function mount({ scene, islands, flows, setPaused }) {
     pack.hidden = false;
   }
 
+  function seasonMarks() {
+    return Object.keys(seasonCard.stickers).sort();
+  }
+
+  function seasonLabel(key) {
+    const year = key.slice(0, 4);
+    const season = seasonById(key.slice(5));
+    return season ? t(season.stickerKey, { year }) : key;
+  }
+
+  let seasonShown = "";
+
+  function openSeasonSticker(key) {
+    const line = document.getElementById("sticker-line");
+    const keys = seasonMarks();
+    if (!line || (key !== "all" && !seasonCard.stickers[key])) return;
+    seasonShown = key;
+    stickerShown = "";
+    line.hidden = false;
+    line.textContent = key === "all" ? keys.map(seasonLabel).join("、") : seasonLabel(key);
+    for (const button of document.querySelectorAll("#season-row [data-season-sticker]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.seasonSticker === key));
+    }
+    for (const button of document.querySelectorAll("#sticker-row [data-sticker]")) {
+      button.setAttribute("aria-pressed", "false");
+    }
+  }
+
   function openSticker(id) {
     const row = STICKERS.find(([key]) => key === id);
     const line = document.getElementById("sticker-line");
     if (!row || !line || !(book.eggs || {})[id]) return;
     stickerShown = id;
+    seasonShown = "";
     line.hidden = false;
     line.textContent = t(row[2]);
     for (const button of document.querySelectorAll("#sticker-row [data-sticker]")) {
@@ -356,15 +416,36 @@ export function mount({ scene, islands, flows, setPaused }) {
         `<button type="button" class="sticker" data-sticker="${esc(id)}" aria-pressed="${id === stickerShown}">${esc(t(mark))}</button>`
       )).join("");
     }
-    if (line) {
-      const open = got.find(([id]) => id === stickerShown);
-      if (open) {
-        line.hidden = false;
-        line.textContent = t(open[2]);
+    const marks = seasonMarks();
+    const seasonRow = document.getElementById("season-row");
+    if (seasonRow) {
+      if (marks.length > 6) {
+        seasonRow.innerHTML = `<button type="button" class="sticker" data-season-sticker="all" aria-pressed="${seasonShown === "all"}">${esc(t("seasonMore", { n: marks.length }))}</button>`;
       } else {
-        stickerShown = "";
-        line.hidden = true;
-        line.textContent = "";
+        seasonRow.innerHTML = marks.map((key) => (
+          `<button type="button" class="sticker" data-season-sticker="${esc(key)}" aria-pressed="${key === seasonShown}">${esc(seasonLabel(key))}</button>`
+        )).join("");
+      }
+      seasonRow.hidden = marks.length === 0;
+    }
+    if (line) {
+      if (seasonShown === "all") {
+        line.hidden = false;
+        line.textContent = marks.map(seasonLabel).join("、");
+      } else if (seasonShown && seasonCard.stickers[seasonShown]) {
+        line.hidden = false;
+        line.textContent = seasonLabel(seasonShown);
+      } else {
+        const open = got.find(([id]) => id === stickerShown);
+        if (open) {
+          line.hidden = false;
+          line.textContent = t(open[2]);
+        } else {
+          stickerShown = "";
+          seasonShown = "";
+          line.hidden = true;
+          line.textContent = "";
+        }
       }
     }
     placeStickers();
@@ -568,16 +649,18 @@ export function mount({ scene, islands, flows, setPaused }) {
   function paintPins() {
     const current = MISSIONS.find((row) => !book.missions[row.id]);
     const ping = Boolean(book.welcome) && current?.id === "m1";
+    const themeId = board.theme?.island || "";
     for (const el of document.querySelectorAll(".pin")) {
       el.classList.toggle("stamped", Boolean(book.islands[el.dataset.island]));
       el.classList.toggle("ping", ping && el.dataset.island === "watch");
+      el.classList.toggle("pin-season", el.dataset.island === themeId);
     }
   }
 
   function paintGuideCopy() {
     guide.querySelector("#guide-face").textContent = t("guideMark");
     guide.querySelector("#guide-title").textContent = t("guideTitle");
-    guide.querySelector("#guide-say").textContent = t("guideHello");
+    guide.querySelector("#guide-say").textContent = pipiHome(seasonDate) === "summer" ? t("seasonSummerHello") : t("guideHello");
     guide.querySelector("#guide-go").textContent = t("guideGo");
     const capFace = $("caption-face");
     if (capFace) capFace.textContent = t("guideMark");
@@ -602,13 +685,23 @@ export function mount({ scene, islands, flows, setPaused }) {
     if (guide.hidden) return;
     guide.hidden = true;
     $("help").focus({ preventScroll: true });
+    showSeasonMile(false);
   }
 
   function paintMission() {
     const current = MISSIONS.find((row) => !book.missions[row.id]);
-    const show = Boolean(book.welcome) && Boolean(current);
-    mission.hidden = !show;
+    const theme = board.theme;
+    const seasonOpen = Boolean(theme) && !seasonCard.stickers[yearKey(seasonDate, theme.id)];
+    const showMission = Boolean(book.welcome) && Boolean(current);
+    mission.hidden = guide.hidden ? !(showMission || seasonOpen) : true;
     mission.dataset.id = current ? current.id : "";
+    const line = mission.querySelector(".season-line");
+    const rotator = mission.querySelector(".mission-rotator");
+    if (line) {
+      line.hidden = !seasonOpen;
+      line.textContent = seasonOpen ? t(theme.taskKey, { year: String(seasonDate.getFullYear()) }) : "";
+    }
+    if (rotator) rotator.hidden = !showMission;
     if (!current) return;
     mission.querySelector(".mission-kicker").textContent = t("missionKicker");
     mission.querySelector(".mission-text").textContent = t(current.key);
@@ -664,6 +757,15 @@ export function mount({ scene, islands, flows, setPaused }) {
     return Math.min(9000, Math.max(3500, count * per));
   }
 
+  function seasonBubble() {
+    const theme = board.theme;
+    if (!theme) return "";
+    const year = String(seasonDate.getFullYear());
+    const notes = board.notes.map((item) => t(seasonNoteKey(item, seasonDate), { year }));
+    const gap = getLang() === "en" ? " " : "";
+    return [t(theme.sayKey, { year }), ...notes].join(gap);
+  }
+
   function mileCopy() {
     const key = mile.dataset.key;
     if (!key) return "";
@@ -683,10 +785,13 @@ export function mount({ scene, islands, flows, setPaused }) {
   function paintMile() {
     const key = mile.dataset.key;
     if (!key) return "";
-    const text = mileCopy();
+    const text = key === "season" ? seasonBubble() : mileCopy();
     const action = key === "eggFlock"
       ? `<button type="button" class="btn btn--solid" data-flock-health>${esc(t("flockHealth"))}</button>`
-      : "";
+      : key === "season"
+        ? `<button type="button" class="btn btn--solid" data-season-look>${esc(t("seasonLook"))}</button>`
+        : "";
+    mile.classList.toggle("is-season", key === "season");
     mile.innerHTML = `<i class="caption-face">${esc(t("guideMark"))}</i><span>${esc(text)}</span>${action}`;
     return text;
   }
@@ -699,9 +804,51 @@ export function mount({ scene, islands, flows, setPaused }) {
     return null;
   }
 
+  function showSeasonMile(force) {
+    const theme = board.theme;
+    if (!theme) return;
+    const key = yearKey(seasonDate, theme.id);
+    if (!force && seasonCard.seen[key] === isoDate(seasonDate)) return;
+    seasonCard.seen[key] = isoDate(seasonDate);
+    seasonCard = saveSeason(seasonCard);
+    mile.dataset.key = "season";
+    mile.dataset.island = theme.island;
+    delete mile.dataset.ask;
+    delete mile.dataset.vars;
+    mile.hidden = false;
+    paintMile();
+    window.clearTimeout(mileTimer);
+    mileTimer = window.setTimeout(() => {
+      mile.hidden = true;
+      mile.classList.remove("is-season");
+    }, 6000);
+  }
+
+  function grantSeason(silent) {
+    const theme = board.theme;
+    if (!theme) return false;
+    const key = yearKey(seasonDate, theme.id);
+    if (seasonCard.stickers[key] || !seasonDone(theme, book)) return false;
+    seasonCard.stickers[key] = Date.now();
+    seasonCard = saveSeason(seasonCard);
+    paintPassport(false);
+    paintMission();
+    if (!silent && (mile.hidden || mile.dataset.key !== "season")) {
+      showMile("seasonGot", { sticker: t(theme.stickerKey, { year: String(seasonDate.getFullYear()) }) });
+    }
+    return true;
+  }
+
+  function paintSeasonButton() {
+    seasonBtn.hidden = !board.theme;
+    seasonBtn.textContent = t("seasonGo");
+    seasonBtn.setAttribute("aria-label", t("seasonGo"));
+  }
+
   function showMile(key, vars) {
     mile.dataset.key = key;
     delete mile.dataset.ask;
+    delete mile.dataset.island;
     if (vars) mile.dataset.vars = JSON.stringify(vars);
     else delete mile.dataset.vars;
     mile.hidden = false;
@@ -927,8 +1074,9 @@ export function mount({ scene, islands, flows, setPaused }) {
     playStamp();
     const seen = Object.keys(book.islands).length;
     const mileKey = String(mile.dataset.key || "");
-    const eggOn = !mile.hidden && (mileKey.startsWith("egg") || mileKey === "say");
-    if ((seen === 1 || seen === 7) && !eggOn) showMile(seen === 1 ? "mile1" : "mile7");
+    const holdMile = !mile.hidden && (mileKey.startsWith("egg") || mileKey === "say" || mileKey === "season" || mileKey === "seasonGot");
+    if ((seen === 1 || seen === 7) && !holdMile) showMile(seen === 1 ? "mile1" : "mile7");
+    grantSeason(false);
     if (seen === 14 && !book.done) {
       book.done = true;
       savePassport(book);
@@ -1111,6 +1259,7 @@ export function mount({ scene, islands, flows, setPaused }) {
     paintRail();
     paintPassport(false);
     paintGuideCopy();
+    paintSeasonButton();
     paintMission();
     syncDrawerButton();
     markTabs(activeTabMark());
@@ -1811,6 +1960,7 @@ export function mount({ scene, islands, flows, setPaused }) {
       paintPassport(false);
       scene.revealForest(hit.id);
       showMile(hit.id === "mite" ? "eggMite" : "eggLepto");
+      if (hit.id === "lepto") grantSeason(false);
       return;
     }
     if (hit.kind === "item") selectItem(hit.islandId, hit.itemId);
@@ -2087,6 +2237,9 @@ export function mount({ scene, islands, flows, setPaused }) {
     clearArcade();
     clearPostcard();
     postcardCard = { v: 1, to: "family", sign: "", sent: 0 };
+    clearSeason();
+    seasonCard = { v: 1, seen: {}, stickers: {} };
+    seasonShown = "";
     scene.restoreSaucer();
     stampFreshId = null;
     cancelStamp();
@@ -2095,6 +2248,7 @@ export function mount({ scene, islands, flows, setPaused }) {
     paintPassport(false);
     paintPins();
     paintMission();
+    showSeasonMile(false);
   });
   modal.querySelector(".modal-card").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && event.target.tagName !== "BUTTON") {
@@ -2401,8 +2555,15 @@ export function mount({ scene, islands, flows, setPaused }) {
   window.addEventListener("resize", placePassport);
   window.addEventListener("resize", placeBadge);
   window.matchMedia("(pointer: coarse)").addEventListener("change", paintTicks);
+  scene.applySeason(board.theme ? board.theme.island : "");
+  scene.setPipiSeason(pipiHome(seasonDate));
+  grantSeason(true);
+  paintPins();
   if (!quiet && !book.welcome && !deepLink) showGuide();
-  else paintMission();
+  else {
+    paintMission();
+    window.setTimeout(() => showSeasonMile(false), 1200);
+  }
 
   $("source-link").href = SOURCE_INDEX;
   measureSafe();

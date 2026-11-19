@@ -15,6 +15,7 @@ import { createPeople } from "./people.js";
 import { bootQuality, gpuName, markQualityOk, noteQualityLoss, qualityText, settleQuality } from "./quality.js";
 import { textureCanvas } from "./canvas2d.js";
 import { play as playSfx } from "./sfx.js";
+import { seasonSelfTest } from "./season.js";
 import { Line2 } from "three/addons/lines/Line2.js";
 import { LineGeometry } from "three/addons/lines/LineGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
@@ -1316,6 +1317,7 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   let saucer = null;
   let pipi = null;
   let pipiMode = "hide";
+  let pipiSeason = "winter";
   let pipiU = 0.28;
   let pipiFlash = 0;
   let pipiCam = null;
@@ -4790,8 +4792,116 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     cam.phi = 0.95;
   }
 
+  function tintPipi(hex) {
+    if (!pipi) return;
+    pipi.group.traverse((child) => {
+      const mat = child.material;
+      if (!mat?.color) return;
+      if (mat.userData.pipiHex == null) mat.userData.pipiHex = mat.color.getHex();
+      mat.color.set(hex);
+    });
+  }
+
+  function restorePipiMats() {
+    if (!pipi) return;
+    pipi.group.traverse((child) => {
+      const mat = child.material;
+      if (!mat || mat.userData.pipiHex == null) return;
+      mat.color.setHex(mat.userData.pipiHex);
+    });
+  }
+
+  function parkWood() {
+    if (!pipi || pipiMode === "fly" || pipiMode === "flash") return false;
+    const view = views.get("watch");
+    if (!view) return false;
+    view.group.attach(pipi.group);
+    restPipiBody();
+    pipi.group.position.set(0.16, 1.28, 0.55);
+    pipi.group.rotation.set(0, 0, 0);
+    pipi.group.visible = true;
+    pipi.labelEl.textContent = t("eggPipiName");
+    tintPipi(P.wood);
+    if (perchLamp) perchLamp.visible = false;
+    pipiMode = "wood";
+    holdRender = Math.max(holdRender, 0.6);
+    return true;
+  }
+
+  function setPipiSeason(mode) {
+    pipiSeason = mode === "summer" ? "summer" : "winter";
+    if (pipiSeason === "summer") return parkWood();
+    if (pipiMode !== "wood") return false;
+    restorePipiMats();
+    pipiMode = "hide";
+    scene.attach(pipi.group);
+    pipi.group.visible = false;
+    if (perchLamp) perchLamp.visible = false;
+    return false;
+  }
+
+  function paintFlag(rec, hex, show) {
+    if (!rec) return;
+    rec.color.set(hex);
+    rec._colored = false;
+    // sync skips a record whose pose did not change, so a color-only write never lands.
+    rec._gen = -1;
+    if (show != null) rec.scaleMul = show ? 1 : 0;
+  }
+
+  function applySeason(islandId) {
+    for (const view of views.values()) {
+      const on = view.island.id === islandId;
+      for (const rec of view.group.userData.baseFlags || []) paintFlag(rec, on ? P.seasonFlag : P.cloth, null);
+      paintFlag(view.group.userData.seasonFlag, on ? P.seasonFlag : P.cloth, on);
+    }
+    kit.touch();
+    kit.sync();
+  }
+
+  function seasonFlagState(id) {
+    const view = views.get(id);
+    const rec = view?.group.userData.seasonFlag;
+    if (!rec) return null;
+    const sample = new THREE.Color();
+    const read = (item) => {
+      if (!item?.mesh?.getColorAt) return item?.color ? `#${item.color.getHexString()}` : "";
+      item.mesh.getColorAt(item.index, sample);
+      return `#${sample.getHexString()}`;
+    };
+    return {
+      mul: rec.scaleMul ?? 1,
+      color: read(rec),
+      bases: (view.group.userData.baseFlags || []).map(read),
+      amp: motion.uAmp.value,
+    };
+  }
+
+  function pipiState() {
+    let parent = "";
+    if (pipi) {
+      for (const [id, view] of views) {
+        if (view.group === pipi.group.parent) parent = id;
+      }
+    }
+    const body = pipi?.group.getObjectByName("body");
+    return {
+      mode: pipiMode,
+      season: pipiSeason,
+      parent,
+      visible: Boolean(pipi?.group.visible),
+      color: body?.material?.color ? `#${body.material.color.getHexString()}` : "",
+      y: pipi ? Number(pipi.group.position.y.toFixed(2)) : 0,
+    };
+  }
+
   function flyPipi() {
-    if (pipiMode === "fly" || pipiMode === "flash" || !pipi) return false;
+    if (!pipi) return false;
+    if (pipiSeason === "summer") {
+      if (pipiMode === "fly" || pipiMode === "flash") return false;
+      return parkWood();
+    }
+    if (pipiMode === "fly" || pipiMode === "flash") return false;
     const lane = northLane();
     if (!lane?.points?.length) return false;
     if (pipiMode === "perch") {
@@ -4888,9 +4998,10 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   function syncPipi(mins, islandId) {
     if (!pipi || pipiMode === "fly" || pipiMode === "flash") return false;
     const hour = clockHour(mins);
-    const want = islandId === "watch" && (hour >= 22 || hour < 5);
-    if (want) {
+    const wantNight = islandId === "watch" && (hour >= 22 || hour < 5);
+    if (wantNight) {
       if (pipiMode === "perch") return false;
+      restorePipiMats();
       const view = views.get("watch");
       if (!view) return false;
       view.group.attach(pipi.group);
@@ -4904,7 +5015,13 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
       holdRender = Math.max(holdRender, 0.6);
       return true;
     }
-    if (pipiMode === "perch") {
+    if (pipiSeason === "summer") {
+      if (pipiMode === "wood") return false;
+      parkWood();
+      return false;
+    }
+    if (pipiMode === "perch" || pipiMode === "wood") {
+      restorePipiMats();
       pipiMode = "hide";
       scene.attach(pipi.group);
       pipi.group.visible = false;
@@ -5682,6 +5799,13 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
   }
   lossReady = true;
 
+  if (import.meta.env.DEV) {
+    window.__island = Object.assign(window.__island ?? {}, {
+      seasonFlag: seasonFlagState,
+      pipiState,
+    });
+  }
+
   return {
     tick,
     resize,
@@ -5856,6 +5980,8 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     onRepel(fn) { repelCb = fn; },
     flyPipi,
     syncPipi,
+    applySeason,
+    setPipiSeason,
     tipSaucer,
     restoreSaucer,
     rideFlow,
@@ -5884,6 +6010,13 @@ export async function createScene(canvas, data, { reduced = false, rescue = fals
     },
     selfTest() {
       const errors = [];
+      errors.push(...seasonSelfTest());
+      let flagMeshes = 0;
+      scene.traverse((obj) => { if (obj.name === "kit-flag") flagMeshes += 1; });
+      if (flagMeshes !== 1) errors.push(`flag meshes ${flagMeshes}`);
+      let seasonFlags = 0;
+      for (const view of views.values()) if (view.group.userData.seasonFlag) seasonFlags += 1;
+      if (seasonFlags !== 14) errors.push(`season flags ${seasonFlags}`);
       const strictFlows = flowViews.filter((route) => route.line.visible === true).length;
       let drawnLines = 0;
       for (const route of flowViews) {
@@ -6396,8 +6529,10 @@ function addKit(group, island, lamps, kit, life) {
     if (glow) lamps.push(rec);
     return rec;
   };
+  const baseFlags = [];
+  group.userData.baseFlags = baseFlags;
   function putFlag(x, y, z) {
-    kit.part({
+    const rec = kit.part({
       kind: "flag",
       parent: group,
       x: x + 0.09,
@@ -6406,6 +6541,8 @@ function addKit(group, island, lamps, kit, life) {
       color: P.cloth,
       alive,
     });
+    baseFlags.push(rec);
+    return rec;
   }
   if (island.kit === "port") {
     put("box", P.c8d6244, 0, 0.22, -MESH_R * 0.15, 0.36, 0.08, 1.35);
@@ -6473,4 +6610,15 @@ function addKit(group, island, lamps, kit, life) {
   } else if (island.kit === "houses") {
     put("box", P.cefe6d4, 0, 0.66, -0.32, 0.7, 0.28, 0.34);
   }
+  const seasonFlag = kit.part({
+    kind: "flag",
+    parent: group,
+    x: 0.42,
+    y: 1.22,
+    z: 0.28,
+    color: P.cloth,
+    alive,
+  });
+  seasonFlag.scaleMul = 0;
+  group.userData.seasonFlag = seasonFlag;
 }

@@ -1101,6 +1101,14 @@ body.gl-lost .veil { visibility: hidden; pointer-events: none; }
   white-space: nowrap;
 }
 .pin.named em { display: block; }
+.pin.pin-season::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--teal);
+  display: block;
+}
 .pin.dim { opacity: 0.38; }
 .pin.spot { opacity: 0.25; }
 .pin.occluded { opacity: 0.25; }
@@ -1209,8 +1217,10 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 }
 .sticker-line[hidden] { display: none !important; }
 .ledger .sticker-pack { max-width: 100%; color: var(--ink); margin: 0 0 6px; }
-.sticker-row { display: inline-flex; flex-wrap: wrap; gap: 3px; pointer-events: auto; }
+.sticker-row, .season-row { display: inline-flex; flex-wrap: wrap; gap: 3px; pointer-events: auto; }
+.season-row[hidden] { display: none !important; }
 .sticker-row button.sticker,
+.season-row button.sticker,
 .grad-stickers .sticker {
   min-width: 16px;
   height: 16px;
@@ -1223,8 +1233,10 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   text-align: center;
   text-shadow: none;
 }
-.sticker-row button.sticker { margin: 0; cursor: pointer; appearance: none; }
-.sticker-row button.sticker:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.sticker-row button.sticker,
+.season-row button.sticker { margin: 0; cursor: pointer; appearance: none; white-space: nowrap; }
+.sticker-row button.sticker:focus-visible,
+.season-row button.sticker:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 .grad-stickers { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
 .grad-stickers .sticker.miss { background: var(--line); color: var(--muted); }
 .ledger-head .passport-hud {
@@ -1309,6 +1321,29 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
   pointer-events: auto;
   flex: 1 0 100%;
 }
+.mile.is-season { animation: mile-fade 200ms linear; }
+@keyframes mile-fade { from { opacity: 0; } to { opacity: 1; } }
+.season-line {
+  margin: 0;
+  padding: 8px 14px 12px;
+  font: 700 var(--fs-sm)/1.45 var(--sans);
+  color: var(--ink);
+}
+.mission .season-line[hidden],
+.mission .mission-rotator[hidden] { display: none !important; }
+#season-go {
+  position: absolute;
+  z-index: 5;
+  top: 72px;
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: var(--fs-xs);
+}
+#season-go[hidden] { display: none !important; }
 .sheet .stamp {
   position: absolute;
   top: 14px;
@@ -1694,6 +1729,10 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 }
 
 @media (max-width: 980px) {
+  #season-go {
+    top: calc(64px + env(safe-area-inset-top));
+    left: calc(8px + env(safe-area-inset-left));
+  }
   .guide, .mission {
     left: 8px;
     right: auto;
@@ -1706,12 +1745,13 @@ html[data-theme="night"] .pin.hot b { background: var(--c-ink, var(--c, var(--te
 }
 
 @media (max-width: 420px) {
+  #season-go { top: calc(118px + env(safe-area-inset-top)); }
   .title-card,
   .guide,
   .mission,
   .chapter,
   .repel-count,
-  .view-menu { top: calc(156px + env(safe-area-inset-top)); }
+  .view-menu { top: calc(166px + env(safe-area-inset-top)); }
 }
 @media (min-width: 981px) {
   body.detail .guide, body.detail .mission { left: 412px; }

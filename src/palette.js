@@ -91,6 +91,8 @@ export const reed = "#8eaa72";
 export const bucket = "#c5d4d8";
 export const crate = "#c4a484";
 export const cloth = "#e7d3c4";
+// Season flag. sRGB S about 0.17, L about 0.49. Not emissive.
+export const seasonFlag = "#7f9468";
 export const cross = "#c98980";
 export const bamboo = "#c4b07a";
 export const glowLamp = "#ffc27a";
